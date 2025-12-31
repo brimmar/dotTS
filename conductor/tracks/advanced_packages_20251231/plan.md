@@ -15,6 +15,6 @@
 - [x] Task: Update `PackageResource` to skip `apply` if package is already found on system [453b508]
 - [x] Task: Conductor - User Manual Verification 'Phase 3: System Idempotency' (Protocol in workflow.md)
 
-## Phase 4: Versioning Support
+## Phase 4: Versioning Support [checkpoint: a2d2fb1]
 - [x] Task: Add versioning support to `PackageResourceProps` and provider commands [7e0849e]
-- [~] Task: Conductor - User Manual Verification 'Phase 4: Versioning' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Versioning' (Protocol in workflow.md)
