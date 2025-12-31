@@ -2,7 +2,7 @@
 
 ## Phase 1: State Service & Hashing
 - [x] Task: Implement `StateService` for loading and saving `.dotts/state.json` [7259ce4]
-- [ ] Task: Implement a hashing utility to generate unique signatures for resource configurations
+- [x] Task: Implement a hashing utility to generate unique signatures for resource configurations [9ba4f59]
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: State Service' (Protocol in workflow.md)
 
 ## Phase 2: Resource Lifecycle (Destroy)
