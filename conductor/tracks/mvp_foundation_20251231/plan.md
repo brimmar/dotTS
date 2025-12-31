@@ -8,7 +8,7 @@
 ## Phase 2: Configuration Schema
 - [x] Task: Define the Zod schema for dotfile configuration (packages, files, symlinks) [681844b]
 - [x] Task: Create TypeScript types derived from the Zod schema [b4af98e]
-- [ ] Task: Write tests for configuration validation
+- [x] Task: Write tests for configuration validation [faf5592]
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Configuration Schema' (Protocol in workflow.md)
 
 ## Phase 3: Implement `init` Command
