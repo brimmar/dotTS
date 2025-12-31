@@ -10,10 +10,10 @@
 - [x] Task: Implement new providers for `Cargo` and `Pip` [f59438d]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Provider Abstraction' (Protocol in workflow.md)
 
-## Phase 3: System-State Idempotency
+## Phase 3: System-State Idempotency [checkpoint: 901d011]
 - [x] Task: Implement `isInstalled` check for all providers using system commands [453b508]
 - [x] Task: Update `PackageResource` to skip `apply` if package is already found on system [453b508]
-- [~] Task: Conductor - User Manual Verification 'Phase 3: System Idempotency' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: System Idempotency' (Protocol in workflow.md)
 
 ## Phase 4: Versioning Support
 - [ ] Task: Add versioning support to `PackageResourceProps` and provider commands
