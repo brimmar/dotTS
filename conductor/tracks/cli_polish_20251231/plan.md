@@ -12,6 +12,6 @@
 - [x] Task: Implement `dotts doctor` command with system environment checks [23e1705]
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Doctor Command' (Protocol in workflow.md)
 
-## Phase 4: Enhanced Error Reporting
+## Phase 4: Enhanced Error Reporting [checkpoint: 7305a92]
 - [x] Task: Implement user-friendly error formatting for Runner and CLI exceptions [dfdb3ad]
-- [~] Task: Conductor - User Manual Verification 'Phase 4: Error Handling' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Error Handling' (Protocol in workflow.md)
