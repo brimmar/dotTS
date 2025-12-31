@@ -2,8 +2,8 @@
 
 ## Phase 1: Platform Awareness
 - [x] Task: Implement `PlatformService` for OS and Linux distribution detection [1d91577]
-- [ ] Task: Update `PackageResource` to use `PlatformService` for smart default manager selection
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Platform Awareness' (Protocol in workflow.md)
+- [x] Task: Update `PackageResource` to use `PlatformService` for smart default manager selection [5cbd86d]
+- [~] Task: Conductor - User Manual Verification 'Phase 1: Platform Awareness' (Protocol in workflow.md)
 
 ## Phase 2: Provider Abstraction
 - [ ] Task: Implement `PackageProvider` interface and refactor existing managers into providers
