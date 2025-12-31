@@ -10,8 +10,8 @@
 - [x] Task: Implement `destroy()` for `FileResource`, `SymlinkResource`, and `PackageResource` [e8e1024]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Resource Lifecycle' (Protocol in workflow.md)
 
-## Phase 3: Runner Orchestration
+## Phase 3: Runner Orchestration [checkpoint: 215b4c2]
 - [x] Task: Update `Runner` to compute the diff between desired config and existing state [84b5f2d]
 - [x] Task: Implement the execution logic for Create, Update, and Delete actions in the `Runner` [84b5f2d]
 - [x] Task: Update the CLI `apply` output to display resource action status (e.g., + Create, ~ Update, - Delete) [84b5f2d]
-- [~] Task: Conductor - User Manual Verification 'Phase 3: Runner Orchestration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Runner Orchestration' (Protocol in workflow.md)
