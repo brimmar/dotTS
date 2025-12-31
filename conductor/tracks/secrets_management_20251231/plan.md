@@ -2,7 +2,7 @@
 
 ## Phase 1: Secret Storage & Encryption
 - [x] Task: Implement a `SecretStore` service using Node's `crypto` module for encryption/decryption [46e6f69]
-- [ ] Task: Implement storage logic to save/load encrypted secrets from `.dotts/secrets.json`
+- [x] Task: Implement storage logic to save/load encrypted secrets from `.dotts/secrets.json` [fd7862f]
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Secret Storage' (Protocol in workflow.md)
 
 ## Phase 2: CLI Secret Management
