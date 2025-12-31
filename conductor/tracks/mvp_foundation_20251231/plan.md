@@ -17,7 +17,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Implement init Command' (Protocol in workflow.md)
 
 ## Phase 4: Implement Basic `apply` Command
-- [ ] Task: Write Tests for `dotts apply` (loading configuration and validating structure)
+- [x] Task: Write Tests for `dotts apply` (loading configuration and validating structure) [12e4e73]
 - [ ] Task: Implement configuration loading mechanism using Bun.build or direct import
 - [ ] Task: Implement `dotts apply` (basic logging of actions to be taken)
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Implement Basic apply Command' (Protocol in workflow.md)
