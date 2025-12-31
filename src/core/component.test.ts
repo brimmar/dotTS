@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'bun:test';
 import { Component, Resource } from './component';
 
+import { Effect } from 'effect';
+
 class TestResource extends Resource {
   constructor(scope: Component, id: string) {
     super(scope, id);
+  }
+
+  apply() {
+    return Effect.void;
   }
 }
 

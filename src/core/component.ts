@@ -1,3 +1,5 @@
+import { Effect } from 'effect';
+
 export abstract class Component {
   public readonly children: Component[] = [];
 
@@ -15,4 +17,6 @@ export abstract class Resource extends Component {
     super(id);
     scope.add(this);
   }
+
+  abstract apply(): Effect.Effect<void, Error>;
 }
