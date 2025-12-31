@@ -1,0 +1,8 @@
+{
+  "track_id": "state_management_20251231",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2025-12-31T15:00:00Z",
+  "updated_at": "2025-12-31T15:00:00Z",
+  "description": "Implement state tracking to enable garbage collection of removed resources and idempotency for existing ones."
+}
