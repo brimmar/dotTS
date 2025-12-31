@@ -23,4 +23,11 @@ export class SymlinkResource extends Resource {
       yield* _(fs.symlink(this.props.source, this.props.path));
     });
   }
+
+  destroy() {
+    return Effect.gen(this, function* (_) {
+      const fs = yield* _(FileSystem);
+      yield* _(fs.unlink(this.props.path));
+    });
+  }
 }

@@ -21,19 +21,26 @@ export class FileResource extends Resource {
   }
 
   apply() {
-    return Effect.gen(this, function* (_) {
-      const fs = yield* _(FileSystem);
-      const sm = yield* _(SecretManager);
+    return Effect.gen(this, function* () {
+      const fs = yield* FileSystem;
+      const sm = yield* SecretManager;
       
       let content: string;
       if (this.props.content instanceof SecretToken) {
-        content = yield* _(sm.get(this.props.content.name));
+        content = yield* sm.get(this.props.content.name);
       } else {
         content = this.props.content;
       }
 
-      yield* _(fs.mkdir(dirname(this.props.path)));
-      yield* _(fs.writeFile(this.props.path, content));
+      yield* fs.mkdir(dirname(this.props.path));
+      yield* fs.writeFile(this.props.path, content);
+    });
+  }
+
+  destroy() {
+    return Effect.gen(this, function* () {
+      const fs = yield* FileSystem;
+      yield* fs.rm(this.props.path);
     });
   }
 }

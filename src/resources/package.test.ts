@@ -31,4 +31,31 @@ describe('PackageResource', () => {
     
     expect(executedCommand).toBe('brew install neovim');
   });
+
+  it('should execute the correct uninstall command on destroy', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    
+    let executedCommand = '';
+    const SystemCommandMock = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: (command) => Effect.sync(() => { 
+          executedCommand = command; 
+          return ''; 
+        })
+      })
+    );
+
+    const pkgRes = new PackageResource(stack, 'my-pkg', {
+      name: 'neovim',
+      manager: 'brew',
+    });
+
+    const program = pkgRes.destroy();
+    
+    await Effect.runPromise(Effect.provide(program, SystemCommandMock));
+    
+    expect(executedCommand).toBe('brew uninstall neovim');
+  });
 });

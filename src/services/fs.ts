@@ -2,16 +2,17 @@ import { Context, Effect, Layer } from 'effect';
 import * as NodeFS from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-export class FileSystem extends Context.Tag('FileSystem')<
-  FileSystem,
-  {
-    readonly writeFile: (path: string, content: string) => Effect.Effect<void, Error>;
-    readonly readFile: (path: string) => Effect.Effect<string, Error>;
-    readonly exists: (path: string) => Effect.Effect<boolean, Error>;
-    readonly mkdir: (path: string) => Effect.Effect<void, Error>;
-    readonly symlink: (target: string, path: string) => Effect.Effect<void, Error>;
-  }
->() {}
+export interface FileSystem {
+  readonly writeFile: (path: string, content: string) => Effect.Effect<void, Error>;
+  readonly readFile: (path: string) => Effect.Effect<string, Error>;
+  readonly exists: (path: string) => Effect.Effect<boolean, Error>;
+  readonly mkdir: (path: string) => Effect.Effect<void, Error>;
+  readonly symlink: (target: string, path: string) => Effect.Effect<void, Error>;
+  readonly rm: (path: string) => Effect.Effect<void, Error>;
+  readonly unlink: (path: string) => Effect.Effect<void, Error>;
+}
+
+export const FileSystem = Context.GenericTag<FileSystem>('FileSystem');
 
 export const FileSystemLive = Layer.succeed(
   FileSystem,
@@ -52,6 +53,16 @@ export const FileSystemLive = Layer.succeed(
            await NodeFS.symlink(target, path);
         },
         catch: (error) => new Error(`Failed to create symlink ${path} -> ${target}: ${String(error)}`),
+      }),
+    rm: (path) =>
+      Effect.tryPromise({
+        try: () => NodeFS.rm(path, { force: true, recursive: true }),
+        catch: (error) => new Error(`Failed to remove ${path}: ${String(error)}`),
+      }),
+    unlink: (path) =>
+      Effect.tryPromise({
+        try: () => NodeFS.unlink(path),
+        catch: (error) => new Error(`Failed to unlink ${path}: ${String(error)}`),
       }),
   })
 );

@@ -19,5 +19,6 @@ export abstract class Resource extends Component {
   }
 
   abstract apply(): Effect.Effect<void, Error>;
+  abstract destroy(): Effect.Effect<void, Error>;
   abstract hash(): string;
 }

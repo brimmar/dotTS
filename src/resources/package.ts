@@ -5,7 +5,7 @@ import { hashConfig } from '../core/hash';
 
 export interface PackageResourceProps {
   name: string;
-  manager: 'brew' | 'apt' | 'npm';
+  manager: 'brew' | 'apt' | 'npm' | 'pacman' | 'bun';
 }
 
 export class PackageResource extends Resource {
@@ -25,6 +25,14 @@ export class PackageResource extends Resource {
     });
   }
 
+  destroy() {
+    return Effect.gen(this, function* (_) {
+      const exec = yield* _(SystemCommand);
+      const command = this.getUninstallCommand();
+      yield* _(exec.run(command));
+    });
+  }
+
   private getInstallCommand(): string {
     switch (this.props.manager) {
       case 'brew':
@@ -37,6 +45,21 @@ export class PackageResource extends Resource {
         return `bun add -g ${this.props.name}`;
       case 'npm':
         return `npm install -g ${this.props.name}`;
+    }
+  }
+
+  private getUninstallCommand(): string {
+    switch (this.props.manager) {
+      case 'brew':
+        return `brew uninstall ${this.props.name}`;
+      case 'apt':
+        return `sudo apt-get remove -y ${this.props.name}`;
+      case 'pacman':
+        return `sudo pacman -Rs --noconfirm ${this.props.name}`;
+      case 'bun':
+        return `bun remove -g ${this.props.name}`;
+      case 'npm':
+        return `npm uninstall -g ${this.props.name}`;
     }
   }
 }

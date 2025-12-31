@@ -1,33 +1,61 @@
 import { describe, it, expect } from 'bun:test';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import { App, Stack } from '../core/app';
 import { FileResource } from './file';
-import { FileSystem, FileSystemLive } from '../services/fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
-import { rm, readFile } from 'fs/promises';
+import { FileSystem } from '../services/fs';
+import { SecretManager } from '../services/secrets-manager';
 
 describe('FileResource', () => {
-  const testDir = join(tmpdir(), 'dotts-file-res-test-' + Math.random().toString(36).slice(2));
+  const MockFS = (state: any) => Layer.succeed(FileSystem, FileSystem.of({
+    writeFile: (path, content) => Effect.sync(() => { state.writtenPath = path; state.writtenContent = content; state.exists = true; }),
+    readFile: () => Effect.succeed(''),
+    exists: () => Effect.sync(() => state.exists),
+    mkdir: () => Effect.void,
+    symlink: () => Effect.void,
+    rm: () => Effect.sync(() => { state.exists = false; }),
+    unlink: () => Effect.sync(() => { state.exists = false; }),
+  }));
 
-  it('should write file content to the specified path', async () => {
+  const MockSM = Layer.succeed(SecretManager, SecretManager.of({
+    get: (name) => Effect.succeed('secret-val'),
+    set: () => Effect.void,
+    list: () => Effect.succeed([]),
+    setPaths: () => Effect.void,
+  }));
+
+  it('should write file content', async () => {
+    const state = { writtenPath: '', writtenContent: '', exists: false };
     const app = new App();
     const stack = new Stack(app, 'test');
-    const filePath = join(testDir, 'test-file.txt');
-    const content = 'hello resource';
+    const fileRes = new FileResource(stack, 'my-file', { path: '/tmp/test.txt', content: 'hello' });
+
+    await Effect.runPromise(
+      Effect.provide(fileRes.apply(), Layer.mergeAll(MockFS(state), MockSM))
+    );
     
-    const fileRes = new FileResource(stack, 'my-file', {
-      path: filePath,
-      content: content,
+    expect(state.writtenPath).toBe('/tmp/test.txt');
+    expect(state.writtenContent).toBe('hello');
+  });
+
+  it('should remove the file on destroy', async () => {
+    const state = { exists: true };
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const fileRes = new FileResource(stack, 'test-file', { path: '/tmp/test.txt', content: 'to be deleted' });
+
+    const program = Effect.gen(function* () {
+      const fs = yield* FileSystem;
+      const existsBefore = yield* fs.exists('/tmp/test.txt');
+      yield* fileRes.destroy();
+      const existsAfter = yield* fs.exists('/tmp/test.txt');
+      return { existsBefore, existsAfter };
     });
 
-    const program = fileRes.apply();
-    
-    await Effect.runPromise(Effect.provide(program, FileSystemLive));
-    
-    const actualContent = await readFile(filePath, 'utf-8');
-    expect(actualContent).toBe(content);
+    const { existsBefore, existsAfter } = await Effect.runPromise(
+      Effect.provide(program, Layer.mergeAll(MockFS(state), MockSM))
+    );
 
-    await rm(testDir, { recursive: true, force: true });
+    expect(existsBefore).toBe(true);
+    expect(existsAfter).toBe(false);
   });
 });
