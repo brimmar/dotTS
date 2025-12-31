@@ -18,6 +18,6 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Core Primitive Components' (Protocol in workflow.md)
 
 ## Phase 4: CLI Integration & Dry Run
-- [ ] Task: Refactor `dotts apply` to accept a `--dry-run` flag
+- [x] Task: Refactor `dotts apply` to accept a `--dry-run` flag [b10f179]
 - [ ] Task: Wire the Runner into the CLI to execute the plan (or log it for dry-run)
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: CLI Integration' (Protocol in workflow.md)
