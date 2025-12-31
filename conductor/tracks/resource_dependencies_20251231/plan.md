@@ -1,8 +1,8 @@
 # Plan: Resource Dependencies & Ordering
 
 ## Phase 1: Dependency Core
-- [ ] Task: Update `Component` and `Resource` to support `addDependency` and `dependsOn` property
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Dependency Core' (Protocol in workflow.md)
+- [x] Task: Update `Component` and `Resource` to support `addDependency` and `dependsOn` property [12cad97]
+- [~] Task: Conductor - User Manual Verification 'Phase 1: Dependency Core' (Protocol in workflow.md)
 
 ## Phase 2: Graph Sorting Engine
 - [ ] Task: Implement a topological sort algorithm to order resources correctly
