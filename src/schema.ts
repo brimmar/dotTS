@@ -21,3 +21,8 @@ export const DottsSchema = z.object({
   symlinks: z.array(SymlinkSchema).default([]),
   files: z.array(FileSchema).default([]),
 });
+
+export type Package = z.infer<typeof PackageSchema>;
+export type Symlink = z.infer<typeof SymlinkSchema>;
+export type File = z.infer<typeof FileSchema>;
+export type Dotts = z.infer<typeof DottsSchema>;
