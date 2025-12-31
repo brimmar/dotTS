@@ -11,6 +11,6 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: CLI Secret Management' (Protocol in workflow.md)
 
 ## Phase 3: Component Integration
-- [ ] Task: Implement a `Secret` resolution helper `config.secret(name)`
+- [x] Task: Implement a `Secret` resolution helper `config.secret(name)` [33ba789]
 - [ ] Task: Update `Runner` to resolve secrets before applying resources
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Component Integration' (Protocol in workflow.md)
