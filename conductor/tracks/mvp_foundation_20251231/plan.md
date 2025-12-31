@@ -11,10 +11,10 @@
 - [x] Task: Write tests for configuration validation [faf5592]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Configuration Schema' (Protocol in workflow.md)
 
-## Phase 3: Implement `init` Command
+## Phase 3: Implement `init` Command [checkpoint: 9989f57]
 - [x] Task: Write Tests for `dotts init` command (creating folder structure and `dotts.ts` template) [81fb9fd]
 - [x] Task: Implement `dotts init` command [ab43275]
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Implement init Command' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Implement init Command' (Protocol in workflow.md)
 
 ## Phase 4: Implement Basic `apply` Command
 - [ ] Task: Write Tests for `dotts apply` (loading configuration and validating structure)
