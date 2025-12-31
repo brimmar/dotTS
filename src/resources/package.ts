@@ -3,10 +3,14 @@ import { Resource, Component } from '../core/component';
 import { SystemCommand } from '../services/exec';
 import { PlatformService } from '../services/platform';
 import { hashConfig } from '../core/hash';
+import { PackageProvider } from './package/provider';
+import { BrewProvider, AptProvider, PacmanProvider, BunProvider, NpmProvider, CargoProvider, PipProvider } from './package/providers/common';
+
+export type PackageManager = 'brew' | 'apt' | 'npm' | 'pacman' | 'bun' | 'cargo' | 'pip';
 
 export interface PackageResourceProps {
   name: string;
-  manager?: 'brew' | 'apt' | 'npm' | 'pacman' | 'bun';
+  manager?: PackageManager;
 }
 
 export class PackageResource extends Resource {
@@ -20,27 +24,25 @@ export class PackageResource extends Resource {
 
   apply() {
     return Effect.gen(this, function* () {
-      const exec = yield* SystemCommand;
       const platform = yield* PlatformService;
-      
       const manager = yield* this.resolveManager(platform);
-      const command = this.getInstallCommand(manager);
-      yield* exec.run(command);
+      const provider = this.getProvider(manager);
+      
+      yield* provider.install(this.props.name);
     });
   }
 
   destroy() {
     return Effect.gen(this, function* () {
-      const exec = yield* SystemCommand;
       const platform = yield* PlatformService;
-      
       const manager = yield* this.resolveManager(platform);
-      const command = this.getUninstallCommand(manager);
-      yield* exec.run(command);
+      const provider = this.getProvider(manager);
+      
+      yield* provider.uninstall(this.props.name);
     });
   }
 
-  private resolveManager(platform: PlatformService): Effect.Effect<'brew' | 'apt' | 'npm' | 'pacman' | 'bun', Error> {
+  private resolveManager(platform: PlatformService): Effect.Effect<PackageManager, Error> {
     if (this.props.manager) {
       return Effect.succeed(this.props.manager);
     }
@@ -56,35 +58,15 @@ export class PackageResource extends Resource {
     });
   }
 
-  private getInstallCommand(manager: string): string {
+  private getProvider(manager: PackageManager): PackageProvider {
     switch (manager) {
-      case 'brew':
-        return `brew install ${this.props.name}`;
-      case 'apt':
-        return `sudo apt install -y ${this.props.name}`;
-      case 'pacman':
-        return `sudo pacman -S --noconfirm ${this.props.name}`;
-      case 'bun':
-        return `bun add -g ${this.props.name}`;
-      case 'npm':
-        return `npm install -g ${this.props.name}`;
-      default:
-        throw new Error(`Unsupported package manager: ${manager}`);
-    }
-  }
-
-  private getUninstallCommand(manager: string): string {
-    switch (manager) {
-      case 'brew':
-        return `brew uninstall ${this.props.name}`;
-      case 'apt':
-        return `sudo apt-get remove -y ${this.props.name}`;
-      case 'pacman':
-        return `sudo pacman -Rs --noconfirm ${this.props.name}`;
-      case 'bun':
-        return `bun remove -g ${this.props.name}`;
-      case 'npm':
-        return `npm uninstall -g ${this.props.name}`;
+      case 'brew': return new BrewProvider();
+      case 'apt': return new AptProvider();
+      case 'pacman': return new PacmanProvider();
+      case 'bun': return new BunProvider();
+      case 'npm': return new NpmProvider();
+      case 'cargo': return new CargoProvider();
+      case 'pip': return new PipProvider();
       default:
         throw new Error(`Unsupported package manager: ${manager}`);
     }
