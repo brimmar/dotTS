@@ -6,13 +6,9 @@ import { dottsApply } from './commands/apply';
 
 describe('dotts apply', () => {
   const testDir = join(tmpdir(), 'dotts-apply-test-' + Math.random().toString(36).slice(2));
-  const configPath = join(testDir, 'dotts.ts');
-
-  afterEach(async () => {
-    await rm(testDir, { recursive: true, force: true });
-  });
 
   it('should load and validate a dotts.ts file', async () => {
+    const configPath = join(testDir, 'dotts-apply-ok.ts');
     await mkdir(testDir, { recursive: true });
     await writeFile(configPath, `
       export const config = {
@@ -23,7 +19,6 @@ describe('dotts apply', () => {
       };
     `);
 
-    // The function should not throw if the config is valid
     await dottsApply(configPath);
   });
 

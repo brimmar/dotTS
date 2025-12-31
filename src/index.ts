@@ -2,6 +2,7 @@ import * as p from '@clack/prompts';
 import { color } from 'console-log-colors';
 import { dottsInit } from './commands/init';
 import { dottsApply } from './commands/apply';
+import { dottsCheck } from './commands/check';
 import { dottsSecretSet, dottsSecretList } from './commands/secrets';
 import { join } from 'node:path';
 
@@ -12,6 +13,7 @@ async function main() {
     message: 'What would you like to do?',
     options: [
       { value: 'init', label: 'Initialize a new project', hint: 'dotts init' },
+      { value: 'check', label: 'Check configuration', hint: 'dotts check' },
       { value: 'apply', label: 'Apply configuration', hint: 'dotts apply' },
       { value: 'secrets', label: 'Manage secrets', hint: 'dotts secrets' },
       { value: 'exit', label: 'Exit' },
@@ -25,7 +27,20 @@ async function main() {
 
   try {
     if (command === 'init') {
-      // ... (keep init logic)
+      // ...
+    } else if (command === 'check') {
+      const configPath = await p.text({
+        message: 'Path to dotts.ts?',
+        placeholder: './dotts.ts',
+        defaultValue: './dotts.ts',
+      });
+
+      if (p.isCancel(configPath)) {
+        p.outro('Cancelled.');
+        process.exit(0);
+      }
+
+      await dottsCheck(configPath);
     } else if (command === 'apply') {
       // ... (keep apply logic)
     } else if (command === 'secrets') {
