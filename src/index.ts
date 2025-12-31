@@ -1,10 +1,11 @@
 import * as p from '@clack/prompts';
 import { color } from 'console-log-colors';
+import { dottsInit } from './commands/init';
+import { dottsApply } from './commands/apply';
+import { join } from 'node:path';
 
 async function main() {
   p.intro(color.cyan(' dotts '));
-
-  p.note('Welcome to dotts - a modern, type-safe dotfile management tool.', 'info');
 
   const command = await p.select({
     message: 'What would you like to do?',
@@ -20,7 +21,41 @@ async function main() {
     process.exit(0);
   }
 
-  p.log.info(`You selected: ${command}`);
+  try {
+    if (command === 'init') {
+      const projectDir = await p.text({
+        message: 'Where should the project be initialized?',
+        placeholder: './my-dotfiles',
+        defaultValue: './my-dotfiles',
+      });
+
+      if (p.isCancel(projectDir)) {
+        p.outro('Cancelled.');
+        process.exit(0);
+      }
+
+      const s = p.spinner();
+      s.start('Initializing project...');
+      await dottsInit(projectDir);
+      s.stop('Project initialized successfully!');
+      p.note(`Project created at ${projectDir}\nEdit ${join(projectDir, 'dotts.ts')} to get started.`, 'next steps');
+    } else if (command === 'apply') {
+      const configPath = await p.text({
+        message: 'Path to dotts.ts?',
+        placeholder: './dotts.ts',
+        defaultValue: './dotts.ts',
+      });
+
+      if (p.isCancel(configPath)) {
+        p.outro('Cancelled.');
+        process.exit(0);
+      }
+
+      await dottsApply(configPath);
+    }
+  } catch (error) {
+    p.log.error(color.red(error instanceof Error ? error.message : String(error)));
+  }
   
   p.outro(color.green('Done!'));
 }
