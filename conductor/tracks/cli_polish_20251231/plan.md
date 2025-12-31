@@ -9,8 +9,8 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Check Command' (Protocol in workflow.md)
 
 ## Phase 3: Doctor Command
-- [ ] Task: Implement `dotts doctor` command with system environment checks
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Doctor Command' (Protocol in workflow.md)
+- [x] Task: Implement `dotts doctor` command with system environment checks [23e1705]
+- [~] Task: Conductor - User Manual Verification 'Phase 3: Doctor Command' (Protocol in workflow.md)
 
 ## Phase 4: Enhanced Error Reporting
 - [ ] Task: Implement user-friendly error formatting for Runner and CLI exceptions
