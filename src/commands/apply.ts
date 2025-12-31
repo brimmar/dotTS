@@ -7,6 +7,7 @@ import { SystemCommand, SystemCommandLive } from '../services/exec';
 import { SecretManager, SecretManagerLive } from '../services/secrets-manager';
 import { SecretStoreLive } from '../services/secrets';
 import { StateServiceLive } from '../services/state';
+import { PlatformServiceLive } from '../services/platform';
 import { loadConfig } from '../core/loader';
 
 export interface ApplyOptions {
@@ -46,6 +47,7 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
     Effect.provide(RunnerLive),
     Effect.provide(StateServiceLive),
     Effect.provide(SecretManagerLive),
+    Effect.provide(PlatformServiceLive),
     Effect.provide(FSLayer),
     Effect.provide(SecretStoreLive),
     Effect.provide(ExecLayer),

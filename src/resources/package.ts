@@ -1,11 +1,12 @@
 import { Effect } from 'effect';
 import { Resource, Component } from '../core/component';
 import { SystemCommand } from '../services/exec';
+import { PlatformService } from '../services/platform';
 import { hashConfig } from '../core/hash';
 
 export interface PackageResourceProps {
   name: string;
-  manager: 'brew' | 'apt' | 'npm' | 'pacman' | 'bun';
+  manager?: 'brew' | 'apt' | 'npm' | 'pacman' | 'bun';
 }
 
 export class PackageResource extends Resource {
@@ -18,23 +19,45 @@ export class PackageResource extends Resource {
   }
 
   apply() {
-    return Effect.gen(this, function* (_) {
-      const exec = yield* _(SystemCommand);
-      const command = this.getInstallCommand();
-      yield* _(exec.run(command));
+    return Effect.gen(this, function* () {
+      const exec = yield* SystemCommand;
+      const platform = yield* PlatformService;
+      
+      const manager = yield* this.resolveManager(platform);
+      const command = this.getInstallCommand(manager);
+      yield* exec.run(command);
     });
   }
 
   destroy() {
-    return Effect.gen(this, function* (_) {
-      const exec = yield* _(SystemCommand);
-      const command = this.getUninstallCommand();
-      yield* _(exec.run(command));
+    return Effect.gen(this, function* () {
+      const exec = yield* SystemCommand;
+      const platform = yield* PlatformService;
+      
+      const manager = yield* this.resolveManager(platform);
+      const command = this.getUninstallCommand(manager);
+      yield* exec.run(command);
     });
   }
 
-  private getInstallCommand(): string {
-    switch (this.props.manager) {
+  private resolveManager(platform: PlatformService): Effect.Effect<'brew' | 'apt' | 'npm' | 'pacman' | 'bun', Error> {
+    if (this.props.manager) {
+      return Effect.succeed(this.props.manager);
+    }
+
+    return Effect.gen(function* () {
+      const info = yield* platform.get();
+      if (info.os === 'darwin') return 'brew';
+      if (info.os === 'linux') {
+        if (info.distro === 'ubuntu' || info.distro === 'debian') return 'apt';
+        if (info.distro === 'arch') return 'pacman';
+      }
+      throw new Error(`Could not infer package manager for platform: ${info.os} ${info.distro || ''}`);
+    });
+  }
+
+  private getInstallCommand(manager: string): string {
+    switch (manager) {
       case 'brew':
         return `brew install ${this.props.name}`;
       case 'apt':
@@ -45,11 +68,13 @@ export class PackageResource extends Resource {
         return `bun add -g ${this.props.name}`;
       case 'npm':
         return `npm install -g ${this.props.name}`;
+      default:
+        throw new Error(`Unsupported package manager: ${manager}`);
     }
   }
 
-  private getUninstallCommand(): string {
-    switch (this.props.manager) {
+  private getUninstallCommand(manager: string): string {
+    switch (manager) {
       case 'brew':
         return `brew uninstall ${this.props.name}`;
       case 'apt':
@@ -60,6 +85,8 @@ export class PackageResource extends Resource {
         return `bun remove -g ${this.props.name}`;
       case 'npm':
         return `npm uninstall -g ${this.props.name}`;
+      default:
+        throw new Error(`Unsupported package manager: ${manager}`);
     }
   }
 }

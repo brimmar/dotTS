@@ -5,6 +5,7 @@ import { ValidationService, ValidationServiceLive } from '../services/validation
 import { FileSystemLive } from '../services/fs';
 import { SecretManagerLive } from '../services/secrets-manager';
 import { SecretStoreLive } from '../services/secrets';
+import { PlatformServiceLive } from '../services/platform';
 import { loadConfig } from '../core/loader';
 
 export async function dottsCheck(configPath: string) {
@@ -20,6 +21,7 @@ export async function dottsCheck(configPath: string) {
   const MainLive = program.pipe(
     Effect.provide(ValidationServiceLive),
     Effect.provide(SecretManagerLive),
+    Effect.provide(PlatformServiceLive),
     Effect.provide(FileSystemLive),
     Effect.provide(SecretStoreLive)
   );

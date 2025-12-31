@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const PackageSchema = z.object({
   name: z.string(),
-  manager: z.enum(['brew', 'apt', 'npm', 'pacman', 'bun']),
+  manager: z.enum(['brew', 'apt', 'npm', 'pacman', 'bun']).optional(),
 });
 
 export const SymlinkSchema = z.object({
