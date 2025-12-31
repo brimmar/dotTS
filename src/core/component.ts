@@ -22,3 +22,14 @@ export abstract class Resource extends Component {
   abstract destroy(): Effect.Effect<void, Error>;
   abstract hash(): string;
 }
+
+export function flatten(component: Component): Resource[] {
+  let result: Resource[] = [];
+  if (component instanceof Resource) {
+    result.push(component);
+  }
+  for (const child of component.children) {
+    result = result.concat(flatten(child));
+  }
+  return result;
+}

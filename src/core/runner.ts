@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from 'effect';
-import { Component, Resource } from './component';
+import { Component, Resource, flatten } from './component';
 import { StateService, AppState } from '../services/state';
 import { color } from 'console-log-colors';
 
@@ -54,14 +54,3 @@ export const RunnerLive = Layer.effect(
     });
   })
 );
-
-function flatten(component: Component): Resource[] {
-  let result: Resource[] = [];
-  if (component instanceof Resource) {
-    result.push(component);
-  }
-  for (const child of component.children) {
-    result = result.concat(flatten(child));
-  }
-  return result;
-}
