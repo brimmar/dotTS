@@ -6,6 +6,7 @@ import { dottsCheck } from './commands/check';
 import { dottsDoctor } from './commands/doctor';
 import { dottsSecretSet, dottsSecretList } from './commands/secrets';
 import { join } from 'node:path';
+import { formatError } from './core/errors';
 
 async function main() {
   p.intro(color.cyan(' dotts '));
@@ -110,7 +111,11 @@ async function main() {
       }
     }
   } catch (error) {
-    p.log.error(color.red(error instanceof Error ? error.message : String(error)));
+    const formatted = formatError(error);
+    p.log.error(color.red(`${formatted.title}: ${formatted.message}`));
+    if (formatted.hint) {
+      p.note(formatted.hint, 'suggested fix');
+    }
   }
   
   p.outro(color.green('Done!'));
