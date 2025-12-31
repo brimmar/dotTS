@@ -2,7 +2,7 @@
 
 ## Phase 1: Component Architecture Design
 - [x] Task: Define the `Component` and `Resource` interfaces and base classes [d36984e]
-- [ ] Task: Implement a `Stack` or `App` container to hold the component tree
+- [x] Task: Implement a `Stack` or `App` container to hold the component tree [a338320]
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Component Architecture' (Protocol in workflow.md)
 
 ## Phase 2: Execution Engine (The Runner)
