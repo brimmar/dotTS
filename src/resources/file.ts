@@ -4,6 +4,7 @@ import { FileSystem } from '../services/fs';
 import { dirname } from 'node:path';
 import { SecretToken } from '../core/secret';
 import { SecretManager } from '../services/secrets-manager';
+import { hashConfig } from '../core/hash';
 
 export interface FileResourceProps {
   path: string;
@@ -13,6 +14,10 @@ export interface FileResourceProps {
 export class FileResource extends Resource {
   constructor(scope: Component, id: string, public readonly props: FileResourceProps) {
     super(scope, id);
+  }
+
+  hash() {
+    return hashConfig(this.props);
   }
 
   apply() {

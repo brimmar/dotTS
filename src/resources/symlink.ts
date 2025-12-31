@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { Resource, Component } from '../core/component';
 import { FileSystem } from '../services/fs';
+import { hashConfig } from '../core/hash';
 
 export interface SymlinkResourceProps {
   source: string;
@@ -10,6 +11,10 @@ export interface SymlinkResourceProps {
 export class SymlinkResource extends Resource {
   constructor(scope: Component, id: string, public readonly props: SymlinkResourceProps) {
     super(scope, id);
+  }
+
+  hash() {
+    return hashConfig(this.props);
   }
 
   apply() {

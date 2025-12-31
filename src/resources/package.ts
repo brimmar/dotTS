@@ -1,17 +1,20 @@
 import { Effect } from 'effect';
 import { Resource, Component } from '../core/component';
 import { SystemCommand } from '../services/exec';
-
-export type PackageManager = 'brew' | 'apt' | 'pacman' | 'bun' | 'npm';
+import { hashConfig } from '../core/hash';
 
 export interface PackageResourceProps {
   name: string;
-  manager: PackageManager;
+  manager: 'brew' | 'apt' | 'npm';
 }
 
 export class PackageResource extends Resource {
   constructor(scope: Component, id: string, public readonly props: PackageResourceProps) {
     super(scope, id);
+  }
+
+  hash() {
+    return hashConfig(this.props);
   }
 
   apply() {
