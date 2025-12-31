@@ -1,8 +1,8 @@
 # Plan: CLI Polish & Validation
 
-## Phase 1: Validation Engine
+## Phase 1: Validation Engine [checkpoint: e19beb6]
 - [x] Task: Implement a `ValidationService` to check schema, path validity, and secret references [3d3c547]
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Validation Engine' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Validation Engine' (Protocol in workflow.md)
 
 ## Phase 2: Check Command
 - [ ] Task: Implement `dotts check` command to run the Validator on a config file
