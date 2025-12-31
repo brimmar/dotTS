@@ -7,7 +7,7 @@ export const PackageSchema = z.object({
 
 export const SymlinkSchema = z.object({
   source: z.string(),
-  target: z.string(),
+  path: z.string(),
 });
 
 export const FileSchema = z.object({

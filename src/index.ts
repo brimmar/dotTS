@@ -51,7 +51,17 @@ async function main() {
         process.exit(0);
       }
 
-      await dottsApply(configPath);
+      const dryRun = await p.confirm({
+        message: 'Do you want to run in Dry Run mode? (No changes will be made)',
+        initialValue: true,
+      });
+
+      if (p.isCancel(dryRun)) {
+        p.outro('Cancelled.');
+        process.exit(0);
+      }
+
+      await dottsApply(configPath, { dryRun });
     }
   } catch (error) {
     p.log.error(color.red(error instanceof Error ? error.message : String(error)));
