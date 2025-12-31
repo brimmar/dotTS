@@ -1,7 +1,7 @@
 # Plan: Core Primitives: Component System & Execution Engine
 
 ## Phase 1: Component Architecture Design
-- [ ] Task: Define the `Component` and `Resource` interfaces and base classes
+- [x] Task: Define the `Component` and `Resource` interfaces and base classes [d36984e]
 - [ ] Task: Implement a `Stack` or `App` container to hold the component tree
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Component Architecture' (Protocol in workflow.md)
 
