@@ -1,7 +1,7 @@
 # Plan: MVP: Foundation and Core CLI
 
 ## Phase 1: Project Scaffolding
-- [ ] Task: Initialize Bun project and install core dependencies (Clack, Zod, Effect)
+- [x] Task: Initialize Bun project and install core dependencies (Clack, Zod, Effect) [15b284f]
 - [ ] Task: Set up basic CLI entry point with Clack
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Project Scaffolding' (Protocol in workflow.md)
 
