@@ -12,7 +12,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Configuration Schema' (Protocol in workflow.md)
 
 ## Phase 3: Implement `init` Command
-- [ ] Task: Write Tests for `dotts init` command (creating folder structure and `dotts.ts` template)
+- [x] Task: Write Tests for `dotts init` command (creating folder structure and `dotts.ts` template) [81fb9fd]
 - [ ] Task: Implement `dotts init` command
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Implement init Command' (Protocol in workflow.md)
 
