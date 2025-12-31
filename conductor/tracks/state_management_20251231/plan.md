@@ -1,9 +1,9 @@
 # Plan: State Management & Idempotency
 
-## Phase 1: State Service & Hashing
+## Phase 1: State Service & Hashing [checkpoint: b2b6f5d]
 - [x] Task: Implement `StateService` for loading and saving `.dotts/state.json` [7259ce4]
 - [x] Task: Implement a hashing utility to generate unique signatures for resource configurations [9ba4f59]
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: State Service' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: State Service' (Protocol in workflow.md)
 
 ## Phase 2: Resource Lifecycle (Destroy)
 - [ ] Task: Add `destroy()` method to `Resource` base class
