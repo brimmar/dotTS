@@ -11,7 +11,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Resource Lifecycle' (Protocol in workflow.md)
 
 ## Phase 3: Runner Orchestration
-- [ ] Task: Update `Runner` to compute the diff between desired config and existing state
-- [ ] Task: Implement the execution logic for Create, Update, and Delete actions in the `Runner`
-- [ ] Task: Update the CLI `apply` output to display resource action status (e.g., + Create, ~ Update, - Delete)
+- [x] Task: Update `Runner` to compute the diff between desired config and existing state [84b5f2d]
+- [x] Task: Implement the execution logic for Create, Update, and Delete actions in the `Runner` [84b5f2d]
+- [~] Task: Update the CLI `apply` output to display resource action status (e.g., + Create, ~ Update, - Delete)
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Runner Orchestration' (Protocol in workflow.md)
