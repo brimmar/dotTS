@@ -2,15 +2,15 @@ import { describe, it, expect } from 'bun:test';
 import { Component, Resource } from './component';
 
 class TestResource extends Resource {
-  constructor(id: string) {
-    super(id);
+  constructor(scope: Component, id: string) {
+    super(scope, id);
   }
 }
 
 class TestComponent extends Component {
   constructor(id: string) {
     super(id);
-    this.add(new TestResource(`${id}-resource`));
+    new TestResource(this, `${id}-resource`);
   }
 }
 
@@ -22,7 +22,9 @@ describe('Component Architecture', () => {
   });
 
   it('should identify resources correctly', () => {
-    const resource = new TestResource('res');
+    const root = new TestComponent('root');
+    const resource = new TestResource(root, 'res');
     expect(resource.isResource).toBe(true);
+    expect(root.children).toContain(resource);
   });
 });

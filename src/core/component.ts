@@ -11,7 +11,8 @@ export abstract class Component {
 export abstract class Resource extends Component {
   public readonly isResource = true;
 
-  constructor(id: string) {
+  constructor(scope: Component, id: string) {
     super(id);
+    scope.add(this);
   }
 }
