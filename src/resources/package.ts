@@ -11,6 +11,7 @@ export type PackageManager = 'brew' | 'apt' | 'npm' | 'pacman' | 'bun' | 'cargo'
 export interface PackageResourceProps {
   name: string;
   manager?: PackageManager;
+  version?: string;
 }
 
 export class PackageResource extends Resource {
@@ -23,31 +24,33 @@ export class PackageResource extends Resource {
   }
 
   apply() {
+    const { name, version } = this.props;
     return Effect.gen(this, function* () {
       const platform = yield* PlatformService;
       const manager = yield* this.resolveManager(platform);
       const provider = this.getProvider(manager);
       
-      const alreadyInstalled = yield* provider.isInstalled(this.props.name);
+      const alreadyInstalled = yield* provider.isInstalled(name, version);
       if (alreadyInstalled) {
         return;
       }
 
-      yield* provider.install(this.props.name);
+      yield* provider.install(name, version);
     });
   }
 
   destroy() {
+    const { name } = this.props;
     return Effect.gen(this, function* () {
       const platform = yield* PlatformService;
       const manager = yield* this.resolveManager(platform);
       const provider = this.getProvider(manager);
       
-      yield* provider.uninstall(this.props.name);
+      yield* provider.uninstall(name);
     });
   }
 
-  private resolveManager(platform: PlatformService): Effect.Effect<PackageManager, Error> {
+  private resolveManager = (platform: PlatformService): Effect.Effect<PackageManager, Error> => {
     if (this.props.manager) {
       return Effect.succeed(this.props.manager);
     }
@@ -61,7 +64,7 @@ export class PackageResource extends Resource {
       }
       throw new Error(`Could not infer package manager for platform: ${info.os} ${info.distro || ''}`);
     });
-  }
+  };
 
   private getProvider(manager: PackageManager): PackageProvider {
     switch (manager) {

@@ -134,4 +134,36 @@ describe('PackageResource', () => {
     
     expect(executedCommands).not.toContain('brew install neovim');
   });
+
+  it('should install a specific version if requested', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    
+    const executedCommands: string[] = [];
+    const SystemCommandMock = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: (command) => {
+          executedCommands.push(command);
+          if (command.includes('list')) return Effect.fail(new Error('Not found'));
+          return Effect.succeed('');
+        }
+      })
+    );
+
+    const pkgRes = new PackageResource(stack, 'my-pkg', {
+      name: 'neovim',
+      manager: 'brew',
+      version: '0.9.0'
+    });
+
+    await Effect.runPromise(
+      pkgRes.apply().pipe(
+        Effect.provide(SystemCommandMock),
+        Effect.provide(PlatformMock)
+      )
+    );
+    
+    expect(executedCommands).toContain('brew install neovim@0.9.0');
+  });
 });
