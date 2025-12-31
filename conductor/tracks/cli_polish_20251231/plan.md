@@ -13,5 +13,5 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Doctor Command' (Protocol in workflow.md)
 
 ## Phase 4: Enhanced Error Reporting
-- [ ] Task: Implement user-friendly error formatting for Runner and CLI exceptions
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Error Handling' (Protocol in workflow.md)
+- [x] Task: Implement user-friendly error formatting for Runner and CLI exceptions [dfdb3ad]
+- [~] Task: Conductor - User Manual Verification 'Phase 4: Error Handling' (Protocol in workflow.md)
