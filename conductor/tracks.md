@@ -4,5 +4,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [x] Track: MVP: Foundation and Core CLI
-*Link: [./conductor/tracks/mvp_foundation_20251231/](./conductor/tracks/mvp_foundation_20251231/)*
+
+
+## [ ] Track: Secrets Management
+
+*Link: [./conductor/tracks/secrets_management_20251231/](./conductor/tracks/secrets_management_20251231/)*
