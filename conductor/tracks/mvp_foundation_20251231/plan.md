@@ -13,7 +13,7 @@
 
 ## Phase 3: Implement `init` Command
 - [x] Task: Write Tests for `dotts init` command (creating folder structure and `dotts.ts` template) [81fb9fd]
-- [ ] Task: Implement `dotts init` command
+- [x] Task: Implement `dotts init` command [ab43275]
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Implement init Command' (Protocol in workflow.md)
 
 ## Phase 4: Implement Basic `apply` Command
