@@ -16,5 +16,5 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 3: System Idempotency' (Protocol in workflow.md)
 
 ## Phase 4: Versioning Support
-- [ ] Task: Add versioning support to `PackageResourceProps` and provider commands
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Versioning' (Protocol in workflow.md)
+- [x] Task: Add versioning support to `PackageResourceProps` and provider commands [7e0849e]
+- [~] Task: Conductor - User Manual Verification 'Phase 4: Versioning' (Protocol in workflow.md)
