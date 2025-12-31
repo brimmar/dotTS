@@ -20,4 +20,4 @@
 - [x] Task: Write Tests for `dotts apply` (loading configuration and validating structure) [12e4e73]
 - [x] Task: Implement configuration loading mechanism using Bun.build or direct import [f8e169a]
 - [x] Task: Implement `dotts apply` (basic logging of actions to be taken) [a78cb99]
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Implement Basic apply Command' (Protocol in workflow.md)
+- [~] Task: Conductor - User Manual Verification 'Phase 4: Implement Basic apply Command' (Protocol in workflow.md)

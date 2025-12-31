@@ -2,16 +2,17 @@ import { exists } from 'node:fs/promises';
 import { DottsSchema } from '../schema';
 import * as p from '@clack/prompts';
 import { color } from 'console-log-colors';
+import { resolve } from 'node:path';
 
 export async function dottsApply(configPath: string) {
-  if (!(await exists(configPath))) {
-    throw new Error(`Configuration file not found: ${configPath}`);
+  const absolutePath = resolve(configPath);
+
+  if (!(await exists(absolutePath))) {
+    throw new Error(`Configuration file not found: ${absolutePath}`);
   }
 
   // Dynamically import the dotts.ts file
-  // Note: In a real scenario, we might need to bundle/transpile it if it imports other files
-  // but for MVP, a direct import of a TS file works in Bun.
-  const module = await import(configPath);
+  const module = await import(absolutePath);
   
   if (!module.config) {
     throw new Error(`Configuration file must export a 'config' object: ${configPath}`);
