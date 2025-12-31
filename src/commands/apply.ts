@@ -11,6 +11,8 @@ import { SymlinkResource } from '../resources/symlink';
 import { PackageResource } from '../resources/package';
 import { FileSystem, FileSystemLive } from '../services/fs';
 import { SystemCommand, SystemCommandLive } from '../services/exec';
+import { SecretManager, SecretManagerLive } from '../services/secrets-manager';
+import { SecretStoreLive } from '../services/secrets';
 
 export interface ApplyOptions {
   dryRun?: boolean;
@@ -79,9 +81,15 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
     yield* _(runner.run(app));
   });
 
-  const MainLive = Layer.mergeAll(FSLayer, ExecLayer, Runner.live);
+  const MainLive = program.pipe(
+    Effect.provide(Runner.live),
+    Effect.provide(FSLayer),
+    Effect.provide(ExecLayer),
+    Effect.provide(SecretManagerLive),
+    Effect.provide(SecretStoreLive)
+  );
   
-  await Effect.runPromise(Effect.provide(program, MainLive));
+  await Effect.runPromise(MainLive);
 
   return config;
 }

@@ -3,6 +3,7 @@ import { Effect, Layer } from 'effect';
 import { Runner } from './runner';
 import { App, Stack } from './app';
 import { Resource } from './component';
+import { SecretManager } from '../services/secrets-manager';
 
 class TestResource extends Resource {
   constructor(scope: any, id: string, public readonly action: () => Effect.Effect<void, Error>) {
@@ -24,17 +25,50 @@ describe('Runner', () => {
     
     new TestResource(stack, 'res', action);
     
-    // We need to implement a way for Resources to expose their "apply" logic.
-    // For this test, we assume the Runner knows how to find and execute it.
-    
     const program = Effect.gen(function* (_) {
       const runner = yield* _(Runner);
       yield* _(runner.run(app));
     });
 
-    const runnable = Effect.provide(program, Runner.live);
+    const runnable = program.pipe(Effect.provide(Runner.live));
     await Effect.runPromise(runnable);
     
     expect(executed).toBe(true);
+  });
+
+  it('should resolve secrets via SecretManager during resource application', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'dev');
+    
+    let resolvedValue = '';
+    const action = () => Effect.gen(function* (_) {
+      const sm = yield* _(SecretManager);
+      resolvedValue = yield* _(sm.get('MY_KEY'));
+    });
+    
+    new TestResource(stack, 'res', action);
+    
+    const SecretManagerMock = Layer.succeed(
+      SecretManager,
+      SecretManager.of({
+        get: (name) => Effect.succeed('secret-value'),
+        set: () => Effect.void,
+        list: () => Effect.succeed([]),
+        setPaths: () => Effect.void,
+      })
+    );
+
+    const program = Effect.gen(function* (_) {
+      const runner = yield* _(Runner);
+      yield* _(runner.run(app));
+    });
+
+    const runnable = program.pipe(
+      Effect.provide(Runner.live),
+      Effect.provide(SecretManagerMock)
+    );
+    
+    await Effect.runPromise(runnable);
+    expect(resolvedValue).toBe('secret-value');
   });
 });
