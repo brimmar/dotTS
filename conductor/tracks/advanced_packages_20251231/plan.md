@@ -6,9 +6,9 @@
 - [~] Task: Conductor - User Manual Verification 'Phase 1: Platform Awareness' (Protocol in workflow.md)
 
 ## Phase 2: Provider Abstraction
-- [ ] Task: Implement `PackageProvider` interface and refactor existing managers into providers
-- [ ] Task: Implement new providers for `Cargo` and `Pip`
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Provider Abstraction' (Protocol in workflow.md)
+- [x] Task: Implement `PackageProvider` interface and refactor existing managers into providers [f59438d]
+- [x] Task: Implement new providers for `Cargo` and `Pip` [f59438d]
+- [~] Task: Conductor - User Manual Verification 'Phase 2: Provider Abstraction' (Protocol in workflow.md)
 
 ## Phase 3: System-State Idempotency
 - [ ] Task: Implement `isInstalled` check for all providers using system commands
