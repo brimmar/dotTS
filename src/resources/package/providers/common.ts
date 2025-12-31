@@ -2,6 +2,19 @@ import { Effect } from 'effect';
 import { PackageProvider } from '../provider';
 import { SystemCommand } from '../../../services/exec';
 
+function checkWithWhich(name: string) {
+  return Effect.gen(function* () {
+    const exec = yield* SystemCommand;
+    return yield* Effect.match(
+      exec.run(`which ${name}`),
+      {
+        onFailure: () => false,
+        onSuccess: () => true,
+      }
+    );
+  });
+}
+
 export class BrewProvider implements PackageProvider {
   install(name: string) {
     return Effect.gen(function* () {
@@ -15,8 +28,17 @@ export class BrewProvider implements PackageProvider {
       yield* exec.run(`brew uninstall ${name}`);
     });
   }
-  isInstalled(_name: string) {
-    return Effect.succeed(false);
+  isInstalled(name: string) {
+    return Effect.gen(function* () {
+      const exec = yield* SystemCommand;
+      return yield* Effect.match(
+        exec.run(`brew list --versions ${name}`),
+        {
+          onFailure: () => false,
+          onSuccess: () => true,
+        }
+      );
+    });
   }
 }
 
@@ -33,8 +55,17 @@ export class AptProvider implements PackageProvider {
       yield* exec.run(`sudo apt-get remove -y ${name}`);
     });
   }
-  isInstalled(_name: string) {
-    return Effect.succeed(false);
+  isInstalled(name: string) {
+    return Effect.gen(function* () {
+      const exec = yield* SystemCommand;
+      return yield* Effect.match(
+        exec.run(`dpkg -s ${name}`),
+        {
+          onFailure: () => false,
+          onSuccess: () => true,
+        }
+      );
+    });
   }
 }
 
@@ -51,8 +82,17 @@ export class PacmanProvider implements PackageProvider {
       yield* exec.run(`sudo pacman -Rs --noconfirm ${name}`);
     });
   }
-  isInstalled(_name: string) {
-    return Effect.succeed(false);
+  isInstalled(name: string) {
+    return Effect.gen(function* () {
+      const exec = yield* SystemCommand;
+      return yield* Effect.match(
+        exec.run(`pacman -Qi ${name}`),
+        {
+          onFailure: () => false,
+          onSuccess: () => true,
+        }
+      );
+    });
   }
 }
 
@@ -69,8 +109,8 @@ export class BunProvider implements PackageProvider {
       yield* exec.run(`bun remove -g ${name}`);
     });
   }
-  isInstalled(_name: string) {
-    return Effect.succeed(false);
+  isInstalled(name: string) {
+    return checkWithWhich(name);
   }
 }
 
@@ -87,8 +127,17 @@ export class NpmProvider implements PackageProvider {
       yield* exec.run(`npm uninstall -g ${name}`);
     });
   }
-  isInstalled(_name: string) {
-    return Effect.succeed(false);
+  isInstalled(name: string) {
+    return Effect.gen(function* () {
+      const exec = yield* SystemCommand;
+      return yield* Effect.match(
+        exec.run(`npm list -g ${name}`),
+        {
+          onFailure: () => false,
+          onSuccess: () => true,
+        }
+      );
+    });
   }
 }
 
@@ -105,8 +154,8 @@ export class CargoProvider implements PackageProvider {
       yield* exec.run(`cargo uninstall ${name}`);
     });
   }
-  isInstalled(_name: string) {
-    return Effect.succeed(false);
+  isInstalled(name: string) {
+    return checkWithWhich(name);
   }
 }
 
@@ -123,7 +172,16 @@ export class PipProvider implements PackageProvider {
       yield* exec.run(`pip uninstall -y ${name}`);
     });
   }
-  isInstalled(_name: string) {
-    return Effect.succeed(false);
+  isInstalled(name: string) {
+    return Effect.gen(function* () {
+      const exec = yield* SystemCommand;
+      return yield* Effect.match(
+        exec.run(`pip show ${name}`),
+        {
+          onFailure: () => false,
+          onSuccess: () => true,
+        }
+      );
+    });
   }
 }

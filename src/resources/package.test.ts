@@ -13,18 +13,19 @@ describe('PackageResource', () => {
     })
   );
 
-  it('should execute the correct install command', async () => {
+  it('should execute install if not already installed', async () => {
     const app = new App();
     const stack = new Stack(app, 'test');
     
-    let executedCommand = '';
+    const executedCommands: string[] = [];
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) => Effect.sync(() => { 
-          executedCommand = command; 
-          return ''; 
-        })
+        run: (command) => {
+          executedCommands.push(command);
+          if (command.includes('list')) return Effect.fail(new Error('Not found'));
+          return Effect.succeed('');
+        }
       })
     );
 
@@ -33,16 +34,14 @@ describe('PackageResource', () => {
       manager: 'brew',
     });
 
-    const program = pkgRes.apply();
-    
     await Effect.runPromise(
-      program.pipe(
+      pkgRes.apply().pipe(
         Effect.provide(SystemCommandMock),
         Effect.provide(PlatformMock)
       )
     );
     
-    expect(executedCommand).toBe('brew install neovim');
+    expect(executedCommands).toContain('brew install neovim');
   });
 
   it('should execute the correct uninstall command on destroy', async () => {
@@ -53,10 +52,10 @@ describe('PackageResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) => Effect.sync(() => { 
-          executedCommand = command; 
-          return ''; 
-        })
+        run: (command) => {
+          executedCommand = command;
+          return Effect.succeed('');
+        }
       })
     );
 
@@ -65,10 +64,8 @@ describe('PackageResource', () => {
       manager: 'brew',
     });
 
-    const program = pkgRes.destroy();
-    
     await Effect.runPromise(
-      program.pipe(
+      pkgRes.destroy().pipe(
         Effect.provide(SystemCommandMock),
         Effect.provide(PlatformMock)
       )
@@ -81,14 +78,15 @@ describe('PackageResource', () => {
     const app = new App();
     const stack = new Stack(app, 'test');
     
-    let executedCommand = '';
+    const executedCommands: string[] = [];
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) => Effect.sync(() => { 
-          executedCommand = command; 
-          return ''; 
-        })
+        run: (command) => {
+          executedCommands.push(command);
+          if (command.includes('list')) return Effect.fail(new Error('Not found'));
+          return Effect.succeed('');
+        }
       })
     );
 
@@ -96,15 +94,44 @@ describe('PackageResource', () => {
       name: 'neovim',
     });
 
-    const program = pkgRes.apply();
-    
     await Effect.runPromise(
-      program.pipe(
+      pkgRes.apply().pipe(
         Effect.provide(SystemCommandMock),
         Effect.provide(PlatformMock)
       )
     );
     
-    expect(executedCommand).toBe('brew install neovim');
+    expect(executedCommands).toContain('brew install neovim');
+  });
+
+  it('should skip install if already installed on the system', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    
+    const executedCommands: string[] = [];
+    const SystemCommandMock = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: (command) => {
+          executedCommands.push(command);
+          if (command.includes('list')) return Effect.succeed('neovim 0.9.0');
+          return Effect.succeed('');
+        }
+      })
+    );
+
+    const pkgRes = new PackageResource(stack, 'my-pkg', {
+      name: 'neovim',
+      manager: 'brew',
+    });
+
+    await Effect.runPromise(
+      pkgRes.apply().pipe(
+        Effect.provide(SystemCommandMock),
+        Effect.provide(PlatformMock)
+      )
+    );
+    
+    expect(executedCommands).not.toContain('brew install neovim');
   });
 });

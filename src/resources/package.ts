@@ -28,6 +28,11 @@ export class PackageResource extends Resource {
       const manager = yield* this.resolveManager(platform);
       const provider = this.getProvider(manager);
       
+      const alreadyInstalled = yield* provider.isInstalled(this.props.name);
+      if (alreadyInstalled) {
+        return;
+      }
+
       yield* provider.install(this.props.name);
     });
   }
