@@ -10,7 +10,7 @@
 - [x] Task: Add `secrets list` command to the CLI (masked output) [78e4b7f]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: CLI Secret Management' (Protocol in workflow.md)
 
-## Phase 3: Component Integration
+## Phase 3: Component Integration [checkpoint: d8eb363]
 - [x] Task: Implement a `Secret` resolution helper `config.secret(name)` [33ba789]
 - [x] Task: Update `Runner` to resolve secrets before applying resources [8399af1]
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Component Integration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Component Integration' (Protocol in workflow.md)
