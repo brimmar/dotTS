@@ -5,7 +5,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Validation Engine' (Protocol in workflow.md)
 
 ## Phase 2: Check Command
-- [ ] Task: Implement `dotts check` command to run the Validator on a config file
+- [x] Task: Implement `dotts check` command to run the Validator on a config file [f6421ec]
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Check Command' (Protocol in workflow.md)
 
 ## Phase 3: Doctor Command
