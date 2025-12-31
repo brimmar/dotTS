@@ -11,11 +11,11 @@
 - [x] Task: Implement the core `Runner` logic to traverse the component tree and generate an Execution Plan [30a1ec1]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Execution Engine' (Protocol in workflow.md)
 
-## Phase 3: Core Primitive Components
+## Phase 3: Core Primitive Components [checkpoint: bb5c923]
 - [x] Task: Implement `FileComponent` with content and permissions handling [0d9e8a9]
 - [x] Task: Implement `SymlinkComponent` with target validation [4751a02]
 - [x] Task: Implement `PackageComponent` with simple manager delegation [2222f24]
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Core Primitive Components' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Core Primitive Components' (Protocol in workflow.md)
 
 ## Phase 4: CLI Integration & Dry Run
 - [ ] Task: Refactor `dotts apply` to accept a `--dry-run` flag
