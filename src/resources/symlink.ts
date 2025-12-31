@@ -6,11 +6,12 @@ import { hashConfig } from '../core/hash';
 export interface SymlinkResourceProps {
   source: string;
   path: string;
+  dependsOn?: Component[];
 }
 
 export class SymlinkResource extends Resource {
   constructor(scope: Component, id: string, public readonly props: SymlinkResourceProps) {
-    super(scope, id);
+    super(scope, id, props);
   }
 
   hash() {

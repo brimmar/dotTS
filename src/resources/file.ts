@@ -9,11 +9,12 @@ import { hashConfig } from '../core/hash';
 export interface FileResourceProps {
   path: string;
   content: string | SecretToken;
+  dependsOn?: Component[];
 }
 
 export class FileResource extends Resource {
   constructor(scope: Component, id: string, public readonly props: FileResourceProps) {
-    super(scope, id);
+    super(scope, id, props);
   }
 
   hash() {

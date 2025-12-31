@@ -12,11 +12,12 @@ export interface PackageResourceProps {
   name: string;
   manager?: PackageManager;
   version?: string;
+  dependsOn?: Component[];
 }
 
 export class PackageResource extends Resource {
   constructor(scope: Component, id: string, public readonly props: PackageResourceProps) {
-    super(scope, id);
+    super(scope, id, props);
   }
 
   hash() {
