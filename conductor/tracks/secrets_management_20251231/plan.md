@@ -6,8 +6,8 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Secret Storage' (Protocol in workflow.md)
 
 ## Phase 2: CLI Secret Management
-- [ ] Task: Add `secrets set` command to the CLI
-- [ ] Task: Add `secrets list` command to the CLI (masked output)
+- [x] Task: Add `secrets set` command to the CLI [78e4b7f]
+- [x] Task: Add `secrets list` command to the CLI (masked output) [78e4b7f]
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: CLI Secret Management' (Protocol in workflow.md)
 
 ## Phase 3: Component Integration
