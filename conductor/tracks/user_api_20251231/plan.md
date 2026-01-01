@@ -10,7 +10,7 @@
 - [x] Task: Ensure the loader correctly sets the active context before execution [5bc6267]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Loader' (Protocol in workflow.md)
 
-## Phase 3: Developer Experience & Templates
-- [ ] Task: Create a single public entry point for all user-facing functions
-- [ ] Task: Update `dotts init` template to use the new fluent style
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: DX' (Protocol in workflow.md)
+## Phase 3: Developer Experience & Templates [checkpoint: 527a01b]
+- [x] Task: Create a single public entry point for all user-facing functions [a90f86a]
+- [x] Task: Update `dotts init` template to use the new fluent style [a90f86a]
+- [x] Task: Conductor - User Manual Verification 'Phase 3: DX' (Protocol in workflow.md)
