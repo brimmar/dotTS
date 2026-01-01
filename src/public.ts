@@ -5,6 +5,9 @@ import { SymlinkResource } from './resources/symlink';
 import { DirectoryResource, DirectoryResourceProps } from './resources/directory';
 import { ScriptResource, ScriptResourceProps } from './resources/script';
 import { secret as secretTokenHelper } from './core/secret';
+import { App, Stack } from './core/app';
+
+export { App, Stack };
 
 export function pkg(name: string, props: Omit<PackageResourceProps, 'name'> = {}) {
   const stack = ActiveContext.requireStack();
