@@ -23,6 +23,7 @@ Traditional dotfile management is often fragmented and difficult to maintain:
 ## Key Features
 - **Type-safe Declarative Configuration:** Use TypeScript to define system states with full IDE support and compile-time validation.
 - **Dynamic Templating:** Leverage templating to inject environment-specific variables and secrets into configuration files.
+- **Fluent Environment Helpers:** Use `onPlatform` and `onDistro` to easily vary configuration based on the operating system or Linux distribution.
 - **Granular System Control:** Manage POSIX attributes like permissions and ownership for files and directories with precision.
 - **Extensible Scripting:** Execute arbitrary shell commands with custom idempotency logic (`unless`, `onlyIf`) for specialized setup tasks.
 - **Parallel Execution:** Accelerate system setup by executing independent resource tiers concurrently, with automatic locking for singleton resources.
