@@ -4,6 +4,7 @@ import { FileResource, FileResourceProps } from './resources/file';
 import { SymlinkResource } from './resources/symlink';
 import { DirectoryResource, DirectoryResourceProps } from './resources/directory';
 import { ScriptResource, ScriptResourceProps } from './resources/script';
+import { RemoteFileResource, RemoteFileResourceProps } from './resources/remote-file';
 import { secret as secretTokenHelper } from './core/secret';
 import { App, Stack } from './core/app';
 
@@ -32,6 +33,11 @@ export function dir(path: string, props: Omit<DirectoryResourceProps, 'path'> = 
 export function script(run: string, props: Omit<ScriptResourceProps, 'run'> = {}) {
   const stack = ActiveContext.requireStack();
   return new ScriptResource(stack, `script-${run.slice(0, 20)}`, { ...props, run });
+}
+
+export function remoteFile(path: string, props: Omit<RemoteFileResourceProps, 'path'>) {
+  const stack = ActiveContext.requireStack();
+  return new RemoteFileResource(stack, `remote-${path}`, { ...props, path });
 }
 
 export const secret = secretTokenHelper;

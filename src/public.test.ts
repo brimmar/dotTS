@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { ActiveContext } from './core/context';
 import { App, Stack } from './core/app';
-import { pkg, file, link, dir, script, secret, onPlatform, onDistro } from './public';
+import { pkg, file, link, dir, script, remoteFile, secret, onPlatform, onDistro } from './public';
 import { PackageResource } from './resources/package';
 import { FileResource } from './resources/file';
 import { SymlinkResource } from './resources/symlink';
 import { DirectoryResource } from './resources/directory';
 import { ScriptResource } from './resources/script';
+import { RemoteFileResource } from './resources/remote-file';
 import { SecretToken } from './core/secret';
 
 describe('Functional Helpers', () => {
@@ -48,6 +49,12 @@ describe('Functional Helpers', () => {
     expect(stack.children).toContain(res);
   });
 
+  it('remoteFile() should create a RemoteFileResource', () => {
+    const res = remoteFile('/tmp/remote', { url: 'https://example.com' });
+    expect(res).toBeInstanceOf(RemoteFileResource);
+    expect(stack.children).toContain(res);
+  });
+
   it('secret() should return a SecretToken', () => {
     const s = secret('API_KEY');
     expect(s).toBeInstanceOf(SecretToken);
@@ -73,62 +80,32 @@ describe('Functional Helpers', () => {
     onDistro('ubuntu', () => { called = true; });
     expect(called).toBe(true);
 
-        called = false;
+    called = false;
+    onDistro('arch', () => { called = true; });
+    expect(called).toBe(false);
+  });
 
-        onDistro('arch', () => { called = true; });
-
-        expect(called).toBe(false);
-
-      });
-
+  it('onPlatform() should support multiple OS matches', () => {
+    ActiveContext.setPlatform({ os: 'linux', arch: 'x64' });
     
+    let called = false;
+    onPlatform(['darwin', 'linux'], () => { called = true; });
+    expect(called).toBe(true);
 
-      it('onPlatform() should support multiple OS matches', () => {
+    called = false;
+    onPlatform(['darwin', 'win32'], () => { called = true; });
+    expect(called).toBe(false);
+  });
 
-        ActiveContext.setPlatform({ os: 'linux', arch: 'x64' });
-
-        
-
-        let called = false;
-
-        onPlatform(['darwin', 'linux'], () => { called = true; });
-
-        expect(called).toBe(true);
-
+  it('onDistro() should support multiple distro matches', () => {
+    ActiveContext.setPlatform({ os: 'linux', arch: 'x64', distro: 'ubuntu' });
     
+    let called = false;
+    onDistro(['ubuntu', 'debian'], () => { called = true; });
+    expect(called).toBe(true);
 
-        called = false;
-
-        onPlatform(['darwin', 'win32'], () => { called = true; });
-
-        expect(called).toBe(false);
-
-      });
-
-    
-
-      it('onDistro() should support multiple distro matches', () => {
-
-        ActiveContext.setPlatform({ os: 'linux', arch: 'x64', distro: 'ubuntu' });
-
-        
-
-        let called = false;
-
-        onDistro(['ubuntu', 'debian'], () => { called = true; });
-
-        expect(called).toBe(true);
-
-    
-
-        called = false;
-
-        onDistro(['arch', 'fedora'], () => { called = true; });
-
-        expect(called).toBe(false);
-
-      });
-
-    });
-
-    
+    called = false;
+    onDistro(['arch', 'fedora'], () => { called = true; });
+    expect(called).toBe(false);
+  });
+});
