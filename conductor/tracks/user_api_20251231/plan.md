@@ -1,8 +1,8 @@
 # Plan: User API & Developer Experience
 
 ## Phase 1: Fluent Helpers & Context
-- [ ] Task: Implement `ActiveContext` to track the current stack and app
-- [ ] Task: Implement functional helpers (`file`, `pkg`, `link`, `dir`, `script`, `secret`)
+- [x] Task: Implement `ActiveContext` to track the current stack and app [51fb818]
+- [~] Task: Implement functional helpers (`file`, `pkg`, `link`, `dir`, `script`, `secret`)
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Helpers' (Protocol in workflow.md)
 
 ## Phase 2: Functional Loader
