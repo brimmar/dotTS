@@ -36,16 +36,25 @@ export function script(run: string, props: Omit<ScriptResourceProps, 'run'> = {}
 
 export const secret = secretTokenHelper;
 
-export function onPlatform(os: string, callback: () => void | Promise<void>) {
+export type OS = 'aix' | 'darwin' | 'freebsd' | 'linux' | 'openbsd' | 'sunos' | 'win32' | 'android';
+export type Distro = 'ubuntu' | 'debian' | 'arch' | 'fedora' | 'centos' | 'rhel' | 'alpine' | string;
+
+export function onPlatform(os: OS | OS[], callback: () => void | Promise<void>) {
   const platform = ActiveContext.getPlatform();
-  if (platform?.os === os) {
+  if (!platform) return;
+
+  const matches = Array.isArray(os) ? os.includes(platform.os as OS) : platform.os === os;
+  if (matches) {
     callback();
   }
 }
 
-export function onDistro(distro: string, callback: () => void | Promise<void>) {
+export function onDistro(distro: Distro | Distro[], callback: () => void | Promise<void>) {
   const platform = ActiveContext.getPlatform();
-  if (platform?.distro === distro) {
+  if (!platform || !platform.distro) return;
+
+  const matches = Array.isArray(distro) ? distro.includes(platform.distro) : platform.distro === distro;
+  if (matches) {
     callback();
   }
 }

@@ -73,8 +73,62 @@ describe('Functional Helpers', () => {
     onDistro('ubuntu', () => { called = true; });
     expect(called).toBe(true);
 
-    called = false;
-    onDistro('arch', () => { called = true; });
-    expect(called).toBe(false);
-  });
-});
+        called = false;
+
+        onDistro('arch', () => { called = true; });
+
+        expect(called).toBe(false);
+
+      });
+
+    
+
+      it('onPlatform() should support multiple OS matches', () => {
+
+        ActiveContext.setPlatform({ os: 'linux', arch: 'x64' });
+
+        
+
+        let called = false;
+
+        onPlatform(['darwin', 'linux'], () => { called = true; });
+
+        expect(called).toBe(true);
+
+    
+
+        called = false;
+
+        onPlatform(['darwin', 'win32'], () => { called = true; });
+
+        expect(called).toBe(false);
+
+      });
+
+    
+
+      it('onDistro() should support multiple distro matches', () => {
+
+        ActiveContext.setPlatform({ os: 'linux', arch: 'x64', distro: 'ubuntu' });
+
+        
+
+        let called = false;
+
+        onDistro(['ubuntu', 'debian'], () => { called = true; });
+
+        expect(called).toBe(true);
+
+    
+
+        called = false;
+
+        onDistro(['arch', 'fedora'], () => { called = true; });
+
+        expect(called).toBe(false);
+
+      });
+
+    });
+
+    
