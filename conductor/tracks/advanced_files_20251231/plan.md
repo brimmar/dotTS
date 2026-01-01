@@ -10,6 +10,6 @@
 - [x] Task: Update `FileResource` to support dynamic content resolution via templates [f39529c]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Templating' (Protocol in workflow.md)
 
-## Phase 3: Directory Resource
-- [ ] Task: Implement `DirectoryResource` for explicit directory management
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Directory Resource' (Protocol in workflow.md)
+## Phase 3: Directory Resource [checkpoint: 362ab6b]
+- [x] Task: Implement `DirectoryResource` for explicit directory management [d702207]
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Directory Resource' (Protocol in workflow.md)
