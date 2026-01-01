@@ -5,6 +5,8 @@ import { hashConfig } from '../core/hash';
 
 export interface ScriptResourceProps {
   run: string;
+  unless?: string;
+  onlyIf?: string;
   workingDir?: string;
   environment?: Record<string, string>;
   dependsOn?: Component[];
@@ -22,6 +24,29 @@ export class ScriptResource extends Resource {
   apply() {
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
+
+      if (this.props.unless) {
+        const skip = yield* Effect.match(
+          exec.run(this.props.unless, { cwd: this.props.workingDir, env: this.props.environment }),
+          {
+            onFailure: () => false,
+            onSuccess: () => true,
+          }
+        );
+        if (skip) return;
+      }
+
+      if (this.props.onlyIf) {
+        const proceed = yield* Effect.match(
+          exec.run(this.props.onlyIf, { cwd: this.props.workingDir, env: this.props.environment }),
+          {
+            onFailure: () => false,
+            onSuccess: () => true,
+          }
+        );
+        if (!proceed) return;
+      }
+
       yield* exec.run(this.props.run, {
         cwd: this.props.workingDir,
         env: this.props.environment,
@@ -30,8 +55,6 @@ export class ScriptResource extends Resource {
   }
 
   destroy() {
-    // Arbitrary scripts don't have a built-in destroy mechanism.
-    // Users can use ScriptResource for cleanup in other ways if needed.
     return Effect.void;
   }
 }
