@@ -4,6 +4,7 @@ import { App, Stack } from '../core/app';
 import { FileResource } from './file';
 import { FileSystem } from '../services/fs';
 import { SecretManager } from '../services/secrets-manager';
+import { TemplateService, TemplateServiceLive } from '../services/template';
 
 describe('FileResource', () => {
   const MockFS = (state: any) => Layer.succeed(FileSystem, FileSystem.of({
@@ -25,6 +26,10 @@ describe('FileResource', () => {
     setPaths: () => Effect.void,
   }));
 
+  const MockTemplate = Layer.succeed(TemplateService, TemplateService.of({
+    render: (template, view) => Effect.succeed(template.replace('{{name}}', view.name)),
+  }));
+
   it('should write file content', async () => {
     const state = { writtenPath: '', writtenContent: '', exists: false };
     const app = new App();
@@ -32,7 +37,7 @@ describe('FileResource', () => {
     const fileRes = new FileResource(stack, 'my-file', { path: '/tmp/test.txt', content: 'hello' });
 
     await Effect.runPromise(
-      Effect.provide(fileRes.apply(), Layer.mergeAll(MockFS(state), MockSM))
+      Effect.provide(fileRes.apply(), Layer.mergeAll(MockFS(state), MockSM, MockTemplate))
     );
     
     expect(state.writtenPath).toBe('/tmp/test.txt');
@@ -54,7 +59,7 @@ describe('FileResource', () => {
     });
 
     const { existsBefore, existsAfter } = await Effect.runPromise(
-      Effect.provide(program, Layer.mergeAll(MockFS(state), MockSM))
+      Effect.provide(program, Layer.mergeAll(MockFS(state), MockSM, MockTemplate))
     );
 
     expect(existsBefore).toBe(true);
@@ -74,10 +79,27 @@ describe('FileResource', () => {
     } as any);
 
     await Effect.runPromise(
-      Effect.provide(fileRes.apply(), Layer.mergeAll(MockFS(state), MockSM))
+      Effect.provide(fileRes.apply(), Layer.mergeAll(MockFS(state), MockSM, MockTemplate))
     );
     
     expect(state.chmod).toEqual({ path: '/tmp/attr-test.txt', mode: 0o644 });
     expect(state.chown).toEqual({ path: '/tmp/attr-test.txt', uid: 1000, gid: 1000 });
+  });
+
+  it('should render content as a template if vars are provided', async () => {
+    const state: any = {};
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const fileRes = new FileResource(stack, 'tpl-file', {
+      path: '/tmp/tpl.txt',
+      content: 'Hello {{name}}!',
+      vars: { name: 'Dotts' }
+    } as any);
+
+    await Effect.runPromise(
+      Effect.provide(fileRes.apply(), Layer.mergeAll(MockFS(state), MockSM, MockTemplate))
+    );
+    
+    expect(state.writtenContent).toBe('Hello Dotts!');
   });
 });

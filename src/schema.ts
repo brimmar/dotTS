@@ -14,6 +14,7 @@ export const SymlinkSchema = z.object({
 export const FileSchema = z.object({
   path: z.string(),
   content: z.string(),
+  vars: z.record(z.any()).optional(),
   mode: z.number().optional(),
   uid: z.number().optional(),
   gid: z.number().optional(),

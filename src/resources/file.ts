@@ -4,11 +4,13 @@ import { FileSystem } from '../services/fs';
 import { dirname } from 'node:path';
 import { SecretToken } from '../core/secret';
 import { SecretManager } from '../services/secrets-manager';
+import { TemplateService } from '../services/template';
 import { hashConfig } from '../core/hash';
 
 export interface FileResourceProps {
   path: string;
   content: string | SecretToken;
+  vars?: Record<string, any>;
   mode?: number;
   uid?: number;
   gid?: number;
@@ -28,12 +30,17 @@ export class FileResource extends Resource {
     return Effect.gen(this, function* () {
       const fs = yield* FileSystem;
       const sm = yield* SecretManager;
+      const tpl = yield* TemplateService;
       
       let content: string;
       if (this.props.content instanceof SecretToken) {
         content = yield* sm.get(this.props.content.name);
       } else {
         content = this.props.content;
+      }
+
+      if (this.props.vars) {
+        content = yield* tpl.render(content, this.props.vars);
       }
 
       yield* fs.mkdir(dirname(this.props.path));

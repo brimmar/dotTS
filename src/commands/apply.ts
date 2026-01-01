@@ -8,6 +8,7 @@ import { SecretManager, SecretManagerLive } from '../services/secrets-manager';
 import { SecretStoreLive } from '../services/secrets';
 import { StateServiceLive } from '../services/state';
 import { PlatformServiceLive } from '../services/platform';
+import { TemplateServiceLive } from '../services/template';
 import { loadConfig } from '../core/loader';
 
 export interface ApplyOptions {
@@ -29,6 +30,8 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
         symlink: (target, path) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would create symlink: ${path} -> ${target}`))),
         rm: (path) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would remove: ${path}`))),
         unlink: (path) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would unlink: ${path}`))),
+        chmod: (path, mode) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would chmod: ${path} to ${mode}`))),
+        chown: (path, uid, gid) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would chown: ${path} to ${uid}:${gid}`))),
       }))
     : FileSystemLive;
 
@@ -48,6 +51,7 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
     Effect.provide(StateServiceLive),
     Effect.provide(SecretManagerLive),
     Effect.provide(PlatformServiceLive),
+    Effect.provide(TemplateServiceLive),
     Effect.provide(FSLayer),
     Effect.provide(SecretStoreLive),
     Effect.provide(ExecLayer),
