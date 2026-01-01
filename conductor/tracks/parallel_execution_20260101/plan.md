@@ -10,7 +10,7 @@
 - [x] Task: Ensure the `Runner` respects these constraints during concurrent execution [210434d]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Constraints' (Protocol in workflow.md)
 
-## Phase 3: Performance & UX Polish
-- [ ] Task: Add execution timing metrics to the CLI summary
-- [ ] Task: Optimize Clack output for concurrent operations (prevent text overlapping/jank)
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Polish' (Protocol in workflow.md)
+## Phase 3: Performance & UX Polish [checkpoint: e58360c]
+- [x] Task: Add execution timing metrics to the CLI summary [3eb7d91]
+- [x] Task: Optimize Clack output for concurrent operations (prevent text overlapping/jank) [3eb7d91]
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Polish' (Protocol in workflow.md)
