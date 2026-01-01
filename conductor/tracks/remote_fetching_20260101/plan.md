@@ -1,8 +1,8 @@
 # Plan: Remote Fetching
 
 ## Phase 1: Basic Remote Download
-- [ ] Task: Implement `HttpService` using Bun's native `fetch`
-- [ ] Task: Create `RemoteFileResource` and functional helper `remoteFile()`
+- [x] Task: Implement `HttpService` using Bun's native `fetch` [8bd0648]
+- [~] Task: Create `RemoteFileResource` and functional helper `remoteFile()`
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Basic Download' (Protocol in workflow.md)
 
 ## Phase 2: Integrity & Attributes
