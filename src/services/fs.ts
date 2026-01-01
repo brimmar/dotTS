@@ -10,6 +10,8 @@ export interface FileSystem {
   readonly symlink: (target: string, path: string) => Effect.Effect<void, Error>;
   readonly rm: (path: string) => Effect.Effect<void, Error>;
   readonly unlink: (path: string) => Effect.Effect<void, Error>;
+  readonly chmod: (path: string, mode: number) => Effect.Effect<void, Error>;
+  readonly chown: (path: string, uid: number, gid: number) => Effect.Effect<void, Error>;
 }
 
 export const FileSystem = Context.GenericTag<FileSystem>('FileSystem');
@@ -63,6 +65,16 @@ export const FileSystemLive = Layer.succeed(
       Effect.tryPromise({
         try: () => NodeFS.unlink(path),
         catch: (error) => new Error(`Failed to unlink ${path}: ${String(error)}`),
+      }),
+    chmod: (path, mode) =>
+      Effect.tryPromise({
+        try: () => NodeFS.chmod(path, mode),
+        catch: (error) => new Error(`Failed to chmod ${path} to ${mode}: ${String(error)}`),
+      }),
+    chown: (path, uid, gid) =>
+      Effect.tryPromise({
+        try: () => NodeFS.chown(path, uid, gid),
+        catch: (error) => new Error(`Failed to chown ${path} to ${uid}:${gid}: ${String(error)}`),
       }),
   })
 );
