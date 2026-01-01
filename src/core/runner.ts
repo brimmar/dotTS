@@ -2,6 +2,7 @@ import { Context, Effect, Layer } from 'effect';
 import { Component, Resource, flatten } from './component';
 import { StateService, AppState } from '../services/state';
 import { color } from 'console-log-colors';
+import { sortResources } from './graph';
 
 export interface Runner {
   readonly run: (component: Component) => Effect.Effect<void, Error>;
@@ -20,7 +21,8 @@ export const RunnerLive = Layer.effect(
           const currentState = yield* stateService.load();
           const newState: AppState = {};
           
-          const resources = flatten(component);
+          const rawResources = flatten(component);
+          const resources = sortResources(rawResources);
 
           for (const res of resources) {
             const id = res.id;
