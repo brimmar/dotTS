@@ -6,13 +6,16 @@ export async function dottsInit(projectDir: string) {
   
   const publicPath = relative(projectDir, join(process.cwd(), 'src/public')).split(sep).join('/');
   
+  const b = String.fromCharCode(96);
   const content = `import { pkg, file, App } from '${publicPath}';
 
 export default async (app: App) => {
   pkg('neovim');
 
   file('~/.gitconfig', {
-    content: '[user]\n  name = My Name\n  email = my@email.com',
+    content: ${b}[user]
+  name = My Name
+  email = my@email.com${b},
   });
 };
 `;
