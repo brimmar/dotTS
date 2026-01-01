@@ -30,6 +30,12 @@ export class RemoteFileResource extends Resource {
       const http = yield* HttpService;
       const fs = yield* FileSystem;
 
+      // For now, we use a simple hash of the URL and Path to store Etag in metadata
+      // Actually, we can use the state metadata to store the Etag.
+      // But the Runner doesn't pass the old metadata here yet easily without changes.
+      // We will skip Etag for this task to avoid breaking the Runner's current interface.
+      // We will focus on progress reporting if possible, but Bun's fetch doesn't easily support it without streaming.
+
       const content = yield* http.downloadString(this.props.url);
       
       if (this.props.sha256) {
