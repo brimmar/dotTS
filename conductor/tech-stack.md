@@ -12,6 +12,9 @@
 ## Configuration & Validation
 - **Zod:** Employed for defining and validating the structure of dotfile configurations, providing excellent TypeScript integration.
 
+## Templating
+- **Mustache:** Used for logic-less templating, allowing for dynamic content generation in managed files.
+
 ## Architecture & Logic
 - **Effect:** A powerful library for building robust, type-safe, and testable applications. It will manage our side effects, error handling, and dependency management.
 
