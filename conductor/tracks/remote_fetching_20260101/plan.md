@@ -6,8 +6,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Basic Download' (Protocol in workflow.md)
 
 ## Phase 2: Integrity & Attributes
-- [ ] Task: Implement SHA256 verification for `RemoteFileResource`
-- [ ] Task: Support setting POSIX attributes (mode, owner, group) on downloaded files
+- [x] Task: Implement SHA256 verification for `RemoteFileResource` [5a66c76]
+- [x] Task: Support setting POSIX attributes (mode, owner, group) on downloaded files [5a66c76]
+- [~] Task: Conductor - User Manual Verification 'Phase 2: Integrity' (Protocol in workflow.md)
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Integrity' (Protocol in workflow.md)
 
 ## Phase 3: UX & Progress
