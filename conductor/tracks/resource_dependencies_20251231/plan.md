@@ -10,5 +10,5 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Graph Engine' (Protocol in workflow.md)
 
 ## Phase 3: Runner Integration
-- [ ] Task: Update the `Runner` to sort the resource tree before execution
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Runner Integration' (Protocol in workflow.md)
+- [x] Task: Update the `Runner` to sort the resource tree before execution [c51b089]
+- [~] Task: Conductor - User Manual Verification 'Phase 3: Runner Integration' (Protocol in workflow.md)
