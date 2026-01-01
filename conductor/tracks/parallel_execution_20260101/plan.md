@@ -1,8 +1,8 @@
 # Plan: Parallel Execution
 
 ## Phase 1: Batched Execution Engine
-- [ ] Task: Implement "tier-based" sorting in `Graph` engine to group parallelizable resources
-- [ ] Task: Refactor `Runner.run()` to execute resource tiers concurrently using `Effect.all`
+- [x] Task: Implement "tier-based" sorting in `Graph` engine to group parallelizable resources [e799795]
+- [~] Task: Refactor `Runner.run()` to execute resource tiers concurrently using `Effect.all`
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Batched Execution' (Protocol in workflow.md)
 
 ## Phase 2: Resource Constraints & Locking
