@@ -7,6 +7,7 @@ import { SymlinkResource } from '../resources/symlink';
 import { FileResource } from '../resources/file';
 import { DirectoryResource } from '../resources/directory';
 import { ScriptResource } from '../resources/script';
+import { ActiveContext } from './context';
 
 export async function loadConfig(configPath: string): Promise<{ app: App; config: any }> {
   const absolutePath = resolve(configPath);
@@ -17,8 +18,23 @@ export async function loadConfig(configPath: string): Promise<{ app: App; config
 
   const module = await import(absolutePath);
   
+  const app = new App();
+  const stack = new Stack(app, 'default');
+
+  // Handle functional configuration (export default)
+  if (typeof module.default === 'function') {
+    ActiveContext.setStack(stack);
+    try {
+      await module.default(app);
+    } finally {
+      ActiveContext.clear();
+    }
+    return { app, config: { name: 'functional-config' } };
+  }
+
+  // Handle legacy object-based configuration (export const config)
   if (!module.config) {
-    throw new Error(`Configuration file must export a 'config' object: ${configPath}`);
+    throw new Error(`Configuration file must export a 'config' object or a default function: ${configPath}`);
   }
 
   const result = DottsSchema.safeParse(module.config);
@@ -29,8 +45,6 @@ export async function loadConfig(configPath: string): Promise<{ app: App; config
   }
 
   const config = result.data;
-  const app = new App();
-  const stack = new Stack(app, 'default');
 
   for (const pkg of config.packages) {
     new PackageResource(stack, `pkg-${pkg.name}`, pkg);
