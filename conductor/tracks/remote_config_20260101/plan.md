@@ -1,9 +1,9 @@
 # Plan: Remote Configuration Support
 
-## Phase 1: Repository Resolver & Fetcher
+## Phase 1: Repository Resolver & Fetcher [checkpoint: 5a9cd41]
 - [x] Task: Implement `RemoteRepoService` for shorthand resolution and cloning [cb1e4c8]
 - [x] Task: Add utility to handle temporary directory management [5d2bdd7]
-- [~] Task: Conductor - User Manual Verification 'Phase 1: Resolver' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Resolver' (Protocol in workflow.md)
 
 ## Phase 2: Remote Apply Integration
 - [ ] Task: Update `dotts apply` to detect and handle remote repository strings
