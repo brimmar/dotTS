@@ -5,10 +5,10 @@
 - [x] Task: Update `FileResource` to support `mode`, `owner`, and `group` attributes [f86a216]
 - [x] Task: Conductor - User Manual Verification 'Phase 1: File Attributes' (Protocol in workflow.md)
 
-## Phase 2: Templating
-- [ ] Task: Integrate `mustache` templating library
-- [ ] Task: Update `FileResource` to support dynamic content resolution via templates
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Templating' (Protocol in workflow.md)
+## Phase 2: Templating [checkpoint: 635b46b]
+- [x] Task: Integrate `mustache` templating library [158363e]
+- [x] Task: Update `FileResource` to support dynamic content resolution via templates [f39529c]
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Templating' (Protocol in workflow.md)
 
 ## Phase 3: Directory Resource
 - [ ] Task: Implement `DirectoryResource` for explicit directory management
