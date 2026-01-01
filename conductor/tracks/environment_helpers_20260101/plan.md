@@ -10,6 +10,6 @@
 - [x] Task: Ensure helpers are correctly typed for IDE autocompletion [1ef41fc]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Refinement' (Protocol in workflow.md)
 
-## Phase 3: Documentation & Examples
-- [~] Task: Update the `dotts init` template or provide a snippet in documentation
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: DX' (Protocol in workflow.md)
+## Phase 3: Documentation & Examples [checkpoint: 85595e8]
+- [x] Task: Update the `dotts init` template or provide a snippet in documentation [bba509d]
+- [x] Task: Conductor - User Manual Verification 'Phase 3: DX' (Protocol in workflow.md)
