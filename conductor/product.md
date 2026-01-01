@@ -25,6 +25,7 @@ Traditional dotfile management is often fragmented and difficult to maintain:
 - **Dynamic Templating:** Leverage templating to inject environment-specific variables and secrets into configuration files.
 - **Granular System Control:** Manage POSIX attributes like permissions and ownership for files and directories with precision.
 - **Extensible Scripting:** Execute arbitrary shell commands with custom idempotency logic (`unless`, `onlyIf`) for specialized setup tasks.
+- **Parallel Execution:** Accelerate system setup by executing independent resource tiers concurrently, with automatic locking for singleton resources.
 - **Hermetic Setup:** Achieve reproducible environments with a simplified UX that hides the underlying complexity.
 - **Modular & Shareable Presets:** Easily package and share configuration modules, enabling community-driven or team-specific setups.
 - **Automated Dependency Management:** Automatically handle the installation and configuration of tools defined in the dotfiles.
