@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { Resource, Component } from './component';
-import { sortResources } from './graph';
+import { sortResources, sortResourcesByTier } from './graph';
 import { Effect } from 'effect';
 
 class MockResource extends Resource {
@@ -45,5 +45,29 @@ describe('Graph Engine', () => {
     r1.addDependency(r2); // Cycle!
 
     expect(() => sortResources([r1, r2])).toThrow(/Circular dependency detected/);
+  });
+
+  it('should group resources into execution tiers', () => {
+    const parent = new class extends Component { constructor() { super('root'); } };
+    
+    const r1 = new MockResource(parent, 'r1');
+    const r2 = new MockResource(parent, 'r2');
+    const r3 = new MockResource(parent, 'r3', { dependsOn: [r1] });
+    const r4 = new MockResource(parent, 'r4', { dependsOn: [r1] });
+    const r5 = new MockResource(parent, 'r5', { dependsOn: [r3, r4] });
+
+    // Tiers should be:
+    // Tier 0: [r1, r2] (no dependencies)
+    // Tier 1: [r3, r4] (depends on r1)
+    // Tier 2: [r5] (depends on r3, r4)
+
+    const tiers = sortResourcesByTier([r1, r2, r3, r4, r5]);
+    
+    expect(tiers.length).toBe(3);
+    expect(tiers[0]).toContain(r1);
+    expect(tiers[0]).toContain(r2);
+    expect(tiers[1]).toContain(r3);
+    expect(tiers[1]).toContain(r4);
+    expect(tiers[2]).toContain(r5);
   });
 });
