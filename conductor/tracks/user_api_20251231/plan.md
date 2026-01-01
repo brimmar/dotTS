@@ -5,10 +5,10 @@
 - [x] Task: Implement functional helpers (`file`, `pkg`, `link`, `dir`, `script`, `secret`) [0011733]
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Helpers' (Protocol in workflow.md)
 
-## Phase 2: Functional Loader
-- [ ] Task: Update `loader.ts` to support functional configurations via `export default`
-- [ ] Task: Ensure the loader correctly sets the active context before execution
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Loader' (Protocol in workflow.md)
+## Phase 2: Functional Loader [checkpoint: 72c3da0]
+- [x] Task: Update `loader.ts` to support functional configurations via `export default` [5bc6267]
+- [x] Task: Ensure the loader correctly sets the active context before execution [5bc6267]
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Loader' (Protocol in workflow.md)
 
 ## Phase 3: Developer Experience & Templates
 - [ ] Task: Create a single public entry point for all user-facing functions
