@@ -1,0 +1,16 @@
+# Plan: Remote Fetching
+
+## Phase 1: Basic Remote Download
+- [ ] Task: Implement `HttpService` using Bun's native `fetch`
+- [ ] Task: Create `RemoteFileResource` and functional helper `remoteFile()`
+- [ ] Task: Conductor - User Manual Verification 'Phase 1: Basic Download' (Protocol in workflow.md)
+
+## Phase 2: Integrity & Attributes
+- [ ] Task: Implement SHA256 verification for `RemoteFileResource`
+- [ ] Task: Support setting POSIX attributes (mode, owner, group) on downloaded files
+- [ ] Task: Conductor - User Manual Verification 'Phase 2: Integrity' (Protocol in workflow.md)
+
+## Phase 3: UX & Progress
+- [ ] Task: Add progress reporting for downloads to the CLI
+- [ ] Task: Implement basic caching (Etag support)
+- [ ] Task: Conductor - User Manual Verification 'Phase 3: DX' (Protocol in workflow.md)
