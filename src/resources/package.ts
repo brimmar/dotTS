@@ -20,6 +20,10 @@ export class PackageResource extends Resource {
     super(scope, id, props);
   }
 
+  get concurrencyKey() {
+    return `pkg-manager-${this.props.manager || 'system'}`;
+  }
+
   hash() {
     return hashConfig(this.props);
   }

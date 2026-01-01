@@ -25,25 +25,30 @@ export const RunnerLive = Layer.effect(
           const tiers = sortResourcesByTier(rawResources);
 
           for (const tier of tiers) {
+            // Group resources in the current tier by concurrencyKey
+            const groups = new Map<string | undefined, Resource[]>();
+            for (const res of tier) {
+              const key = res.concurrencyKey;
+              if (!groups.has(key)) groups.set(key, []);
+              groups.get(key)!.push(res);
+            }
+
+            // Execute groups concurrently
             yield* Effect.all(
-              tier.map((res) =>
+              Array.from(groups.entries()).map(([key, resources]) =>
                 Effect.gen(function* () {
-                  const id = res.id;
-                  const hash = res.hash();
-                  const oldState = currentState[id];
-
-                  if (!oldState) {
-                    console.log(color.green(`+ Create: ${id}`));
-                    yield* res.apply();
-                  } else if (oldState.hash !== hash) {
-                    console.log(color.yellow(`~ Update: ${id}`));
-                    yield* res.apply();
+                  // If key is undefined, resources can run concurrently with each other
+                  if (key === undefined) {
+                    yield* Effect.all(
+                      resources.map((res) => runResource(res, currentState, newState)),
+                      { concurrency: 'unbounded' }
+                    );
                   } else {
-                    console.log(color.gray(`  No-op: ${id}`));
+                    // Resources with the same key must run sequentially
+                    for (const res of resources) {
+                      yield* runResource(res, currentState, newState);
+                    }
                   }
-
-                  // We store props in metadata for future use (e.g. deletion)
-                  newState[id] = { hash, metadata: (res as any).props || {} };
                 })
               ),
               { concurrency: 'unbounded' }
@@ -63,3 +68,23 @@ export const RunnerLive = Layer.effect(
     });
   })
 );
+
+function runResource(res: Resource, currentState: AppState, newState: AppState) {
+  return Effect.gen(function* () {
+    const id = res.id;
+    const hash = res.hash();
+    const oldState = currentState[id];
+
+    if (!oldState) {
+      console.log(color.green(`+ Create: ${id}`));
+      yield* res.apply();
+    } else if (oldState.hash !== hash) {
+      console.log(color.yellow(`~ Update: ${id}`));
+      yield* res.apply();
+    } else {
+      console.log(color.gray(`  No-op:  ${id}`));
+    }
+
+    newState[id] = { hash, metadata: (res as any).props || {} };
+  });
+}

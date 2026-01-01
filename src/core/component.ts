@@ -28,6 +28,14 @@ export abstract class Resource extends Component {
     }
   }
 
+  /**
+   * Optional key used to serialize execution of resources that cannot run in parallel.
+   * Resources with the same concurrencyKey will be executed sequentially within their tier.
+   */
+  get concurrencyKey(): string | undefined {
+    return undefined;
+  }
+
   abstract apply(): Effect.Effect<void, Error>;
   abstract destroy(): Effect.Effect<void, Error>;
   abstract hash(): string;

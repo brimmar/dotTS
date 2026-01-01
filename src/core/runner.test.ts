@@ -110,4 +110,38 @@ describe('Runner', () => {
     // With parallel execution, maxActive should be > 1
     expect(maxActive).toBeGreaterThan(1);
   });
+
+  it('should serialize resources with the same concurrencyKey', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    
+    let activeCount = 0;
+    let maxActive = 0;
+
+    class LockedResource extends TestResource {
+      get concurrencyKey() { return 'global-lock'; }
+      apply() {
+        return Effect.gen(this, function* () {
+          activeCount++;
+          if (activeCount > maxActive) maxActive = activeCount;
+          yield* Effect.sleep('10 millis');
+          activeCount--;
+        });
+      }
+    }
+
+    new LockedResource(stack, 'r1');
+    new LockedResource(stack, 'r2');
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(Layer.provide(MockState()));
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    // Even if they are in the same tier, they should be serialized
+    expect(maxActive).toBe(1);
+  });
 });
