@@ -4,7 +4,7 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [ ] Track: Remote Fetching
+## [x] Track: Remote Fetching
 *Link: [./conductor/tracks/remote_fetching_20260101/](./conductor/tracks/remote_fetching_20260101/)*
 
 ---

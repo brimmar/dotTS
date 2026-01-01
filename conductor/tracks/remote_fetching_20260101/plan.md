@@ -11,7 +11,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Integrity' (Protocol in workflow.md)
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Integrity' (Protocol in workflow.md)
 
-## Phase 3: UX & Progress
-- [ ] Task: Add progress reporting for downloads to the CLI
-- [ ] Task: Implement basic caching (Etag support)
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: DX' (Protocol in workflow.md)
+## Phase 3: UX & Progress [checkpoint: 7105707]
+- [x] Task: Add progress reporting for downloads to the CLI [112e7c5]
+- [x] Task: Implement basic caching (Etag support) [112e7c5]
+- [x] Task: Conductor - User Manual Verification 'Phase 3: DX' (Protocol in workflow.md)
