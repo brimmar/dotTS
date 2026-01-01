@@ -1,8 +1,8 @@
 # Plan: Remote Configuration Support
 
 ## Phase 1: Repository Resolver & Fetcher
-- [ ] Task: Implement `RemoteRepoService` for shorthand resolution and cloning
-- [ ] Task: Add utility to handle temporary directory management
+- [x] Task: Implement `RemoteRepoService` for shorthand resolution and cloning [cb1e4c8]
+- [~] Task: Add utility to handle temporary directory management
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Resolver' (Protocol in workflow.md)
 
 ## Phase 2: Remote Apply Integration
