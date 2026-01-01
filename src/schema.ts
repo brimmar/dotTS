@@ -14,6 +14,9 @@ export const SymlinkSchema = z.object({
 export const FileSchema = z.object({
   path: z.string(),
   content: z.string(),
+  mode: z.number().optional(),
+  uid: z.number().optional(),
+  gid: z.number().optional(),
 });
 
 export const DottsSchema = z.object({

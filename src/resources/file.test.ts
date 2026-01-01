@@ -14,6 +14,8 @@ describe('FileResource', () => {
     symlink: () => Effect.void,
     rm: () => Effect.sync(() => { state.exists = false; }),
     unlink: () => Effect.sync(() => { state.exists = false; }),
+    chmod: (path, mode) => Effect.sync(() => { state.chmod = { path, mode }; }),
+    chown: (path, uid, gid) => Effect.sync(() => { state.chown = { path, uid, gid }; }),
   }));
 
   const MockSM = Layer.succeed(SecretManager, SecretManager.of({
@@ -57,5 +59,25 @@ describe('FileResource', () => {
 
     expect(existsBefore).toBe(true);
     expect(existsAfter).toBe(false);
+  });
+
+  it('should apply file attributes (mode, owner, group)', async () => {
+    const state: any = {};
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const fileRes = new FileResource(stack, 'my-file', {
+      path: '/tmp/attr-test.txt',
+      content: 'hello',
+      mode: 0o644,
+      uid: 1000,
+      gid: 1000,
+    } as any);
+
+    await Effect.runPromise(
+      Effect.provide(fileRes.apply(), Layer.mergeAll(MockFS(state), MockSM))
+    );
+    
+    expect(state.chmod).toEqual({ path: '/tmp/attr-test.txt', mode: 0o644 });
+    expect(state.chown).toEqual({ path: '/tmp/attr-test.txt', uid: 1000, gid: 1000 });
   });
 });

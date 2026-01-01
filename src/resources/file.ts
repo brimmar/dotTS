@@ -9,6 +9,9 @@ import { hashConfig } from '../core/hash';
 export interface FileResourceProps {
   path: string;
   content: string | SecretToken;
+  mode?: number;
+  uid?: number;
+  gid?: number;
   dependsOn?: Component[];
 }
 
@@ -35,6 +38,16 @@ export class FileResource extends Resource {
 
       yield* fs.mkdir(dirname(this.props.path));
       yield* fs.writeFile(this.props.path, content);
+
+      if (this.props.mode !== undefined) {
+        yield* fs.chmod(this.props.path, this.props.mode);
+      }
+
+      if (this.props.uid !== undefined || this.props.gid !== undefined) {
+        const uid = this.props.uid ?? process.getuid!();
+        const gid = this.props.gid ?? process.getgid!();
+        yield* fs.chown(this.props.path, uid, gid);
+      }
     });
   }
 
