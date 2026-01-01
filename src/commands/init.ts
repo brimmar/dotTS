@@ -7,11 +7,28 @@ export async function dottsInit(projectDir: string) {
   const publicPath = relative(projectDir, join(process.cwd(), 'src/public')).split(sep).join('/');
   
   const b = String.fromCharCode(96);
-  const content = `import { pkg, file, App } from '${publicPath}';
+  const content = `import { pkg, file, onPlatform, onDistro, App } from '${publicPath}';
 
 export default async (app: App) => {
+  // Common packages
+  pkg('git');
   pkg('neovim');
 
+  // Platform-specific configuration
+  onPlatform('darwin', () => {
+    pkg('iterm2');
+  });
+
+  onPlatform('linux', () => {
+    pkg('tilix');
+  });
+
+  // Distribution-specific configuration
+  onDistro('ubuntu', () => {
+    pkg('build-essential');
+  });
+
+  // Managed files
   file('~/.gitconfig', {
     content: ${b}[user]
   name = My Name

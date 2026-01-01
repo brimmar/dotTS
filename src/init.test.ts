@@ -13,10 +13,30 @@ describe('dotts init', () => {
     }
   });
 
-  it('should create a project directory and a dotts.ts file', async () => {
-    await dottsInit(testProjectDir);
-    
-    expect(await exists(testProjectDir)).toBe(true);
-    expect(await exists(join(testProjectDir, 'dotts.ts'))).toBe(true);
+    it('should create a project directory and a dotts.ts file', async () => {
+
+      await dottsInit(testProjectDir);
+
+      
+
+      expect(await exists(testProjectDir)).toBe(true);
+
+      const configPath = join(testProjectDir, 'dotts.ts');
+
+      expect(await exists(configPath)).toBe(true);
+
+  
+
+      const content = await Bun.file(configPath).text();
+
+      expect(content).toContain('import { pkg, file, onPlatform, onDistro, App }');
+
+      expect(content).toContain('onPlatform(\'darwin\'');
+
+      expect(content).toContain('onDistro(\'ubuntu\'');
+
+    });
+
   });
-});
+
+  
