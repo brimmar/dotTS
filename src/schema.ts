@@ -20,11 +20,19 @@ export const FileSchema = z.object({
   gid: z.number().optional(),
 });
 
+export const DirectorySchema = z.object({
+  path: z.string(),
+  mode: z.number().optional(),
+  uid: z.number().optional(),
+  gid: z.number().optional(),
+});
+
 export const DottsSchema = z.object({
   name: z.string(),
   packages: z.array(PackageSchema).default([]),
   symlinks: z.array(SymlinkSchema).default([]),
   files: z.array(FileSchema).default([]),
+  directories: z.array(DirectorySchema).default([]),
 });
 
 export type Package = z.infer<typeof PackageSchema>;
