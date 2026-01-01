@@ -1,0 +1,8 @@
+{
+  "track_id": "advanced_files_20251231",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2025-12-31T23:00:00Z",
+  "updated_at": "2025-12-31T23:00:00Z",
+  "description": "Enhance file management with permissions, ownership, and templating support."
+}
