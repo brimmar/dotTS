@@ -3,14 +3,16 @@ import { Resource, Component } from '../core/component';
 import { HttpService } from '../services/http';
 import { FileSystem } from '../services/fs';
 import { hashConfig } from '../core/hash';
+import { createHash } from 'node:crypto';
+import { dirname } from 'node:path';
 
 export interface RemoteFileResourceProps {
   url: string;
   path: string;
   sha256?: string;
   mode?: number;
-  owner?: string;
-  group?: string;
+  uid?: number;
+  gid?: number;
   dependsOn?: Component[];
 }
 
@@ -29,10 +31,25 @@ export class RemoteFileResource extends Resource {
       const fs = yield* FileSystem;
 
       const content = yield* http.downloadString(this.props.url);
+      
+      if (this.props.sha256) {
+        const actualHash = createHash('sha256').update(content).digest('hex');
+        if (actualHash !== this.props.sha256) {
+          throw new Error(`Hash mismatch for ${this.props.url}. Expected ${this.props.sha256}, got ${actualHash}`);
+        }
+      }
+
+      yield* fs.mkdir(dirname(this.props.path));
       yield* fs.writeFile(this.props.path, content);
       
       if (this.props.mode !== undefined) {
         yield* fs.chmod(this.props.path, this.props.mode);
+      }
+
+      if (this.props.uid !== undefined || this.props.gid !== undefined) {
+        const uid = this.props.uid ?? process.getuid!();
+        const gid = this.props.gid ?? process.getgid!();
+        yield* fs.chown(this.props.path, uid, gid);
       }
     });
   }

@@ -49,4 +49,78 @@ describe('RemoteFileResource', () => {
     expect(writtenPath).toBe('/tmp/file.txt');
     expect(writtenContent).toBe('remote content');
   });
+
+  it('should fail if sha256 hash mismatch', async () => {
+    const MockHttp = Layer.succeed(HttpService, HttpService.of({
+      downloadString: () => Effect.succeed('wrong content'),
+      downloadBytes: () => Effect.succeed(new Uint8Array()),
+    }));
+
+    const MockFS = Layer.succeed(FileSystem, FileSystem.of({
+      writeFile: () => Effect.void,
+      readFile: () => Effect.succeed(''),
+      exists: () => Effect.succeed(false),
+      mkdir: () => Effect.void,
+      symlink: () => Effect.void,
+      rm: () => Effect.void,
+      unlink: () => Effect.void,
+      chmod: () => Effect.void,
+      chown: () => Effect.void,
+    }));
+
+    const res = new RemoteFileResource(stack, 'remote-fail', {
+      url: 'https://example.com/file.txt',
+      path: '/tmp/file.txt',
+      sha256: 'ed7002b439e9ac845f22357d822baa1444730df89de548322927c6f1208a0ef9', // sha256 of 'remote content'
+    });
+
+    const result = await Effect.runPromiseExit(res.apply().pipe(
+      Effect.provide(Layer.mergeAll(MockHttp, MockFS))
+    ));
+
+    expect(result._tag).toBe('Failure');
+  });
+
+  it('should apply POSIX attributes', async () => {
+    let chmodPath = '';
+    let chmodMode = 0;
+    let chownPath = '';
+    let chownUid = 0;
+    let chownGid = 0;
+
+    const MockHttp = Layer.succeed(HttpService, HttpService.of({
+      downloadString: () => Effect.succeed('content'),
+      downloadBytes: () => Effect.succeed(new Uint8Array()),
+    }));
+
+    const MockFS = Layer.succeed(FileSystem, FileSystem.of({
+      writeFile: () => Effect.void,
+      readFile: () => Effect.succeed(''),
+      exists: () => Effect.succeed(false),
+      mkdir: () => Effect.void,
+      symlink: () => Effect.void,
+      rm: () => Effect.void,
+      unlink: () => Effect.void,
+      chmod: (path, mode) => Effect.sync(() => { chmodPath = path; chmodMode = mode; }),
+      chown: (path, uid, gid) => Effect.sync(() => { chownPath = path; chownUid = uid; chownGid = gid; }),
+    }));
+
+    const res = new RemoteFileResource(stack, 'remote-attrs', {
+      url: 'https://example.com/file.txt',
+      path: '/tmp/file.txt',
+      mode: 0o644,
+      uid: 1000,
+      gid: 1000,
+    });
+
+    await Effect.runPromise(res.apply().pipe(
+      Effect.provide(Layer.mergeAll(MockHttp, MockFS))
+    ));
+
+    expect(chmodPath).toBe('/tmp/file.txt');
+    expect(chmodMode).toBe(0o644);
+    expect(chownPath).toBe('/tmp/file.txt');
+    expect(chownUid).toBe(1000);
+    expect(chownGid).toBe(1000);
+  });
 });
