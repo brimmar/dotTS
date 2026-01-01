@@ -10,6 +10,6 @@
 - [x] Task: Implement `onlyIf` logic for script guards [ab0fd2b]
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Conditionals' (Protocol in workflow.md)
 
-## Phase 3: CLI & Schema Integration
-- [ ] Task: Update `DottsSchema` and `loader.ts` to support `scripts`
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Integration' (Protocol in workflow.md)
+## Phase 3: CLI & Schema Integration [checkpoint: b647939]
+- [x] Task: Update `DottsSchema` and `loader.ts` to support `scripts` [1be336b]
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Integration' (Protocol in workflow.md)
