@@ -6,6 +6,7 @@ import { PackageResource } from '../resources/package';
 import { SymlinkResource } from '../resources/symlink';
 import { FileResource } from '../resources/file';
 import { DirectoryResource } from '../resources/directory';
+import { ScriptResource } from '../resources/script';
 
 export async function loadConfig(configPath: string): Promise<{ app: App; config: any }> {
   const absolutePath = resolve(configPath);
@@ -45,6 +46,10 @@ export async function loadConfig(configPath: string): Promise<{ app: App; config
 
   for (const dir of config.directories) {
     new DirectoryResource(stack, `dir-${dir.path}`, dir);
+  }
+
+  for (const script of config.scripts) {
+    new ScriptResource(stack, `script-${script.run.slice(0, 20)}`, script);
   }
 
   return { app, config };

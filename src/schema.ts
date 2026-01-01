@@ -27,12 +27,21 @@ export const DirectorySchema = z.object({
   gid: z.number().optional(),
 });
 
+export const ScriptSchema = z.object({
+  run: z.string(),
+  unless: z.string().optional(),
+  onlyIf: z.string().optional(),
+  workingDir: z.string().optional(),
+  environment: z.record(z.string()).optional(),
+});
+
 export const DottsSchema = z.object({
   name: z.string(),
   packages: z.array(PackageSchema).default([]),
   symlinks: z.array(SymlinkSchema).default([]),
   files: z.array(FileSchema).default([]),
   directories: z.array(DirectorySchema).default([]),
+  scripts: z.array(ScriptSchema).default([]),
 });
 
 export type Package = z.infer<typeof PackageSchema>;

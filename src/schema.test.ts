@@ -8,6 +8,7 @@ describe('DottsSchema', () => {
       packages: [{ name: 'neovim', manager: 'brew' }],
       symlinks: [{ source: './zshrc', path: '~/.zshrc' }],
       files: [{ path: '~/.gitconfig', content: '[user]\n  name = Test' }],
+      scripts: [{ run: 'echo ok', unless: 'false' }],
     };
     const result = DottsSchema.safeParse(config);
     expect(result.success).toBe(true);
