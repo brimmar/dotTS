@@ -2,7 +2,7 @@ import { Context, Effect, Layer } from 'effect';
 import { Component, Resource, flatten } from './component';
 import { StateService, AppState } from '../services/state';
 import { color } from 'console-log-colors';
-import { sortResources } from './graph';
+import { sortResourcesByTier } from './graph';
 
 export interface Runner {
   readonly run: (component: Component) => Effect.Effect<void, Error>;
@@ -22,25 +22,32 @@ export const RunnerLive = Layer.effect(
           const newState: AppState = {};
           
           const rawResources = flatten(component);
-          const resources = sortResources(rawResources);
+          const tiers = sortResourcesByTier(rawResources);
 
-          for (const res of resources) {
-            const id = res.id;
-            const hash = res.hash();
-            const oldState = currentState[id];
+          for (const tier of tiers) {
+            yield* Effect.all(
+              tier.map((res) =>
+                Effect.gen(function* () {
+                  const id = res.id;
+                  const hash = res.hash();
+                  const oldState = currentState[id];
 
-            if (!oldState) {
-              console.log(color.green(`+ Create: ${id}`));
-              yield* res.apply();
-            } else if (oldState.hash !== hash) {
-              console.log(color.yellow(`~ Update: ${id}`));
-              yield* res.apply();
-            } else {
-              console.log(color.gray(`  No-op: ${id}`));
-            }
+                  if (!oldState) {
+                    console.log(color.green(`+ Create: ${id}`));
+                    yield* res.apply();
+                  } else if (oldState.hash !== hash) {
+                    console.log(color.yellow(`~ Update: ${id}`));
+                    yield* res.apply();
+                  } else {
+                    console.log(color.gray(`  No-op: ${id}`));
+                  }
 
-            // We store props in metadata for future use (e.g. deletion)
-            newState[id] = { hash, metadata: (res as any).props || {} };
+                  // We store props in metadata for future use (e.g. deletion)
+                  newState[id] = { hash, metadata: (res as any).props || {} };
+                })
+              ),
+              { concurrency: 'unbounded' }
+            );
           }
 
           // Detect deletions

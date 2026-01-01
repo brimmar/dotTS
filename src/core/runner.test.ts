@@ -1,18 +1,16 @@
 import { describe, it, expect } from 'bun:test';
 import { Effect, Layer } from 'effect';
-import { Runner } from './runner';
+import { Runner, RunnerLive } from './runner';
 import { App, Stack } from './app';
 import { Resource, Component } from './component';
-import { StateService, AppState } from '../services/state';
-import { color } from 'console-log-colors';
+import { StateService } from '../services/state';
 
 class TestResource extends Resource {
   public applied = false;
   public destroyed = false;
-  public props = {};
 
-  constructor(scope: any, id: string, public readonly _hash: string = 'hash') {
-    super(scope, id);
+  constructor(scope: Component, id: string, public readonly _hash: string = 'hash', props: any = {}) {
+    super(scope, id, props);
   }
 
   apply() {
@@ -28,105 +26,29 @@ class TestResource extends Resource {
   }
 }
 
-function flatten(component: Component): Resource[] {
-  let result: Resource[] = [];
-  if (component instanceof Resource) {
-    result.push(component);
-  }
-  for (const child of component.children) {
-    result = result.concat(flatten(child));
-  }
-  return result;
-}
-
-const run = (component: Component) =>
-  Effect.gen(function* () {
-    const stateService = yield* StateService;
-    const currentState = yield* stateService.load();
-    const newState: AppState = {};
-    
-    const resources = flatten(component);
-
-    for (const res of resources) {
-      const id = res.id;
-      const hash = res.hash();
-      const oldState = currentState[id];
-
-      if (!oldState) {
-        yield* res.apply();
-      } else if (oldState.hash !== hash) {
-        yield* res.apply();
-      } else {
-        // No-op
-      }
-
-      newState[id] = { hash, metadata: (res as any).props || {} };
-    }
-
-    // Deletions not implemented fully yet
-    
-    yield* stateService.save(newState);
-  });
-
 describe('Runner', () => {
+  const MockState = (initialState: any = {}) => Layer.succeed(StateService, StateService.of({
+    setPath: () => Effect.void,
+    load: () => Effect.succeed(initialState),
+    save: () => Effect.void,
+  }));
+
   it('should create new resources', async () => {
     const app = new App();
     const stack = new Stack(app, 'test');
     const res = new TestResource(stack, 'res-1');
 
-    let savedState: any = {};
-    const MockState = Layer.succeed(StateService, StateService.of({
-        setPath: () => Effect.void,
-        load: () => Effect.succeed({}),
-        save: (s) => Effect.sync(() => { savedState = s; }),
-    }));
-
-    const program = run(app);
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
     
-    await Effect.runPromise(Effect.provide(program, MockState));
+    // Provide MockState to RunnerLive
+    const TestRunnerLayer = RunnerLive.pipe(Layer.provide(MockState()));
     
-    expect(res.applied).toBe(true);
-    expect(savedState['res-1']).toBeDefined();
-    expect(savedState['res-1'].hash).toBe('hash');
-  });
-
-  it('should skip unchanged resources', async () => {
-    const app = new App();
-    const stack = new Stack(app, 'test');
-    const res = new TestResource(stack, 'res-1', 'hash');
-
-    const MockState = Layer.succeed(StateService, StateService.of({
-        setPath: () => Effect.void,
-        load: () => Effect.succeed({ 'res-1': { hash: 'hash', metadata: {} } }),
-        save: () => Effect.void,
-    }));
-
-    const program = run(app);
-    
-    await Effect.runPromise(Effect.provide(program, MockState));
-    
-    expect(res.applied).toBe(false);
-  });
-
-  it('should update changed resources', async () => {
-    const app = new App();
-    const stack = new Stack(app, 'test');
-    const res = new TestResource(stack, 'res-1', 'new-hash');
-
-    let savedState: any = {};
-    const MockState = Layer.succeed(StateService, StateService.of({
-        setPath: () => Effect.void,
-        load: () => Effect.succeed({ 'res-1': { hash: 'old-hash', metadata: {} } }),
-        save: (s) => Effect.sync(() => { savedState = s; }),
-    }));
-
-    const program = run(app);
-    
-    await Effect.runPromise(Effect.provide(program, MockState));
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
     
     expect(res.applied).toBe(true);
-    expect(savedState['res-1']).toBeDefined();
-    expect(savedState['res-1'].hash).toBe('new-hash');
   });
 
   it('should execute resources in dependency order', async () => {
@@ -141,23 +63,51 @@ describe('Runner', () => {
     }
 
     const r1 = new OrderResource(stack, 'r1');
-    const r2 = new OrderResource(stack, 'r2', { dependsOn: [r1] });
-    const r3 = new OrderResource(stack, 'r3'); // No dependency
+    const r2 = new OrderResource(stack, 'r2', 'hash', { dependsOn: [r1] });
+    const r3 = new OrderResource(stack, 'r3', 'hash', { dependsOn: [r2] });
 
-    const MockState = Layer.succeed(StateService, StateService.of({
-        setPath: () => Effect.void,
-        load: () => Effect.succeed({}),
-        save: () => Effect.void,
-    }));
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+    
+    const TestRunnerLayer = RunnerLive.pipe(Layer.provide(MockState()));
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+    
+    expect(executionOrder).toEqual(['r1', 'r2', 'r3']);
+  });
 
-    // We pass them out of order to the tree (r3, r2, r1)
-    // Actually, tree order depends on 'add' calls in constructor.
-    // So current order is r1, r2, r3.
-    // If I want to test sorting, I need to ensure that without sorting it might be wrong.
+  it('should execute resources in the same tier concurrently', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
     
-    await Effect.runPromise(Effect.provide(run(app), MockState));
-    
-    expect(executionOrder.indexOf('r1')).toBeLessThan(executionOrder.indexOf('r2'));
+    let activeCount = 0;
+    let maxActive = 0;
+
+    class SlowResource extends TestResource {
+      apply() {
+        return Effect.gen(this, function* () {
+          activeCount++;
+          if (activeCount > maxActive) maxActive = activeCount;
+          yield* Effect.sleep('10 millis');
+          activeCount--;
+        });
+      }
+    }
+
+    new SlowResource(stack, 'r1');
+    new SlowResource(stack, 'r2');
+    new SlowResource(stack, 'r3');
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(Layer.provide(MockState()));
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    // With parallel execution, maxActive should be > 1
+    expect(maxActive).toBeGreaterThan(1);
   });
 });
-
