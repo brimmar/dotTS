@@ -1,8 +1,8 @@
 # Plan: Script Primitives
 
 ## Phase 1: Basic Script Resource
-- [ ] Task: Update `SystemCommand` service to support `workingDir` and `environment` variables
-- [ ] Task: Implement `ScriptResource` with basic `run` and `workingDir` support
+- [x] Task: Update `SystemCommand` service to support `workingDir` and `environment` variables [d4e794c]
+- [~] Task: Implement `ScriptResource` with basic `run` and `workingDir` support
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Basic Script' (Protocol in workflow.md)
 
 ## Phase 2: Conditional Execution
