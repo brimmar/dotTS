@@ -8,6 +8,9 @@ import { FileResource } from '../resources/file';
 import { DirectoryResource } from '../resources/directory';
 import { ScriptResource } from '../resources/script';
 import { ActiveContext } from './context';
+import { PlatformService, PlatformServiceLive } from '../services/platform';
+import { FileSystemLive } from '../services/fs';
+import { Effect, Layer } from 'effect';
 
 export async function loadConfig(configPath: string): Promise<{ app: App; config: any }> {
   const absolutePath = resolve(configPath);
@@ -21,9 +24,18 @@ export async function loadConfig(configPath: string): Promise<{ app: App; config
   const app = new App();
   const stack = new Stack(app, 'default');
 
+  // Fetch platform info
+  const platformInfo = await Effect.runPromise(
+    Effect.provide(
+      PlatformService.pipe(Effect.flatMap(s => s.get())),
+      Layer.mergeAll(PlatformServiceLive, FileSystemLive)
+    )
+  );
+
   // Handle functional configuration (export default)
   if (typeof module.default === 'function') {
     ActiveContext.setStack(stack);
+    ActiveContext.setPlatform(platformInfo);
     try {
       await module.default(app);
     } finally {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { ActiveContext } from './core/context';
 import { App, Stack } from './core/app';
-import { pkg, file, link, dir, script, secret } from './public';
+import { pkg, file, link, dir, script, secret, onPlatform, onDistro } from './public';
 import { PackageResource } from './resources/package';
 import { FileResource } from './resources/file';
 import { SymlinkResource } from './resources/symlink';
@@ -52,5 +52,29 @@ describe('Functional Helpers', () => {
     const s = secret('API_KEY');
     expect(s).toBeInstanceOf(SecretToken);
     expect(s.name).toBe('API_KEY');
+  });
+
+  it('onPlatform() should execute callback only if OS matches', () => {
+    ActiveContext.setPlatform({ os: 'darwin', arch: 'arm64' });
+    
+    let called = false;
+    onPlatform('darwin', () => { called = true; });
+    expect(called).toBe(true);
+
+    called = false;
+    onPlatform('linux', () => { called = true; });
+    expect(called).toBe(false);
+  });
+
+  it('onDistro() should execute callback only if distro matches', () => {
+    ActiveContext.setPlatform({ os: 'linux', arch: 'x64', distro: 'ubuntu' });
+    
+    let called = false;
+    onDistro('ubuntu', () => { called = true; });
+    expect(called).toBe(true);
+
+    called = false;
+    onDistro('arch', () => { called = true; });
+    expect(called).toBe(false);
   });
 });

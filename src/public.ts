@@ -35,3 +35,17 @@ export function script(run: string, props: Omit<ScriptResourceProps, 'run'> = {}
 }
 
 export const secret = secretTokenHelper;
+
+export function onPlatform(os: string, callback: () => void | Promise<void>) {
+  const platform = ActiveContext.getPlatform();
+  if (platform?.os === os) {
+    callback();
+  }
+}
+
+export function onDistro(distro: string, callback: () => void | Promise<void>) {
+  const platform = ActiveContext.getPlatform();
+  if (platform?.distro === distro) {
+    callback();
+  }
+}

@@ -1,7 +1,9 @@
 import { Stack } from './app';
+import { PlatformInfo } from '../services/platform';
 
 export class ActiveContext {
   private static activeStack: Stack | undefined;
+  private static platformInfo: PlatformInfo | undefined;
 
   static setStack(stack: Stack) {
     this.activeStack = stack;
@@ -9,6 +11,14 @@ export class ActiveContext {
 
   static getStack(): Stack | undefined {
     return this.activeStack;
+  }
+
+  static setPlatform(info: PlatformInfo) {
+    this.platformInfo = info;
+  }
+
+  static getPlatform(): PlatformInfo | undefined {
+    return this.platformInfo;
   }
 
   static requireStack(): Stack {
@@ -22,5 +32,6 @@ export class ActiveContext {
 
   static clear() {
     this.activeStack = undefined;
+    this.platformInfo = undefined;
   }
 }
