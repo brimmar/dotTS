@@ -1,8 +1,0 @@
-{
-  "track_id": "environment_helpers_20260101",
-  "type": "feature",
-  "status": "new",
-  "created_at": "2026-01-01T11:00:00Z",
-  "updated_at": "2026-01-01T11:00:00Z",
-  "description": "Implement fluent environment helpers to simplify platform-specific and distribution-specific configuration logic."
-}

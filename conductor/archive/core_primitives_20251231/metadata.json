@@ -1,8 +1,0 @@
-{
-  "track_id": "core_primitives_20251231",
-  "type": "feature",
-  "status": "new",
-  "created_at": "2025-12-31T11:00:00Z",
-  "updated_at": "2025-12-31T11:00:00Z",
-  "description": "Transform dotts into a programmable IaC tool with reusable Components and a robust Execution Engine."
-}

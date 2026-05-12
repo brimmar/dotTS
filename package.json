@@ -21,5 +21,6 @@
     "effect": "^3.19.13",
     "mustache": "^4.2.0",
     "zod": "^4.3.2"
-  }
+  },
+  "bunInstall": { "allowScripts": false }
 }

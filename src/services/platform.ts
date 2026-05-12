@@ -14,32 +14,35 @@ export interface PlatformService {
 
 export const PlatformService = Context.GenericTag<PlatformService>('PlatformService');
 
-export const PlatformServiceLive = Layer.succeed(
+export const PlatformServiceLive = Layer.effect(
   PlatformService,
-  PlatformService.of({
-    get: () =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem;
-        const currentOS = platform();
-        const currentArch = arch();
-        let distro: string | undefined;
+  Effect.gen(function* () {
+    const fs = yield* FileSystem;
 
-        if (currentOS === 'linux') {
-          const osReleaseExists = yield* fs.exists('/etc/os-release');
-          if (osReleaseExists) {
-            const content = yield* fs.readFile('/etc/os-release');
-            const idMatch = content.match(/^ID=(.*)$/m);
-            if (idMatch) {
-              distro = idMatch[1].replace(/"/g, '');
+    return PlatformService.of({
+      get: () =>
+        Effect.gen(function* () {
+          const currentOS = platform();
+          const currentArch = arch();
+          let distro: string | undefined;
+
+          if (currentOS === 'linux') {
+            const osReleaseExists = yield* fs.exists('/etc/os-release');
+            if (osReleaseExists) {
+              const content = yield* fs.readFile('/etc/os-release');
+              const idMatch = content.match(/^ID=(.*)$/m);
+              if (idMatch) {
+                distro = idMatch[1].replace(/"/g, '');
+              }
             }
           }
-        }
 
-        return {
-          os: currentOS,
-          arch: currentArch,
-          distro,
-        };
-      }),
+          return {
+            os: currentOS,
+            arch: currentArch,
+            distro,
+          };
+        }),
+    });
   })
 );

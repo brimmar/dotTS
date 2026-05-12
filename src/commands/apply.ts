@@ -9,17 +9,16 @@ import { SecretStoreLive } from '../services/secrets';
 import { StateServiceLive } from '../services/state';
 import { PlatformServiceLive } from '../services/platform';
 import { TemplateServiceLive } from '../services/template';
+import { RemoteRepoService, RemoteRepoServiceLive } from '../services/remote-repo';
+import { TempDirService, TempDirServiceLive } from '../services/temp-dir';
 import { loadConfig } from '../core/loader';
+import { join } from 'node:path';
 
 export interface ApplyOptions {
   dryRun?: boolean;
 }
 
 export async function dottsApply(configPath: string, options: ApplyOptions = {}) {
-  const { app, config } = await loadConfig(configPath);
-  
-  p.log.step(color.cyan(`Applying configuration: ${config.name}${options.dryRun ? ' (DRY RUN)' : ''}`));
-
   // Create Mock services if dry-run is enabled
   const FSLayer = options.dryRun 
     ? Layer.succeed(FileSystem, FileSystem.of({
@@ -42,8 +41,43 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
     : SystemCommandLive;
 
   const program = Effect.gen(function* (_) {
+    const remoteRepo = yield* _(RemoteRepoService);
+    const tempDir = yield* _(TempDirService);
     const runner = yield* _(Runner);
-    yield* _(runner.run(app));
+
+    let targetConfig = configPath;
+
+    if (remoteRepo.isRemote(configPath)) {
+      const url = yield* _(remoteRepo.resolve(configPath));
+      
+      const confirmed = yield* _(Effect.promise(() => p.confirm({
+        message: `Applying remote configuration from ${color.yellow(url)}. Do you trust this repository?`,
+        initialValue: false,
+      })));
+
+      if (!confirmed || p.isCancel(confirmed)) {
+        return yield* _(Effect.fail(new Error('Remote configuration apply cancelled by user.')));
+      }
+
+      return yield* _(tempDir.use((dir) => Effect.gen(function* (_) {
+        const s = p.spinner();
+        s.start(`Cloning ${url}...`);
+        yield* _(remoteRepo.clone(url, dir));
+        s.stop(`Cloned to temporary directory.`);
+
+        const finalPath = join(dir, 'dotts.ts');
+        const { app, config } = yield* _(Effect.promise(() => loadConfig(finalPath)));
+        
+        p.log.step(color.cyan(`Applying configuration: ${config.name}${options.dryRun ? ' (DRY RUN)' : ''}`));
+        yield* _(runner.run(app));
+        return config;
+      })));
+    } else {
+      const { app, config } = yield* _(Effect.promise(() => loadConfig(configPath)));
+      p.log.step(color.cyan(`Applying configuration: ${config.name}${options.dryRun ? ' (DRY RUN)' : ''}`));
+      yield* _(runner.run(app));
+      return config;
+    }
   });
 
   const MainLive = program.pipe(
@@ -55,9 +89,9 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
     Effect.provide(FSLayer),
     Effect.provide(SecretStoreLive),
     Effect.provide(ExecLayer),
+    Effect.provide(RemoteRepoServiceLive),
+    Effect.provide(TempDirServiceLive),
   );
   
-  await Effect.runPromise(MainLive);
-
-  return config;
+  return await Effect.runPromise(MainLive);
 }
