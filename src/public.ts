@@ -10,6 +10,7 @@ import { LineInFileResource, type LineInFileProps } from './resources/line-in-fi
 import { ServiceResource, type ServiceProps } from './resources/service';
 import { UserResource, type UserProps } from './resources/user';
 import { GroupResource, type GroupProps } from './resources/group';
+import { AptRepositoryResource, type AptRepositoryProps } from './resources/apt-repository';
 import { secret as secretTokenHelper } from './core/secret';
 import { App, Stack } from './core/app';
 
@@ -68,6 +69,11 @@ export function user(name: string, props: Omit<UserProps, 'name'> = {}) {
 export function group(name: string, props: Omit<GroupProps, 'name'> = {}) {
   const stack = ActiveContext.requireStack();
   return new GroupResource(stack, `group-${name}`, { ...props, name });
+}
+
+export function aptRepository(name: string, props: Omit<AptRepositoryProps, 'name'>) {
+  const stack = ActiveContext.requireStack();
+  return new AptRepositoryResource(stack, `apt-repo-${name}`, { ...props, name });
 }
 
 export const secret = secretTokenHelper;
