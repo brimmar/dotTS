@@ -7,6 +7,7 @@ import { ScriptResource, type ScriptResourceProps } from './resources/script';
 import { RemoteFileResource, type RemoteFileResourceProps } from './resources/remote-file';
 import { GitResource, type GitResourceProps } from './resources/git';
 import { LineInFileResource, type LineInFileProps } from './resources/line-in-file';
+import { ServiceResource, type ServiceProps } from './resources/service';
 import { secret as secretTokenHelper } from './core/secret';
 import { App, Stack } from './core/app';
 
@@ -50,6 +51,11 @@ export function git(url: string, props: Omit<GitResourceProps, 'url'>) {
 export function lineInFile(path: string, line: string, props: Omit<LineInFileProps, 'path' | 'line'> = {}) {
   const stack = ActiveContext.requireStack();
   return new LineInFileResource(stack, `line-${path}-${line.slice(0, 10)}`, { ...props, path, line });
+}
+
+export function service(name: string, props: Omit<ServiceProps, 'name'> = {}) {
+  const stack = ActiveContext.requireStack();
+  return new ServiceResource(stack, `service-${name}`, { ...props, name });
 }
 
 export const secret = secretTokenHelper;
