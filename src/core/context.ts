@@ -1,5 +1,5 @@
 import { Stack } from './app';
-import { PlatformInfo } from '../services/platform';
+import type { PlatformInfo } from '../services/platform';
 
 export class ActiveContext {
   private static activeStack: Stack | undefined;

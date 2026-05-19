@@ -22,6 +22,7 @@ describe('RemoteFileResource', () => {
     const MockHttp = Layer.succeed(HttpService, HttpService.of({
       downloadString: (url) => Effect.sync(() => { downloadedUrl = url; return 'remote content'; }),
       downloadBytes: (url) => Effect.sync(() => { downloadedUrl = url; return new Uint8Array(); }),
+      downloadWithMetadata: (url) => Effect.sync(() => ({ content: 'remote content', unchanged: false }))
     }));
 
     const MockFS = Layer.succeed(FileSystem, FileSystem.of({
@@ -54,6 +55,7 @@ describe('RemoteFileResource', () => {
     const MockHttp = Layer.succeed(HttpService, HttpService.of({
       downloadString: () => Effect.succeed('wrong content'),
       downloadBytes: () => Effect.succeed(new Uint8Array()),
+      downloadWithMetadata: () => Effect.succeed({ content: 'content', unchanged: false })
     }));
 
     const MockFS = Layer.succeed(FileSystem, FileSystem.of({
@@ -91,6 +93,7 @@ describe('RemoteFileResource', () => {
     const MockHttp = Layer.succeed(HttpService, HttpService.of({
       downloadString: () => Effect.succeed('content'),
       downloadBytes: () => Effect.succeed(new Uint8Array()),
+      downloadWithMetadata: () => Effect.succeed({ content: 'content', unchanged: false })
     }));
 
     const MockFS = Layer.succeed(FileSystem, FileSystem.of({

@@ -24,7 +24,7 @@ describe('loadConfig', () => {
     `);
 
     const { app } = await loadConfig(configPath);
-    const resources = app.children[0].children; // App -> Stack -> Resources
+    const resources = app.children[0]!.children; // App -> Stack -> Resources
     expect(resources.some(r => r instanceof PackageResource && r.props.name === 'git')).toBe(true);
   });
 
@@ -40,7 +40,7 @@ describe('loadConfig', () => {
 
     const { app, config } = await loadConfig(configPath);
     expect(config.name).toBe('legacy-test');
-    const resources = app.children[0].children;
+    const resources = app.children[0]!.children;
     expect(resources.some(r => r instanceof PackageResource && r.props.name === 'vim')).toBe(true);
   });
 });

@@ -15,7 +15,7 @@ describe('HttpService', () => {
 
   it('should download a file as a string', async () => {
     const mockFetch = mock(() => Promise.resolve(new Response('hello world', { status: 200 })));
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as any;
 
     const program = Effect.gen(function* () {
       const http = yield* HttpService;
@@ -34,7 +34,7 @@ describe('HttpService', () => {
 
       it('should handle 404 errors', async () => {
 
-        global.fetch = mock(() => Promise.resolve(new Response('Not Found', { status: 404, statusText: 'Not Found' })));
+        global.fetch = mock(() => Promise.resolve(new Response('Not Found', { status: 404, statusText: 'Not Found' }))) as any;
 
     
 

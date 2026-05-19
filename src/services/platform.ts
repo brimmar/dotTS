@@ -32,7 +32,7 @@ export const PlatformServiceLive = Layer.effect(
               const content = yield* fs.readFile('/etc/os-release');
               const idMatch = content.match(/^ID=(.*)$/m);
               if (idMatch) {
-                distro = idMatch[1].replace(/"/g, '');
+                distro = idMatch[1]?.replace(/"/g, '');
               }
             }
           }

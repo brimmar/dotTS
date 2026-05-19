@@ -1,10 +1,10 @@
 import { ActiveContext } from './core/context';
-import { PackageResource, PackageResourceProps } from './resources/package';
-import { FileResource, FileResourceProps } from './resources/file';
-import { SymlinkResource } from './resources/symlink';
-import { DirectoryResource, DirectoryResourceProps } from './resources/directory';
-import { ScriptResource, ScriptResourceProps } from './resources/script';
-import { RemoteFileResource, RemoteFileResourceProps } from './resources/remote-file';
+import { PackageResource, type PackageResourceProps } from './resources/package';
+import { FileResource, type FileResourceProps } from './resources/file';
+import { SymlinkResource, type SymlinkResourceProps } from './resources/symlink';
+import { DirectoryResource, type DirectoryResourceProps } from './resources/directory';
+import { ScriptResource, type ScriptResourceProps } from './resources/script';
+import { RemoteFileResource, type RemoteFileResourceProps } from './resources/remote-file';
 import { secret as secretTokenHelper } from './core/secret';
 import { App, Stack } from './core/app';
 

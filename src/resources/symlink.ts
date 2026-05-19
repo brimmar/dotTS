@@ -10,7 +10,7 @@ export interface SymlinkResourceProps {
 }
 
 export class SymlinkResource extends Resource {
-  constructor(scope: Component, id: string, public readonly props: SymlinkResourceProps) {
+  constructor(scope: Component, id: string, override readonly props: SymlinkResourceProps) {
     super(scope, id, props);
   }
 

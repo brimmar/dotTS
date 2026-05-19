@@ -11,11 +11,11 @@ describe('DirectoryResource', () => {
   const testDir = join(tmpdir(), 'dotts-dir-res-test-' + Math.random().toString(36).slice(2));
 
   const MockFS = (state: any) => Layer.succeed(FileSystem, FileSystem.of({
-    mkdir: (path) => Effect.sync(() => { state.createdDir = path; state.exists = true; }),
-    exists: (path) => Effect.sync(() => state.exists),
-    rm: (path) => Effect.sync(() => { state.exists = false; }),
-    chmod: (path, mode) => Effect.sync(() => { state.chmod = { path, mode }; }),
-    chown: (path, uid, gid) => Effect.sync(() => { state.chown = { path, uid, gid }; }),
+    mkdir: (path: string) => Effect.sync(() => { state.createdDir = path; state.exists = true; }),
+    exists: (path: string) => Effect.sync(() => state.exists),
+    rm: (path: string) => Effect.sync(() => { state.exists = false; }),
+    chmod: (path: string, mode: number) => Effect.sync(() => { state.chmod = { path, mode }; }),
+    chown: (path: string, uid: number, gid: number) => Effect.sync(() => { state.chown = { path, uid, gid }; }),
   } as any));
 
   it('should create a directory', async () => {

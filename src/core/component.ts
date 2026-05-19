@@ -15,10 +15,10 @@ export abstract class Component {
   }
 }
 
-export abstract class Resource extends Component {
+export abstract class Resource<Props = any> extends Component {
   public readonly isResource = true;
 
-  constructor(scope: Component, id: string, props?: { dependsOn?: Component[] }) {
+  constructor(scope: Component, id: string, public readonly props: Props & { dependsOn?: Component[] }) {
     super(id);
     scope.add(this);
     if (props?.dependsOn) {
@@ -36,8 +36,8 @@ export abstract class Resource extends Component {
     return undefined;
   }
 
-  abstract apply(): Effect.Effect<void, Error>;
-  abstract destroy(): Effect.Effect<void, Error>;
+  abstract apply(): Effect.Effect<void, Error, any>;
+  abstract destroy(): Effect.Effect<void, Error, any>;
   abstract hash(): string;
 }
 

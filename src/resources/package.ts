@@ -3,7 +3,7 @@ import { Resource, Component } from '../core/component';
 import { SystemCommand } from '../services/exec';
 import { PlatformService } from '../services/platform';
 import { hashConfig } from '../core/hash';
-import { PackageProvider } from './package/provider';
+import type { PackageProvider } from './package/provider';
 import { BrewProvider, AptProvider, PacmanProvider, BunProvider, NpmProvider, CargoProvider, PipProvider } from './package/providers/common';
 
 export type PackageManager = 'brew' | 'apt' | 'npm' | 'pacman' | 'bun' | 'cargo' | 'pip';
@@ -16,11 +16,11 @@ export interface PackageResourceProps {
 }
 
 export class PackageResource extends Resource {
-  constructor(scope: Component, id: string, public readonly props: PackageResourceProps) {
+  constructor(scope: Component, id: string, override readonly props: PackageResourceProps) {
     super(scope, id, props);
   }
 
-  get concurrencyKey() {
+  override get concurrencyKey() {
     return `pkg-manager-${this.props.manager || 'system'}`;
   }
 

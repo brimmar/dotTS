@@ -14,7 +14,7 @@ export const SymlinkSchema = z.object({
 export const FileSchema = z.object({
   path: z.string(),
   content: z.string(),
-  vars: z.record(z.any()).optional(),
+  vars: z.record(z.string(), z.any()).optional(),
   mode: z.number().optional(),
   uid: z.number().optional(),
   gid: z.number().optional(),
@@ -32,7 +32,7 @@ export const ScriptSchema = z.object({
   unless: z.string().optional(),
   onlyIf: z.string().optional(),
   workingDir: z.string().optional(),
-  environment: z.record(z.string()).optional(),
+  environment: z.record(z.string(), z.string()).optional(),
 });
 
 export const DottsSchema = z.object({

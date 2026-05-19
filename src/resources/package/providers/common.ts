@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { PackageProvider } from '../provider';
+import type { PackageProvider } from '../provider';
 import { SystemCommand } from '../../../services/exec';
 import * as p from '@clack/prompts';
 

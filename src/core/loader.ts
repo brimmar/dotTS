@@ -6,9 +6,9 @@ import { PackageResource } from '../resources/package';
 import { SymlinkResource } from '../resources/symlink';
 import { FileResource } from '../resources/file';
 import { DirectoryResource } from '../resources/directory';
-import { ScriptResource } from '../resources/script';
+import { ScriptResource, type ScriptResourceProps } from '../resources/script';
 import { ActiveContext } from './context';
-import { PlatformInfo } from '../services/platform';
+import type { PlatformInfo } from '../services/platform';
 import { platform, arch } from 'node:os';
 
 export async function loadConfig(configPath: string): Promise<{ app: App; config: any }> {
@@ -49,7 +49,7 @@ export async function loadConfig(configPath: string): Promise<{ app: App; config
   const result = DottsSchema.safeParse(module.config);
   
   if (!result.success) {
-    const errorMsg = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('\n');
+    const errorMsg = result.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('\n');
     throw new Error(`Invalid configuration in ${configPath}:\n${errorMsg}`);
   }
 
@@ -72,7 +72,7 @@ export async function loadConfig(configPath: string): Promise<{ app: App; config
   }
 
   for (const script of config.scripts) {
-    new ScriptResource(stack, `script-${script.run.slice(0, 20)}`, script);
+    new ScriptResource(stack, `script-${script.run.slice(0, 20)}`, script as ScriptResourceProps);
   }
 
   return { app, config };

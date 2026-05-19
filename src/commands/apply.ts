@@ -11,6 +11,7 @@ import { PlatformServiceLive } from '../services/platform';
 import { TemplateServiceLive } from '../services/template';
 import { RemoteRepoService, RemoteRepoServiceLive } from '../services/remote-repo';
 import { TempDirService, TempDirServiceLive } from '../services/temp-dir';
+import { HttpServiceLive } from '../services/http';
 import { loadConfig } from '../core/loader';
 import { join } from 'node:path';
 
@@ -80,18 +81,18 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
     }
   });
 
-  const MainLive = program.pipe(
-    Effect.provide(RunnerLive),
-    Effect.provide(StateServiceLive),
-    Effect.provide(SecretManagerLive),
-    Effect.provide(PlatformServiceLive),
-    Effect.provide(TemplateServiceLive),
-    Effect.provide(FSLayer),
-    Effect.provide(SecretStoreLive),
-    Effect.provide(ExecLayer),
-    Effect.provide(RemoteRepoServiceLive),
-    Effect.provide(TempDirServiceLive),
+  const MainLayer = RunnerLive.pipe(
+    Layer.provideMerge(RemoteRepoServiceLive),
+    Layer.provideMerge(TempDirServiceLive),
+    Layer.provideMerge(SecretManagerLive),
+    Layer.provideMerge(PlatformServiceLive),
+    Layer.provideMerge(StateServiceLive),
+    Layer.provideMerge(TemplateServiceLive),
+    Layer.provideMerge(HttpServiceLive),
+    Layer.provideMerge(SecretStoreLive),
+    Layer.provideMerge(ExecLayer),
+    Layer.provideMerge(FSLayer)
   );
   
-  return await Effect.runPromise(MainLive);
+  return await Effect.runPromise(Effect.provide(program, MainLayer));
 }

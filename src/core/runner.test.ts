@@ -13,15 +13,15 @@ class TestResource extends Resource {
     super(scope, id, props);
   }
 
-  apply() {
+  override apply() {
     return Effect.sync(() => { this.applied = true; });
   }
 
-  destroy() {
+  override destroy() {
     return Effect.sync(() => { this.destroyed = true; });
   }
 
-  hash() {
+  override hash() {
     return this._hash;
   }
 }
@@ -57,7 +57,7 @@ describe('Runner', () => {
     
     const executionOrder: string[] = [];
     class OrderResource extends TestResource {
-      apply() {
+      override apply() {
         return Effect.sync(() => { executionOrder.push(this.id); });
       }
     }
@@ -85,7 +85,7 @@ describe('Runner', () => {
     let maxActive = 0;
 
     class SlowResource extends TestResource {
-      apply() {
+      override apply() {
         return Effect.gen(this, function* () {
           activeCount++;
           if (activeCount > maxActive) maxActive = activeCount;
@@ -119,8 +119,8 @@ describe('Runner', () => {
     let maxActive = 0;
 
     class LockedResource extends TestResource {
-      get concurrencyKey() { return 'global-lock'; }
-      apply() {
+      override get concurrencyKey() { return 'global-lock'; }
+      override apply() {
         return Effect.gen(this, function* () {
           activeCount++;
           if (activeCount > maxActive) maxActive = activeCount;

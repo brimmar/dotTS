@@ -2,7 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import { Effect, Layer } from 'effect';
 import { ValidationService, ValidationServiceLive } from './validation';
 import { FileSystem } from './fs';
-import { SecretManager } from './secrets-manager';
+import { SecretManager, SecretManagerLive } from './secrets-manager';
 import { App, Stack } from '../core/app';
 import { FileResource } from '../resources/file';
 import { secret } from '../core/secret';
@@ -27,7 +27,10 @@ describe('ValidationService', () => {
       yield* validator.validate(app);
     });
 
-    const MainLive = Layer.mergeAll(MockFS, getMockSM([]), ValidationServiceLive);
+    const MainLive = ValidationServiceLive.pipe(
+      Layer.provideMerge(getMockSM([])),
+      Layer.provideMerge(MockFS)
+    );
 
     await Effect.runPromise(Effect.provide(program, MainLive));
   });
@@ -42,7 +45,10 @@ describe('ValidationService', () => {
       yield* validator.validate(app);
     });
 
-    const MainLive = Layer.mergeAll(MockFS, getMockSM([]), ValidationServiceLive);
+    const MainLive = ValidationServiceLive.pipe(
+      Layer.provideMerge(getMockSM([])),
+      Layer.provideMerge(MockFS)
+    );
 
     expect(Effect.runPromise(Effect.provide(program, MainLive))).rejects.toThrow(/Secret not found: MISSING_KEY/);
   });

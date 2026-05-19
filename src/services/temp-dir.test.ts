@@ -7,10 +7,9 @@ describe('TempDirService', () => {
   it('should create and clean up a temporary directory', async () => {
     let createdDir = '';
     let removedDir = '';
-
     const MockFS = Layer.succeed(FileSystem, FileSystem.of({
-      mkdir: (path) => Effect.sync(() => { createdDir = path; }),
-      rm: (path) => Effect.sync(() => { removedDir = path; }),
+      mkdir: (path: string) => Effect.sync(() => { createdDir = path; }),
+      rm: (path: string) => Effect.sync(() => { removedDir = path; }),
       exists: () => Effect.succeed(false),
       writeFile: () => Effect.void,
       readFile: () => Effect.succeed(''),
@@ -18,7 +17,7 @@ describe('TempDirService', () => {
       unlink: () => Effect.void,
       chmod: () => Effect.void,
       chown: () => Effect.void,
-    } as any));
+    }));
 
     const program = Effect.gen(function* () {
       const temp = yield* TempDirService;

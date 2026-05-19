@@ -12,7 +12,7 @@ export interface DirectoryResourceProps {
 }
 
 export class DirectoryResource extends Resource {
-  constructor(scope: Component, id: string, public readonly props: DirectoryResourceProps) {
+  constructor(scope: Component, id: string, override readonly props: DirectoryResourceProps) {
     super(scope, id, props);
   }
 

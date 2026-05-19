@@ -13,7 +13,7 @@ export interface ScriptResourceProps {
 }
 
 export class ScriptResource extends Resource {
-  constructor(scope: Component, id: string, public readonly props: ScriptResourceProps) {
+  constructor(scope: Component, id: string, override readonly props: ScriptResourceProps) {
     super(scope, id, props);
   }
 
