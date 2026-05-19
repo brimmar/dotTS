@@ -3,6 +3,7 @@ import { Effect, Layer } from 'effect';
 import { SecretManager, SecretManagerLive } from './secrets-manager';
 import { SecretStoreLive } from './secrets';
 import { FileSystem, FileSystemLive } from './fs';
+import { SystemCommandLive } from './exec';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { rm, mkdir } from 'node:fs/promises';
@@ -28,7 +29,8 @@ describe('SecretManager Service', () => {
     const runnable = program.pipe(
       Effect.provide(SecretManagerLive),
       Effect.provide(SecretStoreLive),
-      Effect.provide(FileSystemLive)
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive)
     );
     
     const result = await Effect.runPromise(runnable);

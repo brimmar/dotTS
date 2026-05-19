@@ -9,6 +9,9 @@ export interface LineInFileProps {
   regexp?: string | RegExp;
   state?: 'present' | 'absent';
   dependsOn?: Component[];
+  become?: boolean | string;
+  retries?: number;
+  retryDelay?: number;
 }
 
 export class LineInFileResource extends Resource {
@@ -26,8 +29,8 @@ export class LineInFileResource extends Resource {
     return Effect.gen(this, function* () {
       const fs = yield* FileSystem;
 
-      const exists = yield* fs.exists(path);
-      let content = exists ? yield* fs.readFile(path) : '';
+      const exists = yield* fs.exists(path, { become: this.props.become });
+      let content = exists ? yield* fs.readFile(path, { become: this.props.become }) : '';
       const lines = content.split('\n');
       let changed = false;
 
@@ -72,7 +75,7 @@ export class LineInFileResource extends Resource {
       }
 
       if (changed) {
-        yield* fs.writeFile(path, lines.join('\n'));
+        yield* fs.writeFile(path, lines.join('\n'), { become: this.props.become });
       }
     });
   }

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import { Effect, Layer } from 'effect';
 import { StateService, StateServiceLive } from './state';
 import { FileSystemLive } from './fs';
+import { SystemCommandLive } from './exec';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { rm } from 'node:fs/promises';
@@ -27,7 +28,8 @@ describe('StateService', () => {
 
     const runnable = program.pipe(
       Effect.provide(StateServiceLive),
-      Effect.provide(FileSystemLive)
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive)
     );
 
     await Effect.runPromise(runnable);

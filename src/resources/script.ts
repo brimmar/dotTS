@@ -11,6 +11,8 @@ export interface ScriptResourceProps {
   environment?: Record<string, string>;
   dependsOn?: Component[];
   become?: boolean | string;
+  retries?: number;
+  retryDelay?: number;
 }
 
 export class ScriptResource extends Resource {

@@ -16,6 +16,8 @@ export interface AptRepositoryProps {
   state?: 'present' | 'absent';
   dependsOn?: Component[];
   become?: boolean | string;
+  retries?: number;
+  retryDelay?: number;
 }
 
 export class AptRepositoryResource extends Resource {

@@ -14,6 +14,9 @@ export interface RemoteFileResourceProps {
   uid?: number;
   gid?: number;
   dependsOn?: Component[];
+  become?: boolean | string;
+  retries?: number;
+  retryDelay?: number;
 }
 
 export class RemoteFileResource extends Resource {
@@ -45,17 +48,17 @@ export class RemoteFileResource extends Resource {
         }
       }
 
-      yield* fs.mkdir(dirname(this.props.path));
-      yield* fs.writeFile(this.props.path, content);
+      yield* fs.mkdir(dirname(this.props.path), { become: this.props.become });
+      yield* fs.writeFile(this.props.path, content, { become: this.props.become });
       
       if (this.props.mode !== undefined) {
-        yield* fs.chmod(this.props.path, this.props.mode);
+        yield* fs.chmod(this.props.path, this.props.mode, { become: this.props.become });
       }
 
       if (this.props.uid !== undefined || this.props.gid !== undefined) {
         const uid = this.props.uid ?? process.getuid!();
         const gid = this.props.gid ?? process.getgid!();
-        yield* fs.chown(this.props.path, uid, gid);
+        yield* fs.chown(this.props.path, uid, gid, { become: this.props.become });
       }
     });
   }
@@ -63,7 +66,7 @@ export class RemoteFileResource extends Resource {
   destroy() {
     return Effect.gen(this, function* () {
       const fs = yield* FileSystem;
-      yield* fs.rm(this.props.path);
+      yield* fs.rm(this.props.path, { become: this.props.become });
     });
   }
 }

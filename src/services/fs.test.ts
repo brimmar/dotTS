@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { Effect, Layer } from 'effect';
 import { FileSystem, FileSystemLive } from './fs';
+import { SystemCommandLive } from './exec';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { rm, stat } from 'fs/promises';
@@ -22,7 +23,10 @@ describe('FileSystem Service', () => {
       return { exists, content };
     });
 
-    const runnable = Effect.provide(program, FileSystemLive);
+    const runnable = program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive)
+    );
     const result = await Effect.runPromise(runnable);
     
     expect(result.exists).toBe(true);
@@ -41,7 +45,10 @@ describe('FileSystem Service', () => {
       return true;
     });
 
-    await Effect.runPromise(Effect.provide(program, FileSystemLive));
+    await Effect.runPromise(program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive)
+    ));
     
     const s = await stat(filePath);
     expect(s.mode & 0o777).toBe(0o600);
@@ -59,7 +66,10 @@ describe('FileSystem Service', () => {
       return true;
     });
 
-    await Effect.runPromise(Effect.provide(program, FileSystemLive));
+    await Effect.runPromise(program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive)
+    ));
     
     await rm(testDir, { recursive: true, force: true });
   });

@@ -9,6 +9,8 @@ export interface GroupProps {
   state?: 'present' | 'absent';
   dependsOn?: Component[];
   become?: boolean | string;
+  retries?: number;
+  retryDelay?: number;
 }
 
 export class GroupResource extends Resource {

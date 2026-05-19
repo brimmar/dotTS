@@ -4,6 +4,7 @@ import { SecretStoreLive } from '../services/secrets';
 import { FileSystemLive } from '../services/fs';
 import * as p from '@clack/prompts';
 import { color } from 'console-log-colors';
+import { SystemCommandLive } from '../services/exec';
 
 export async function dottsSecretSet(name: string, value: string) {
   const program = Effect.gen(function* (_) {
@@ -15,7 +16,8 @@ export async function dottsSecretSet(name: string, value: string) {
   const runnable = program.pipe(
     Effect.provide(SecretManagerLive),
     Effect.provide(SecretStoreLive),
-    Effect.provide(FileSystemLive)
+    Effect.provide(FileSystemLive),
+    Effect.provide(SystemCommandLive)
   );
 
   await Effect.runPromise(runnable);
@@ -38,7 +40,8 @@ export async function dottsSecretList() {
   const runnable = program.pipe(
     Effect.provide(SecretManagerLive),
     Effect.provide(SecretStoreLive),
-    Effect.provide(FileSystemLive)
+    Effect.provide(FileSystemLive),
+    Effect.provide(SystemCommandLive)
   );
 
   await Effect.runPromise(runnable);

@@ -3,6 +3,7 @@ import { Effect } from 'effect';
 import { App, Stack } from '../core/app';
 import { SymlinkResource } from './symlink';
 import { FileSystem, FileSystemLive } from '../services/fs';
+import { SystemCommandLive } from '../services/exec';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { rm, lstat, writeFile, mkdir } from 'fs/promises';
@@ -26,7 +27,10 @@ describe('SymlinkResource', () => {
 
     const program = linkRes.apply();
     
-    await Effect.runPromise(Effect.provide(program, FileSystemLive));
+    await Effect.runPromise(program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive)
+    ));
     
     const stat = await lstat(linkPath);
     expect(stat.isSymbolicLink()).toBe(true);
@@ -57,7 +61,10 @@ describe('SymlinkResource', () => {
       return { existsBefore, existsAfter };
     });
 
-    const { existsBefore, existsAfter } = await Effect.runPromise(Effect.provide(program, FileSystemLive));
+    const { existsBefore, existsAfter } = await Effect.runPromise(program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive)
+    ));
 
     expect(existsBefore).toBe(true);
     expect(existsAfter).toBe(false);

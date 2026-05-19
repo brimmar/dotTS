@@ -7,6 +7,9 @@ export interface SymlinkResourceProps {
   source: string;
   path: string;
   dependsOn?: Component[];
+  become?: boolean | string;
+  retries?: number;
+  retryDelay?: number;
 }
 
 export class SymlinkResource extends Resource {
@@ -21,14 +24,14 @@ export class SymlinkResource extends Resource {
   apply() {
     return Effect.gen(this, function* (_) {
       const fs = yield* _(FileSystem);
-      yield* _(fs.symlink(this.props.source, this.props.path));
+      yield* _(fs.symlink(this.props.source, this.props.path, { become: this.props.become }));
     });
   }
 
   destroy() {
     return Effect.gen(this, function* (_) {
       const fs = yield* _(FileSystem);
-      yield* _(fs.unlink(this.props.path));
+      yield* _(fs.unlink(this.props.path, { become: this.props.become }));
     });
   }
 }
