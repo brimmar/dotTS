@@ -18,7 +18,6 @@ export const RunnerLive = Layer.effect(
 
     return Runner.of({
       run: (component: Component): Effect.Effect<void, Error, never> => Effect.gen(function* () {
-        const stateService = yield* StateService;
         const startTime = performance.now();
         const currentState = yield* stateService.load();
         const newState: AppState = {};
