@@ -5,6 +5,7 @@ import { SymlinkResource, type SymlinkResourceProps } from './resources/symlink'
 import { DirectoryResource, type DirectoryResourceProps } from './resources/directory';
 import { ScriptResource, type ScriptResourceProps } from './resources/script';
 import { RemoteFileResource, type RemoteFileResourceProps } from './resources/remote-file';
+import { GitResource, type GitResourceProps } from './resources/git';
 import { secret as secretTokenHelper } from './core/secret';
 import { App, Stack } from './core/app';
 
@@ -38,6 +39,11 @@ export function script(run: string, props: Omit<ScriptResourceProps, 'run'> = {}
 export function remoteFile(path: string, props: Omit<RemoteFileResourceProps, 'path'>) {
   const stack = ActiveContext.requireStack();
   return new RemoteFileResource(stack, `remote-${path}`, { ...props, path });
+}
+
+export function git(url: string, props: Omit<GitResourceProps, 'url'>) {
+  const stack = ActiveContext.requireStack();
+  return new GitResource(stack, `git-${props.dest}`, { ...props, url });
 }
 
 export const secret = secretTokenHelper;
