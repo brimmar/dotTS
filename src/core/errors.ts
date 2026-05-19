@@ -38,7 +38,7 @@ export function formatError(error: unknown): { title: string; message: string; h
     return {
       title: 'Permission Denied',
       message: msg,
-      hint: 'Check your file permissions or run with appropriate privileges.',
+      hint: 'Check your file permissions or try adding "become: true" to the resource.',
     };
   }
 

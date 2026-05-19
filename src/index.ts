@@ -4,7 +4,7 @@ import { dottsInit } from './commands/init';
 import { dottsApply } from './commands/apply';
 import { dottsCheck } from './commands/check';
 import { dottsDoctor } from './commands/doctor';
-import { dottsSecretSet, dottsSecretList } from './commands/secrets';
+import { dottsSecretSet, dottsSecretList, dottsSecretRemove } from './commands/secrets';
 import { join } from 'node:path';
 import { formatError } from './core/errors';
 
@@ -138,6 +138,7 @@ async function main() {
         options: [
           { value: 'set', label: 'Set a secret' },
           { value: 'list', label: 'List secrets' },
+          { value: 'remove', label: 'Remove a secret' },
         ]
       });
 
@@ -156,6 +157,10 @@ async function main() {
         await dottsSecretSet(name, value);
       } else if (secretAction === 'list') {
         await dottsSecretList();
+      } else if (secretAction === 'remove') {
+        const name = await p.text({ message: 'Secret name to remove:' });
+        if (p.isCancel(name) || !name) return;
+        await dottsSecretRemove(name);
       }
     }
   } catch (error) {

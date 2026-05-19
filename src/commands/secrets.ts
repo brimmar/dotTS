@@ -46,3 +46,20 @@ export async function dottsSecretList() {
 
   await Effect.runPromise(runnable);
 }
+
+export async function dottsSecretRemove(name: string) {
+  const program = Effect.gen(function* (_) {
+    const sm = yield* _(SecretManager);
+    yield* _(sm.remove(name));
+    p.log.success(color.green(`Secret '${name}' removed successfully.`));
+  });
+
+  const runnable = program.pipe(
+    Effect.provide(SecretManagerLive),
+    Effect.provide(SecretStoreLive),
+    Effect.provide(FileSystemLive),
+    Effect.provide(SystemCommandLive)
+  );
+
+  await Effect.runPromise(runnable);
+}

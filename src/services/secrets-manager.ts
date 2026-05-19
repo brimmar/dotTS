@@ -10,6 +10,7 @@ export interface SecretManager {
   readonly get: (name: string) => Effect.Effect<string, Error>;
   readonly set: (name: string, value: string) => Effect.Effect<void, Error>;
   readonly list: () => Effect.Effect<string[], Error>;
+  readonly remove: (name: string) => Effect.Effect<void, Error>;
 }
 
 export const SecretManager = Context.GenericTag<SecretManager>('SecretManager');
@@ -76,6 +77,15 @@ export const SecretManagerLive = Layer.effect(
           const key = yield* getMasterKey();
           const secrets = yield* loadSecrets(key);
           return Object.keys(secrets);
+        }),
+      remove: (name) =>
+        Effect.gen(function* () {
+          const key = yield* getMasterKey();
+          const secrets = yield* loadSecrets(key);
+          if (secrets[name]) {
+            delete secrets[name];
+            yield* saveSecrets(secrets);
+          }
         }),
     });
   })

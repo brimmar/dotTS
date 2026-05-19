@@ -24,6 +24,7 @@ describe('FileResource', () => {
     set: () => Effect.void,
     list: () => Effect.succeed([]),
     setPaths: () => Effect.void,
+    remove: () => Effect.void,
   }));
 
   const MockTemplate = Layer.succeed(TemplateService, TemplateService.of({

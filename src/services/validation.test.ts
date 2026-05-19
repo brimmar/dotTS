@@ -15,6 +15,7 @@ describe('ValidationService', () => {
     get: () => Effect.succeed(''),
     set: () => Effect.void,
     setPaths: () => Effect.void,
+    remove: () => Effect.void,
   }));
 
   it('should validate a correct component tree', async () => {
