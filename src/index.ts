@@ -9,6 +9,54 @@ import { join } from 'node:path';
 import { formatError } from './core/errors';
 
 async function main() {
+  const args = process.argv.slice(2);
+
+  if (args.length > 0) {
+    const command = args[0];
+    try {
+      if (command === 'init') {
+        const projectDir = args[1] || './my-dotfiles';
+        p.log.step(`Initializing project at ${projectDir}...`);
+        await dottsInit(projectDir);
+        p.log.success('Project initialized successfully!');
+        p.note(`Project created at ${projectDir}\nEdit ${join(projectDir, 'dotts.ts')} to get started.`, 'next steps');
+      } else if (command === 'check') {
+        const configPath = args[1] || './dotts.ts';
+        await dottsCheck(configPath);
+      } else if (command === 'doctor') {
+        await dottsDoctor();
+      } else if (command === 'apply') {
+        const configPath = args[1] || './dotts.ts';
+        const dryRun = args.includes('--dry-run');
+        await dottsApply(configPath, { dryRun });
+      } else if (command === 'secrets') {
+        const action = args[1];
+        if (action === 'set') {
+          const name = args[2];
+          const value = args[3];
+          if (!name || !value) {
+            throw new Error('Usage: dotts secrets set <name> <value>');
+          }
+          await dottsSecretSet(name, value);
+        } else if (action === 'list') {
+          await dottsSecretList();
+        } else {
+          throw new Error('Usage: dotts secrets <set|list>');
+        }
+      } else {
+        throw new Error(`Unknown command: ${command}`);
+      }
+    } catch (error) {
+      const formatted = formatError(error);
+      p.log.error(color.red(`${formatted.title}: ${formatted.message}`));
+      if (formatted.hint) {
+        p.note(formatted.hint, 'suggested fix');
+      }
+      process.exit(1);
+    }
+    return;
+  }
+
   p.intro(color.cyan(' dotts '));
 
   const command = await p.select({
