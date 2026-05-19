@@ -7,6 +7,7 @@ const execAsync = promisify(exec);
 export interface RunOptions {
   cwd?: string;
   env?: Record<string, string>;
+  become?: boolean | string;
 }
 
 export interface SystemCommand {
@@ -21,7 +22,12 @@ export const SystemCommandLive = Layer.succeed(
     run: (command, options) =>
       Effect.tryPromise({
         try: async () => {
-          const { stdout } = await execAsync(command, {
+          let finalCommand = command;
+          if (options?.become) {
+            const user = typeof options.become === 'string' ? options.become : 'root';
+            finalCommand = `sudo -u ${user} -- ${command}`;
+          }
+          const { stdout } = await execAsync(finalCommand, {
             cwd: options?.cwd,
             env: options?.env ? { ...process.env, ...options.env } : process.env,
           });

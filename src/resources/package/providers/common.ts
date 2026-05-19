@@ -17,17 +17,17 @@ function checkWithWhich(name: string) {
 }
 
 export class BrewProvider implements PackageProvider {
-  install(name: string, version?: string) {
+  install(name: string, version?: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}@${version}` : name;
-      yield* exec.run(`brew install ${pkg}`);
+      yield* exec.run(`brew install ${pkg}`, options);
     });
   }
-  uninstall(name: string) {
+  uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`brew uninstall ${name}`);
+      yield* exec.run(`brew uninstall ${name}`, options);
     });
   }
   isInstalled(name: string, version?: string) {
@@ -48,17 +48,17 @@ export class BrewProvider implements PackageProvider {
 }
 
 export class AptProvider implements PackageProvider {
-  install(name: string, version?: string) {
+  install(name: string, version?: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}=${version}` : name;
-      yield* exec.run(`sudo apt install -y ${pkg}`);
+      yield* exec.run(`apt install -y ${pkg}`, options);
     });
   }
-  uninstall(name: string) {
+  uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`sudo apt-get remove -y ${name}`);
+      yield* exec.run(`apt-get remove -y ${name}`, options);
     });
   }
   isInstalled(name: string, version?: string) {
@@ -79,19 +79,19 @@ export class AptProvider implements PackageProvider {
 }
 
 export class PacmanProvider implements PackageProvider {
-  install(name: string, version?: string) {
+  install(name: string, version?: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       if (version) {
          p.log.warn(`Pacman provider does not support specific versions easily. Installing latest ${name}.`);
       }
-      yield* exec.run(`sudo pacman -S --noconfirm ${name}`);
+      yield* exec.run(`pacman -S --noconfirm ${name}`, options);
     });
   }
-  uninstall(name: string) {
+  uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`sudo pacman -Rs --noconfirm ${name}`);
+      yield* exec.run(`pacman -Rs --noconfirm ${name}`, options);
     });
   }
   isInstalled(name: string, version?: string) {
@@ -112,17 +112,17 @@ export class PacmanProvider implements PackageProvider {
 }
 
 export class BunProvider implements PackageProvider {
-  install(name: string, version?: string) {
+  install(name: string, version?: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}@${version}` : name;
-      yield* exec.run(`bun add -g ${pkg}`);
+      yield* exec.run(`bun add -g ${pkg}`, options);
     });
   }
-  uninstall(name: string) {
+  uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`bun remove -g ${name}`);
+      yield* exec.run(`bun remove -g ${name}`, options);
     });
   }
   isInstalled(name: string, _version?: string) {
@@ -131,17 +131,17 @@ export class BunProvider implements PackageProvider {
 }
 
 export class NpmProvider implements PackageProvider {
-  install(name: string, version?: string) {
+  install(name: string, version?: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}@${version}` : name;
-      yield* exec.run(`npm install -g ${pkg}`);
+      yield* exec.run(`npm install -g ${pkg}`, options);
     });
   }
-  uninstall(name: string) {
+  uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`npm uninstall -g ${name}`);
+      yield* exec.run(`npm uninstall -g ${name}`, options);
     });
   }
   isInstalled(name: string, version?: string) {
@@ -162,17 +162,17 @@ export class NpmProvider implements PackageProvider {
 }
 
 export class CargoProvider implements PackageProvider {
-  install(name: string, version?: string) {
+  install(name: string, version?: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const versionFlag = version ? `--version ${version}` : '';
-      yield* exec.run(`cargo install ${name} ${versionFlag}`);
+      yield* exec.run(`cargo install ${name} ${versionFlag}`, options);
     });
   }
-  uninstall(name: string) {
+  uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`cargo uninstall ${name}`);
+      yield* exec.run(`cargo uninstall ${name}`, options);
     });
   }
   isInstalled(name: string, version?: string) {
@@ -195,17 +195,17 @@ export class CargoProvider implements PackageProvider {
 }
 
 export class PipProvider implements PackageProvider {
-  install(name: string, version?: string) {
+  install(name: string, version?: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}==${version}` : name;
-      yield* exec.run(`pip install ${pkg}`);
+      yield* exec.run(`pip install ${pkg}`, options);
     });
   }
-  uninstall(name: string) {
+  uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`pip uninstall -y ${name}`);
+      yield* exec.run(`pip uninstall -y ${name}`, options);
     });
   }
   isInstalled(name: string, version?: string) {

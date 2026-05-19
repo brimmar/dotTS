@@ -13,6 +13,7 @@ export interface UserProps {
   createHome?: boolean;
   state?: 'present' | 'absent';
   dependsOn?: Component[];
+  become?: boolean | string;
 }
 
 export class UserResource extends Resource {
@@ -42,14 +43,14 @@ export class UserResource extends Resource {
           if (home) cmd += ` --home-dir ${home}`;
           if (createHome) cmd += ` --create-home`;
           cmd += ` ${name}`;
-          yield* exec.run(cmd);
+          yield* exec.run(cmd, { become: this.props.become });
         } else {
           // Update existing user
           let cmd = `usermod`;
           let needsUpdate = false;
 
           if (uid !== undefined) {
-            const currentUid = yield* exec.run(`id -u ${name}`);
+            const currentUid = yield* exec.run(`id -u ${name}`, { become: this.props.become });
             if (parseInt(currentUid) !== uid) {
               cmd += ` --uid ${uid}`;
               needsUpdate = true;
@@ -57,7 +58,7 @@ export class UserResource extends Resource {
           }
 
           if (gid !== undefined) {
-            const currentGid = yield* exec.run(`id -g ${name}`);
+            const currentGid = yield* exec.run(`id -g ${name}`, { become: this.props.become });
             // This is simplified, gid could be name or id
             if (currentGid !== String(gid)) {
               cmd += ` --gid ${gid}`;
@@ -66,7 +67,7 @@ export class UserResource extends Resource {
           }
 
           if (groups) {
-            const currentGroups = (yield* exec.run(`id -Gn ${name}`)).split(' ');
+            const currentGroups = (yield* exec.run(`id -Gn ${name}`, { become: this.props.become })).split(' ');
             const hasAllGroups = groups.every(g => currentGroups.includes(g));
             if (!hasAllGroups) {
               cmd += ` --groups ${groups.join(',')}`;
@@ -75,7 +76,7 @@ export class UserResource extends Resource {
           }
 
           if (shell) {
-            const currentShell = yield* exec.run(`getent passwd ${name} | cut -d: -f7`);
+            const currentShell = yield* exec.run(`getent passwd ${name} | cut -d: -f7`, { become: this.props.become });
             if (currentShell !== shell) {
               cmd += ` --shell ${shell}`;
               needsUpdate = true;
@@ -84,12 +85,12 @@ export class UserResource extends Resource {
 
           if (needsUpdate) {
             cmd += ` ${name}`;
-            yield* exec.run(cmd);
+            yield* exec.run(cmd, { become: this.props.become });
           }
         }
       } else {
         if (exists) {
-          yield* exec.run(`userdel --remove ${name}`);
+          yield* exec.run(`userdel --remove ${name}`, { become: this.props.become });
         }
       }
     });
@@ -99,12 +100,12 @@ export class UserResource extends Resource {
     const { name } = this.props;
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`userdel --remove ${name}`);
+      yield* exec.run(`userdel --remove ${name}`, { become: this.props.become });
     });
   }
 
   private checkExists(name: string, exec: SystemCommand): Effect.Effect<boolean, Error> {
-    return exec.run(`id ${name}`).pipe(
+    return exec.run(`id ${name}`, { become: this.props.become }).pipe(
       Effect.map(() => true),
       Effect.catchAll(() => Effect.succeed(false))
     );
