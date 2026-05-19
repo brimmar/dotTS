@@ -14,6 +14,8 @@ export interface PackageResourceProps {
   version?: string;
   dependsOn?: Component[];
   become?: boolean | string;
+  retries?: number;
+  retryDelay?: number;
 }
 
 export class PackageResource extends Resource {

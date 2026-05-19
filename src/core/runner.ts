@@ -1,4 +1,4 @@
-import { Context, Effect, Layer } from 'effect';
+import { Context, Effect, Layer, Schedule, Duration } from 'effect';
 import { Component, Resource, flatten } from './component';
 import { StateService, type AppState } from '../services/state';
 import { color } from 'console-log-colors';
@@ -103,11 +103,11 @@ function runResource(res: Resource, currentState: AppState, newState: AppState):
 
     if (!oldState) {
       console.log(color.green(`+ Create: ${id}`));
-      yield* res.apply();
+      yield* withRetry(res.apply(), res);
       result = 'created';
     } else if (oldState.hash !== hash) {
       console.log(color.yellow(`~ Update: ${id}`));
-      yield* res.apply();
+      yield* withRetry(res.apply(), res);
       result = 'updated';
     } else {
       console.log(color.gray(`  No-op:  ${id}`));
@@ -117,4 +117,18 @@ function runResource(res: Resource, currentState: AppState, newState: AppState):
     newState[id] = { hash, metadata: res.props || {} };
     return result;
   });
+}
+
+function withRetry<A, E, R>(effect: Effect.Effect<A, E, R>, res: Resource): Effect.Effect<A, E, R> {
+  const { retries, retryDelay = 1 } = res.props;
+  if (!retries || retries <= 0) {
+    return effect;
+  }
+
+  return Effect.retry(
+    effect,
+    Schedule.recurs(retries).pipe(
+      Schedule.addDelay(() => Duration.seconds(retryDelay))
+    )
+  );
 }

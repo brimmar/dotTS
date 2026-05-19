@@ -10,6 +10,8 @@ export interface ServiceProps {
   enabled?: boolean;
   dependsOn?: Component[];
   become?: boolean | string;
+  retries?: number;
+  retryDelay?: number;
 }
 
 export class ServiceResource extends Resource {

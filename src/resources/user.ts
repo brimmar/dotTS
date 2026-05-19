@@ -14,6 +14,8 @@ export interface UserProps {
   state?: 'present' | 'absent';
   dependsOn?: Component[];
   become?: boolean | string;
+  retries?: number;
+  retryDelay?: number;
 }
 
 export class UserResource extends Resource {

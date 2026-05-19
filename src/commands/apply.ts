@@ -91,7 +91,7 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
     Layer.provideMerge(HttpServiceLive),
     Layer.provideMerge(SecretStoreLive),
     Layer.provideMerge(ExecLayer),
-    Layer.provideMerge(FSLayer)
+    Layer.provideMerge(FSLayer.pipe(Layer.provideMerge(ExecLayer)))
   );
   
   return await Effect.runPromise(Effect.provide(program, MainLayer));

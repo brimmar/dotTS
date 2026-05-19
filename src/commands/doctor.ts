@@ -53,7 +53,7 @@ export async function dottsDoctor() {
 
   });
 
-  const MainLive = Layer.mergeAll(SystemCommandLive, FileSystemLive);
+  const MainLive = FileSystemLive.pipe(Layer.provideMerge(SystemCommandLive));
   
   await Effect.runPromise(Effect.provide(program, MainLive));
 }

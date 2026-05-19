@@ -9,6 +9,9 @@ export interface DirectoryResourceProps {
   uid?: number;
   gid?: number;
   dependsOn?: Component[];
+  become?: boolean | string;
+  retries?: number;
+  retryDelay?: number;
 }
 
 export class DirectoryResource extends Resource {
@@ -24,16 +27,16 @@ export class DirectoryResource extends Resource {
     return Effect.gen(this, function* () {
       const fs = yield* FileSystem;
       
-      yield* fs.mkdir(this.props.path);
+      yield* fs.mkdir(this.props.path, { become: this.props.become });
 
       if (this.props.mode !== undefined) {
-        yield* fs.chmod(this.props.path, this.props.mode);
+        yield* fs.chmod(this.props.path, this.props.mode, { become: this.props.become });
       }
 
       if (this.props.uid !== undefined || this.props.gid !== undefined) {
         const uid = this.props.uid ?? process.getuid!();
         const gid = this.props.gid ?? process.getgid!();
-        yield* fs.chown(this.props.path, uid, gid);
+        yield* fs.chown(this.props.path, uid, gid, { become: this.props.become });
       }
     });
   }
@@ -41,7 +44,7 @@ export class DirectoryResource extends Resource {
   destroy() {
     return Effect.gen(this, function* () {
       const fs = yield* FileSystem;
-      yield* fs.rm(this.props.path);
+      yield* fs.rm(this.props.path, { become: this.props.become });
     });
   }
 }
