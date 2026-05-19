@@ -7,7 +7,8 @@
     "rules": {
       "recommended": true,
       "correctness": {
-        "noUnusedVariables": "error"
+        "noUnusedVariables": "error",
+        "noUnreachable": "error"
       },
       "suspicious": {
         "noConsole": { "level": "error" },
@@ -16,9 +17,6 @@
       "style": {
         "useShorthandArrayType": "error",
         "noNonNullAssertion": "error"
-      },
-      "correctness": {
-        "noUnreachable": "error"
       }
     }
   },
