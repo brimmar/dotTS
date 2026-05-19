@@ -11,6 +11,7 @@ import { ServiceResource, type ServiceProps } from './resources/service';
 import { UserResource, type UserProps } from './resources/user';
 import { GroupResource, type GroupProps } from './resources/group';
 import { AptRepositoryResource, type AptRepositoryProps } from './resources/apt-repository';
+import { UnarchiveResource, type UnarchiveResourceProps } from './resources/unarchive';
 import { secret as secretTokenHelper } from './core/secret';
 import { App, Stack } from './core/app';
 
@@ -74,6 +75,11 @@ export function group(name: string, props: Omit<GroupProps, 'name'> = {}) {
 export function aptRepository(name: string, props: Omit<AptRepositoryProps, 'name'>) {
   const stack = ActiveContext.requireStack();
   return new AptRepositoryResource(stack, `apt-repo-${name}`, { ...props, name });
+}
+
+export function unarchive(id: string, props: UnarchiveResourceProps) {
+  const stack = ActiveContext.requireStack();
+  return new UnarchiveResource(stack, `unarchive-${id}`, props);
 }
 
 export const secret = secretTokenHelper;
