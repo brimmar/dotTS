@@ -8,6 +8,8 @@ import { RemoteFileResource, type RemoteFileResourceProps } from './resources/re
 import { GitResource, type GitResourceProps } from './resources/git';
 import { LineInFileResource, type LineInFileProps } from './resources/line-in-file';
 import { ServiceResource, type ServiceProps } from './resources/service';
+import { UserResource, type UserProps } from './resources/user';
+import { GroupResource, type GroupProps } from './resources/group';
 import { secret as secretTokenHelper } from './core/secret';
 import { App, Stack } from './core/app';
 
@@ -56,6 +58,16 @@ export function lineInFile(path: string, line: string, props: Omit<LineInFilePro
 export function service(name: string, props: Omit<ServiceProps, 'name'> = {}) {
   const stack = ActiveContext.requireStack();
   return new ServiceResource(stack, `service-${name}`, { ...props, name });
+}
+
+export function user(name: string, props: Omit<UserProps, 'name'> = {}) {
+  const stack = ActiveContext.requireStack();
+  return new UserResource(stack, `user-${name}`, { ...props, name });
+}
+
+export function group(name: string, props: Omit<GroupProps, 'name'> = {}) {
+  const stack = ActiveContext.requireStack();
+  return new GroupResource(stack, `group-${name}`, { ...props, name });
 }
 
 export const secret = secretTokenHelper;
