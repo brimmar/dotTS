@@ -27,7 +27,7 @@ export class ScriptResource extends Resource {
 
       if (this.props.unless) {
         const skip = yield* Effect.match(
-          exec.run(this.props.unless, { cwd: this.props.workingDir, env: this.props.environment }),
+          exec.run(this.props.unless, { cwd: this.props.workingDir, env: this.props.environment, become: this.props.become }),
           {
             onFailure: () => false,
             onSuccess: () => true,
@@ -38,7 +38,7 @@ export class ScriptResource extends Resource {
 
       if (this.props.onlyIf) {
         const proceed = yield* Effect.match(
-          exec.run(this.props.onlyIf, { cwd: this.props.workingDir, env: this.props.environment }),
+          exec.run(this.props.onlyIf, { cwd: this.props.workingDir, env: this.props.environment, become: this.props.become }),
           {
             onFailure: () => false,
             onSuccess: () => true,
@@ -50,6 +50,7 @@ export class ScriptResource extends Resource {
       yield* exec.run(this.props.run, {
         cwd: this.props.workingDir,
         env: this.props.environment,
+        become: this.props.become,
       });
     });
   }

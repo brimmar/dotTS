@@ -32,17 +32,17 @@ export class GroupResource extends Resource {
           let cmd = `groupadd`;
           if (gid !== undefined) cmd += ` --gid ${gid}`;
           cmd += ` ${name}`;
-          yield* exec.run(cmd);
+          yield* exec.run(cmd, { become: this.props.become });
         } else if (gid !== undefined) {
           // Check current GID
-          const currentGid = yield* exec.run(`getent group ${name} | cut -d: -f3`);
+          const currentGid = yield* exec.run(`getent group ${name} | cut -d: -f3`, { become: this.props.become });
           if (parseInt(currentGid) !== gid) {
-            yield* exec.run(`groupmod --gid ${gid} ${name}`);
+            yield* exec.run(`groupmod --gid ${gid} ${name}`, { become: this.props.become });
           }
         }
       } else {
         if (exists) {
-          yield* exec.run(`groupdel ${name}`);
+          yield* exec.run(`groupdel ${name}`, { become: this.props.become });
         }
       }
     });
@@ -52,12 +52,12 @@ export class GroupResource extends Resource {
     const { name } = this.props;
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`groupdel ${name}`);
+      yield* exec.run(`groupdel ${name}`, { become: this.props.become });
     });
   }
 
   private checkExists(name: string, exec: SystemCommand): Effect.Effect<boolean, Error> {
-    return exec.run(`getent group ${name}`).pipe(
+    return exec.run(`getent group ${name}`, { become: this.props.become }).pipe(
       Effect.map(() => true),
       Effect.catchAll(() => Effect.succeed(false))
     );

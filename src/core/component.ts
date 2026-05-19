@@ -18,7 +18,7 @@ export abstract class Component {
 export abstract class Resource<Props = any> extends Component {
   public readonly isResource = true;
 
-  constructor(scope: Component, id: string, public readonly props: Props & { dependsOn?: Component[] }) {
+  constructor(scope: Component, id: string, public readonly props: Props & { dependsOn?: Component[]; become?: boolean | string }) {
     super(id);
     scope.add(this);
     if (props?.dependsOn) {

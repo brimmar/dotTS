@@ -42,32 +42,32 @@ export class GitResource extends Resource {
         if (sparse) cloneCmd += ` --no-checkout`;
         
         cloneCmd += ` ${url} ${dest}`;
-        yield* exec.run(cloneCmd);
+        yield* exec.run(cloneCmd, { become: this.props.become });
 
         if (sparse) {
-          yield* exec.run(`git sparse-checkout init --cone`, { cwd: dest });
-          yield* exec.run(`git sparse-checkout set ${sparse.join(' ')}`, { cwd: dest });
-          yield* exec.run(`git checkout ${branch || 'HEAD'}`, { cwd: dest });
+          yield* exec.run(`git sparse-checkout init --cone`, { cwd: dest, become: this.props.become });
+          yield* exec.run(`git sparse-checkout set ${sparse.join(' ')}`, { cwd: dest, become: this.props.become });
+          yield* exec.run(`git checkout ${branch || 'HEAD'}`, { cwd: dest, become: this.props.become });
         }
       } else {
         // Update
         // Verify origin URL
-        const currentUrl = yield* exec.run(`git remote get-url origin`, { cwd: dest });
+        const currentUrl = yield* exec.run(`git remote get-url origin`, { cwd: dest, become: this.props.become });
         if (currentUrl !== url) {
           throw new Error(`Git destination ${dest} exists but points to ${currentUrl} instead of ${url}`);
         }
 
         if (branch) {
-          yield* exec.run(`git checkout ${branch}`, { cwd: dest });
+          yield* exec.run(`git checkout ${branch}`, { cwd: dest, become: this.props.become });
         }
 
         if (sparse) {
-          yield* exec.run(`git sparse-checkout set ${sparse.join(' ')}`, { cwd: dest });
+          yield* exec.run(`git sparse-checkout set ${sparse.join(' ')}`, { cwd: dest, become: this.props.become });
         }
 
-        yield* exec.run(`git pull`, { cwd: dest });
+        yield* exec.run(`git pull`, { cwd: dest, become: this.props.become });
         if (recursive) {
-          yield* exec.run(`git submodule update --init --recursive`, { cwd: dest });
+          yield* exec.run(`git submodule update --init --recursive`, { cwd: dest, become: this.props.become });
         }
       }
     });

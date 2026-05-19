@@ -40,7 +40,7 @@ export class PackageResource extends Resource {
         return;
       }
 
-      yield* provider.install(name, version);
+      yield* provider.install(name, version, { become: this.props.become });
     });
   }
 
@@ -51,7 +51,7 @@ export class PackageResource extends Resource {
       const manager = yield* this.resolveManager(platform);
       const provider = this.getProvider(manager);
       
-      yield* provider.uninstall(name);
+      yield* provider.uninstall(name, { become: this.props.become });
     });
   }
 
