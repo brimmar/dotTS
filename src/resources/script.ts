@@ -10,6 +10,7 @@ export interface ScriptResourceProps {
   workingDir?: string;
   environment?: Record<string, string>;
   dependsOn?: Component[];
+  become?: boolean | string;
 }
 
 export class ScriptResource extends Resource {

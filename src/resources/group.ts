@@ -8,6 +8,7 @@ export interface GroupProps {
   gid?: number;
   state?: 'present' | 'absent';
   dependsOn?: Component[];
+  become?: boolean | string;
 }
 
 export class GroupResource extends Resource {

@@ -9,6 +9,7 @@ export interface ServiceProps {
   state?: 'started' | 'stopped' | 'restarted' | 'reloaded';
   enabled?: boolean;
   dependsOn?: Component[];
+  become?: boolean | string;
 }
 
 export class ServiceResource extends Resource {

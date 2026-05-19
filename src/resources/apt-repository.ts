@@ -15,6 +15,7 @@ export interface AptRepositoryProps {
   key?: string; // URL to the GPG key
   state?: 'present' | 'absent';
   dependsOn?: Component[];
+  become?: boolean | string;
 }
 
 export class AptRepositoryResource extends Resource {

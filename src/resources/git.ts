@@ -12,6 +12,7 @@ export interface GitResourceProps {
   depth?: number;
   recursive?: boolean;
   dependsOn?: Component[];
+  become?: boolean | string;
 }
 
 export class GitResource extends Resource {

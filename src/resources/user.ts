@@ -13,6 +13,7 @@ export interface UserProps {
   createHome?: boolean;
   state?: 'present' | 'absent';
   dependsOn?: Component[];
+  become?: boolean | string;
 }
 
 export class UserResource extends Resource {

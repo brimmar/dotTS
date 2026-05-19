@@ -13,6 +13,7 @@ export interface PackageResourceProps {
   manager?: PackageManager;
   version?: string;
   dependsOn?: Component[];
+  become?: boolean | string;
 }
 
 export class PackageResource extends Resource {
