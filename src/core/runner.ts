@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schedule, Duration } from 'effect';
 import { Component, Resource, flatten } from './component';
 import { StateService, type AppState } from '../services/state';
-import { color } from 'console-log-colors';
+import pc from 'picocolors';
 import { sortResourcesByTier } from './graph';
 import { performance } from 'node:perf_hooks';
 
@@ -69,7 +69,7 @@ export const RunnerLive = Layer.effect(
         let deleted = 0;
         for (const id of Object.keys(currentState)) {
           if (!newState[id]) {
-            console.log(color.red(`- Delete: ${id}`));
+            console.log(pc.red(`- Delete: ${id}`));
             deleted++;
             // TODO: Re-hydrate and destroy resource
           }
@@ -80,12 +80,12 @@ export const RunnerLive = Layer.effect(
         const endTime = performance.now();
         const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-        console.log('\n' + color.bold('Execution Summary:'));
-        console.log(`${color.green(`+ ${created} created`)}`);
-        console.log(`${color.yellow(`~ ${updated} updated`)}`);
-        console.log(`${color.red(`- ${deleted} deleted`)}`);
-        console.log(`${color.gray(`  ${skipped} skipped`)}`);
-        console.log(color.cyan(`Total duration: ${duration}s`));
+        console.log('\n' + pc.bold('Execution Summary:'));
+        console.log(`${pc.green(`+ ${created} created`)}`);
+        console.log(`${pc.yellow(`~ ${updated} updated`)}`);
+        console.log(`${pc.red(`- ${deleted} deleted`)}`);
+        console.log(`${pc.gray(`  ${skipped} skipped`)}`);
+        console.log(pc.cyan(`Total duration: ${duration}s`));
       }) as Effect.Effect<void, Error, never>,
     });
   })
@@ -102,15 +102,15 @@ function runResource(res: Resource, currentState: AppState, newState: AppState):
     let result: ResourceResult;
 
     if (!oldState) {
-      console.log(color.green(`+ Create: ${id}`));
+      console.log(pc.green(`+ Create: ${id}`));
       yield* withRetry(res.apply(), res);
       result = 'created';
     } else if (oldState.hash !== hash) {
-      console.log(color.yellow(`~ Update: ${id}`));
+      console.log(pc.yellow(`~ Update: ${id}`));
       yield* withRetry(res.apply(), res);
       result = 'updated';
     } else {
-      console.log(color.gray(`  No-op:  ${id}`));
+      console.log(pc.gray(`  No-op:  ${id}`));
       result = 'skipped';
     }
 

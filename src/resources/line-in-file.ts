@@ -2,6 +2,14 @@ import { Effect } from 'effect';
 import { Resource, Component } from '../core/component';
 import { FileSystem } from '../services/fs';
 import { hashConfig } from '../core/hash';
+import { resolve } from 'node:path';
+import { homedir } from 'node:os';
+
+function resolvePath(p: string): string {
+  if (p === '~') return homedir();
+  if (p.startsWith('~/') || p.startsWith('~\\')) return `${homedir()}${p.slice(1)}`;
+  return resolve(p);
+}
 
 export interface LineInFileProps {
   path: string;
@@ -17,6 +25,14 @@ export interface LineInFileProps {
 export class LineInFileResource extends Resource {
   constructor(scope: Component, id: string, override readonly props: LineInFileProps) {
     super(scope, id, props);
+  }
+
+  /**
+   * Serialize all lineInFile operations on the same file to prevent race conditions
+   * when multiple resources target the same path concurrently.
+   */
+  override get concurrencyKey(): string {
+    return `line-in-file:${resolvePath(this.props.path)}`;
   }
 
   hash() {

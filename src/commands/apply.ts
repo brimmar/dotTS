@@ -1,5 +1,5 @@
 import * as p from '@clack/prompts';
-import { color } from 'console-log-colors';
+import pc from 'picocolors';
 import { Effect, Layer } from 'effect';
 import { Runner, RunnerLive } from '../core/runner';
 import { FileSystem, FileSystemLive } from '../services/fs';
@@ -23,21 +23,21 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
   // Create Mock services if dry-run is enabled
   const FSLayer = options.dryRun 
     ? Layer.succeed(FileSystem, FileSystem.of({
-        writeFile: (path) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would write file: ${path}`))),
+        writeFile: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would write file: ${path}`))),
         readFile: () => Effect.succeed(''),
         exists: () => Effect.succeed(true),
-        mkdir: (path) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would create directory: ${path}`))),
-        symlink: (target, path) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would create symlink: ${path} -> ${target}`))),
-        rm: (path) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would remove: ${path}`))),
-        unlink: (path) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would unlink: ${path}`))),
-        chmod: (path, mode) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would chmod: ${path} to ${mode}`))),
-        chown: (path, uid, gid) => Effect.sync(() => p.log.info(color.gray(`[DRY RUN] Would chown: ${path} to ${uid}:${gid}`))),
+        mkdir: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would create directory: ${path}`))),
+        symlink: (target, path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would create symlink: ${path} -> ${target}`))),
+        rm: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would remove: ${path}`))),
+        unlink: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would unlink: ${path}`))),
+        chmod: (path, mode) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would chmod: ${path} to ${mode}`))),
+        chown: (path, uid, gid) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would chown: ${path} to ${uid}:${gid}`))),
       }))
     : FileSystemLive;
 
   const ExecLayer = options.dryRun
     ? Layer.succeed(SystemCommand, SystemCommand.of({
-        run: (cmd) => Effect.sync(() => { p.log.info(color.gray(`[DRY RUN] Would execute: ${cmd}`)); return ''; }),
+        run: (cmd) => Effect.sync(() => { p.log.info(pc.gray(`[DRY RUN] Would execute: ${cmd}`)); return ''; }),
       }))
     : SystemCommandLive;
 
@@ -52,7 +52,7 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
       const url = yield* _(remoteRepo.resolve(configPath));
       
       const confirmed = yield* _(Effect.promise(() => p.confirm({
-        message: `Applying remote configuration from ${color.yellow(url)}. Do you trust this repository?`,
+        message: `Applying remote configuration from ${pc.yellow(url)}. Do you trust this repository?`,
         initialValue: false,
       })));
 
@@ -69,13 +69,13 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
         const finalPath = join(dir, 'dotts.ts');
         const { app, config } = yield* _(Effect.promise(() => loadConfig(finalPath)));
         
-        p.log.step(color.cyan(`Applying configuration: ${config.name}${options.dryRun ? ' (DRY RUN)' : ''}`));
+        p.log.step(pc.cyan(`Applying configuration: ${config.name}${options.dryRun ? ' (DRY RUN)' : ''}`));
         yield* _(runner.run(app));
         return config;
       })));
     } else {
       const { app, config } = yield* _(Effect.promise(() => loadConfig(configPath)));
-      p.log.step(color.cyan(`Applying configuration: ${config.name}${options.dryRun ? ' (DRY RUN)' : ''}`));
+      p.log.step(pc.cyan(`Applying configuration: ${config.name}${options.dryRun ? ' (DRY RUN)' : ''}`));
       yield* _(runner.run(app));
       return config;
     }

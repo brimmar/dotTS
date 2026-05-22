@@ -1,4 +1,4 @@
-import { color } from 'console-log-colors';
+import pc from 'picocolors';
 
 export class DottsError extends Error {
   constructor(message: string, public readonly hint?: string) {

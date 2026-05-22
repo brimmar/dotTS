@@ -1,5 +1,5 @@
 import * as p from '@clack/prompts';
-import { color } from 'console-log-colors';
+import pc from 'picocolors';
 import { dottsInit } from './commands/init';
 import { dottsApply } from './commands/apply';
 import { dottsCheck } from './commands/check';
@@ -48,7 +48,7 @@ async function main() {
       }
     } catch (error) {
       const formatted = formatError(error);
-      p.log.error(color.red(`${formatted.title}: ${formatted.message}`));
+      p.log.error(pc.red(`${formatted.title}: ${formatted.message}`));
       if (formatted.hint) {
         p.note(formatted.hint, 'suggested fix');
       }
@@ -57,7 +57,7 @@ async function main() {
     return;
   }
 
-  p.intro(color.cyan(' dotts '));
+  p.intro(pc.cyan(' dotts '));
 
   const command = await p.select({
     message: 'What would you like to do?',
@@ -165,13 +165,13 @@ async function main() {
     }
   } catch (error) {
     const formatted = formatError(error);
-    p.log.error(color.red(`${formatted.title}: ${formatted.message}`));
+    p.log.error(pc.red(`${formatted.title}: ${formatted.message}`));
     if (formatted.hint) {
       p.note(formatted.hint, 'suggested fix');
     }
   }
   
-  p.outro(color.green('Done!'));
+  p.outro(pc.green('Done!'));
 }
 
 main().catch(console.error);

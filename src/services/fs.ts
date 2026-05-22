@@ -1,6 +1,7 @@
 import { Context, Effect, Layer } from 'effect';
 import * as NodeFS from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { homedir } from 'node:os';
 
 export interface FileSystem {
   readonly writeFile: (path: string, content: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
@@ -17,6 +18,18 @@ export interface FileSystem {
 export const FileSystem = Context.GenericTag<FileSystem>('FileSystem');
 
 import { SystemCommand } from './exec';
+
+/**
+ * Expand leading `~` to the current user's home directory.
+ * Node.js filesystem APIs do not do shell-style tilde expansion, so we must
+ * handle it explicitly — otherwise paths like `~/.config/nvim` are treated
+ * as a literal directory starting with `~`.
+ */
+function resolvePath(p: string): string {
+  if (p === '~') return homedir();
+  if (p.startsWith('~/') || p.startsWith('~\\')) return `${homedir()}${p.slice(1)}`;
+  return resolve(p);
+}
 
 export const FileSystemLive = Layer.effect(
   FileSystem,
@@ -39,90 +52,110 @@ export const FileSystemLive = Layer.effect(
     };
 
     return FileSystem.of({
-      writeFile: (path, content, options) =>
-        wrap(
+      writeFile: (path, content, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
           options,
-          () => NodeFS.writeFile(path, content, 'utf-8'),
-          (exec) => exec.run(`tee ${path} << 'EOF'\n${content}\nEOF`, options).pipe(Effect.map(() => undefined)),
-          (error) => `Failed to write file ${path}: ${String(error)}`
-        ),
-      readFile: (path, options) =>
-        wrap(
+          () => NodeFS.writeFile(resolved, content, 'utf-8'),
+          (exec) => exec.run(`tee ${resolved} << 'EOF'\n${content}\nEOF`, options).pipe(Effect.map(() => undefined)),
+          (error) => `Failed to write file ${resolved}: ${String(error)}`
+        );
+      },
+      readFile: (path, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
           options,
-          () => NodeFS.readFile(path, 'utf-8'),
-          (exec) => exec.run(`cat ${path}`, options),
-          (error) => `Failed to read file ${path}: ${String(error)}`
-        ),
-      exists: (path, options) =>
-        wrap(
+          () => NodeFS.readFile(resolved, 'utf-8'),
+          (exec) => exec.run(`cat ${resolved}`, options),
+          (error) => `Failed to read file ${resolved}: ${String(error)}`
+        );
+      },
+      exists: (path, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
           options,
           async () => {
             try {
-              await NodeFS.access(path);
+              await NodeFS.access(resolved);
               return true;
             } catch {
               return false;
             }
           },
           (exec) =>
-            exec.run(`test -e ${path}`, options).pipe(
+            exec.run(`test -e ${resolved}`, options).pipe(
               Effect.map(() => true),
               Effect.catchAll(() => Effect.succeed(false))
             ),
-          (error) => `Failed to check existence of ${path}: ${String(error)}`
-        ),
-      mkdir: (path, options) =>
-        wrap(
+          (error) => `Failed to check existence of ${resolved}: ${String(error)}`
+        );
+      },
+      mkdir: (path, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
           options,
-          () => NodeFS.mkdir(path, { recursive: true }).then(() => undefined),
-          (exec) => exec.run(`mkdir -p ${path}`, options).pipe(Effect.map(() => undefined)),
-          (error) => `Failed to create directory ${path}: ${String(error)}`
-        ),
-      symlink: (target, path, options) =>
-        wrap(
+          () => NodeFS.mkdir(resolved, { recursive: true }).then(() => undefined),
+          (exec) => exec.run(`mkdir -p ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          (error) => `Failed to create directory ${resolved}: ${String(error)}`
+        );
+      },
+      symlink: (target, path, options) => {
+        const resolvedPath = resolvePath(path);
+        // NOTE: target is intentionally NOT resolved — symlinks can be relative or
+        // point to absolute paths specified by the user as-is.
+        return wrap(
           options,
           async () => {
-            await NodeFS.mkdir(dirname(path), { recursive: true });
+            await NodeFS.mkdir(dirname(resolvedPath), { recursive: true });
             try {
-              await NodeFS.unlink(path);
+              await NodeFS.unlink(resolvedPath);
             } catch {}
-            await NodeFS.symlink(target, path);
+            await NodeFS.symlink(target, resolvedPath);
           },
           (exec) =>
             Effect.gen(function* () {
-              yield* exec.run(`mkdir -p ${dirname(path)}`, options);
-              yield* exec.run(`ln -sf ${target} ${path}`, options);
+              yield* exec.run(`mkdir -p ${dirname(resolvedPath)}`, options);
+              yield* exec.run(`ln -sf ${target} ${resolvedPath}`, options);
             }),
-          (error) => `Failed to create symlink ${path} -> ${target}: ${String(error)}`
-        ),
-      rm: (path, options) =>
-        wrap(
+          (error) => `Failed to create symlink ${resolvedPath} -> ${target}: ${String(error)}`
+        );
+      },
+      rm: (path, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
           options,
-          () => NodeFS.rm(path, { force: true, recursive: true }),
-          (exec) => exec.run(`rm -rf ${path}`, options).pipe(Effect.map(() => undefined)),
-          (error) => `Failed to remove ${path}: ${String(error)}`
-        ),
-      unlink: (path, options) =>
-        wrap(
+          () => NodeFS.rm(resolved, { force: true, recursive: true }),
+          (exec) => exec.run(`rm -rf ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          (error) => `Failed to remove ${resolved}: ${String(error)}`
+        );
+      },
+      unlink: (path, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
           options,
-          () => NodeFS.unlink(path),
-          (exec) => exec.run(`rm -f ${path}`, options).pipe(Effect.map(() => undefined)),
-          (error) => `Failed to unlink ${path}: ${String(error)}`
-        ),
-      chmod: (path, mode, options) =>
-        wrap(
+          () => NodeFS.unlink(resolved),
+          (exec) => exec.run(`rm -f ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          (error) => `Failed to unlink ${resolved}: ${String(error)}`
+        );
+      },
+      chmod: (path, mode, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
           options,
-          () => NodeFS.chmod(path, mode),
-          (exec) => exec.run(`chmod ${mode.toString(8)} ${path}`, options).pipe(Effect.map(() => undefined)),
-          (error) => `Failed to chmod ${path} to ${mode}: ${String(error)}`
-        ),
-      chown: (path, uid, gid, options) =>
-        wrap(
+          () => NodeFS.chmod(resolved, mode),
+          (exec) => exec.run(`chmod ${mode.toString(8)} ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          (error) => `Failed to chmod ${resolved} to ${mode}: ${String(error)}`
+        );
+      },
+      chown: (path, uid, gid, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
           options,
-          () => NodeFS.chown(path, uid, gid),
-          (exec) => exec.run(`chown ${uid}:${gid} ${path}`, options).pipe(Effect.map(() => undefined)),
-          (error) => `Failed to chown ${path} to ${uid}:${gid}: ${String(error)}`
-        ),
+          () => NodeFS.chown(resolved, uid, gid),
+          (exec) => exec.run(`chown ${uid}:${gid} ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          (error) => `Failed to chown ${resolved} to ${uid}:${gid}: ${String(error)}`
+        );
+      },
     });
   })
 );

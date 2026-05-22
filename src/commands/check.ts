@@ -1,5 +1,5 @@
 import * as p from '@clack/prompts';
-import { color } from 'console-log-colors';
+import pc from 'picocolors';
 import { Effect, Layer } from 'effect';
 import { ValidationService, ValidationServiceLive } from '../services/validation';
 import { FileSystemLive } from '../services/fs';
@@ -32,13 +32,13 @@ export async function dottsCheck(configPath: string) {
         const finalPath = join(dir, 'dotts.ts');
         const { app, config } = yield* Effect.promise(() => loadConfig(finalPath));
 
-        p.log.step(color.cyan(`Checking remote configuration: ${config.name}`));
+        p.log.step(pc.cyan(`Checking remote configuration: ${config.name}`));
         yield* validator.validate(app);
         return config;
       }));
     } else {
       const { app, config } = yield* Effect.promise(() => loadConfig(configPath));
-      p.log.step(color.cyan(`Checking configuration: ${config.name}`));
+      p.log.step(pc.cyan(`Checking configuration: ${config.name}`));
       yield* validator.validate(app);
       return config;
     }
@@ -58,10 +58,10 @@ export async function dottsCheck(configPath: string) {
   );
   try {
     const config = await Effect.runPromise(MainLive);
-    p.log.success(color.green('Configuration is valid!'));
+    p.log.success(pc.green('Configuration is valid!'));
     return config;
   } catch (error) {
-    p.log.error(color.red(`Validation failed: ${String(error)}`));
+    p.log.error(pc.red(`Validation failed: ${String(error)}`));
     throw error;
   }
 }

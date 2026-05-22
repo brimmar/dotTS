@@ -3,14 +3,14 @@ import { SecretManager, SecretManagerLive } from '../services/secrets-manager';
 import { SecretStoreLive } from '../services/secrets';
 import { FileSystemLive } from '../services/fs';
 import * as p from '@clack/prompts';
-import { color } from 'console-log-colors';
+import pc from 'picocolors';
 import { SystemCommandLive } from '../services/exec';
 
 export async function dottsSecretSet(name: string, value: string) {
   const program = Effect.gen(function* (_) {
     const sm = yield* _(SecretManager);
     yield* _(sm.set(name, value));
-    p.log.success(color.green(`Secret '${name}' set successfully.`));
+    p.log.success(pc.green(`Secret '${name}' set successfully.`));
   });
 
   const runnable = program.pipe(
@@ -33,7 +33,7 @@ export async function dottsSecretList() {
       return;
     }
 
-    p.log.info(color.cyan('Configured secrets:'));
+    p.log.info(pc.cyan('Configured secrets:'));
     secrets.forEach(s => p.log.info(`  - ${s} (********)`));
   });
 
@@ -51,7 +51,7 @@ export async function dottsSecretRemove(name: string) {
   const program = Effect.gen(function* (_) {
     const sm = yield* _(SecretManager);
     yield* _(sm.remove(name));
-    p.log.success(color.green(`Secret '${name}' removed successfully.`));
+    p.log.success(pc.green(`Secret '${name}' removed successfully.`));
   });
 
   const runnable = program.pipe(
