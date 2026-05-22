@@ -1,0 +1,57 @@
+{
+  "name": "dotts",
+  "version": "0.1.0",
+  "description": "Declarative dotfiles management with TypeScript — like AWS CDK for your system",
+  "module": "src/index.ts",
+  "type": "module",
+  "bin": {
+    "dotts": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage",
+    "lint": "biome lint --apply .",
+    "format": "biome format --write .",
+    "type-check": "tsc --noEmit",
+    "build": "bun build ./src/index.ts --compile --outfile dotts",
+    "ci": "bun run test && bun run lint && bun run type-check && bun run build"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brimmar/dotTS.git"
+  },
+  "homepage": "https://github.com/brimmar/dotTS#readme",
+  "bugs": {
+    "url": "https://github.com/brimmar/dotTS/issues"
+  },
+  "keywords": [
+    "dotfiles",
+    "dotts",
+    "configuration",
+    "declarative",
+    "typescript",
+    "iac",
+    "infrastructure-as-code"
+  ],
+  "devDependencies": {
+    "@types/bun": "^1.3.13",
+    "@types/mustache": "^4.2.6",
+    "@types/node": "^25.6.0",
+    "biome": "^0.3.3"
+  },
+  "peerDependencies": {
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "console-log-colors": "^0.5.0",
+    "effect": "^3.21.2",
+    "mustache": "^4.2.0",
+    "zod": "^4.3.6"
+  },
+  "bunInstall": {
+    "allowScripts": false
+  }
+}

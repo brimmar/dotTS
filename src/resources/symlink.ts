@@ -1,0 +1,37 @@
+import { Effect } from 'effect';
+import { Resource, Component } from '../core/component';
+import { FileSystem } from '../services/fs';
+import { hashConfig } from '../core/hash';
+
+export interface SymlinkResourceProps {
+  source: string;
+  path: string;
+  dependsOn?: Component[];
+  become?: boolean | string;
+  retries?: number;
+  retryDelay?: number;
+}
+
+export class SymlinkResource extends Resource {
+  constructor(scope: Component, id: string, override readonly props: SymlinkResourceProps) {
+    super(scope, id, props);
+  }
+
+  hash() {
+    return hashConfig(this.props);
+  }
+
+  apply() {
+    return Effect.gen(this, function* (_) {
+      const fs = yield* _(FileSystem);
+      yield* _(fs.symlink(this.props.source, this.props.path, { become: this.props.become }));
+    });
+  }
+
+  destroy() {
+    return Effect.gen(this, function* (_) {
+      const fs = yield* _(FileSystem);
+      yield* _(fs.unlink(this.props.path, { become: this.props.become }));
+    });
+  }
+}

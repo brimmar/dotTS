@@ -1,0 +1,52 @@
+language js
+
+any {
+  `Effect.runPromise($args)` as $run where {
+    register_diagnostic(
+      span = $run,
+      message = "Do not execute Effects deep in the codebase. Return the Effect and run it only at the application boundary (e.g., main.ts)."
+    )
+  },
+  `Effect.runSync($args)` as $run where {
+    register_diagnostic(
+      span = $run,
+      message = "Do not execute Effects deep in the codebase. Return the Effect and run it only at the application boundary (e.g., main.ts)."
+    )
+  },
+  `Effect.runFork($args)` as $run where {
+    register_diagnostic(
+      span = $run,
+      message = "Do not execute Effects deep in the codebase. Return the Effect and run it only at the application boundary (e.g., main.ts)."
+    )
+  },
+  `throw $msg` as $throwNode where {
+    register_diagnostic(
+      span = $throwNode,
+      message = "Do not use 'throw'. Use 'Effect.fail()' or 'Effect.die()' to keep errors tracked in the E channel."
+    )
+  },
+  `new Promise($args)` as $promiseNode where {
+    register_diagnostic(
+      span = $promiseNode,
+      message = "Do not create raw Promises. Use 'Effect.tryPromise()' or 'Effect.async()'."
+    )
+  },
+  `Date.now()` as $nowNode where {
+    register_diagnostic(
+      span = $nowNode,
+      message = "Use Effect Clock so time is testable."
+    )
+  },
+  `Math.random()` as $randNode where {
+    register_diagnostic(
+      span = $randNode,
+      message = "Use Effect Random so randomness is testable."
+    )
+  },
+  `$left ?? $right` as $nullish where {
+    register_diagnostic(
+      span = $nullish,
+      message = "Do not use nullish coalescing for fallbacks. Validate data at the boundary."
+    )
+  }
+}
