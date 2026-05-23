@@ -2,8 +2,18 @@
   "name": "dotts",
   "version": "0.1.0",
   "description": "Declarative dotfiles management with TypeScript — like AWS CDK for your system",
-  "module": "src/index.ts",
   "type": "module",
+  "main": "./dist/public.js",
+  "types": "./dist/public.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/public.d.ts",
+      "default": "./dist/public.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "bin": {
     "dotts": "./src/index.ts"
   },
@@ -15,6 +25,10 @@
     "format": "biome format --write .",
     "type-check": "tsc --noEmit",
     "build": "bun build ./src/index.ts --compile --outfile dotts",
+    "build:npm": "rm -rf dist && bun run build:npm:types && bun run build:npm:js",
+    "build:npm:types": "tsc --project tsconfig.npm.json",
+    "build:npm:js": "bun build ./src/public.ts --outdir dist --target bun --format esm --external effect --external zod --external mustache --external picocolors --external '@clack/prompts'",
+    "prepublishOnly": "bun run ci && bun run build:npm",
     "ci": "bun run test && bun run lint && bun run type-check && bun run build"
   },
   "license": "MIT",
@@ -25,6 +39,9 @@
   "homepage": "https://github.com/brimmar/dotTS#readme",
   "bugs": {
     "url": "https://github.com/brimmar/dotTS/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "keywords": [
     "dotfiles",

@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   test:
@@ -31,12 +32,6 @@ jobs:
           - os: ubuntu-24.04-arm
             target: linux-arm64
             artifact: dotts-linux-arm64
-          - os: macos-13
-            target: darwin-x64
-            artifact: dotts-darwin-x64
-          - os: macos-latest
-            target: darwin-arm64
-            artifact: dotts-darwin-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -66,3 +61,21 @@ jobs:
             dotts-*
             checksums.txt
           generate_release_notes: true
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - run: bun install
+      - run: bun run build:npm
+      - run: npm publish --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
