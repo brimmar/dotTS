@@ -1,6 +1,8 @@
 import { exists, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { register } from 'node:module';
 import { arch, platform } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import * as publicApi from '../public';
 import type { PlatformInfo } from '../services/platform';
 import { App, Stack } from './app';
@@ -9,11 +11,15 @@ import { ActiveContext } from './context';
 const DEFAULT_EXPORT_ERROR =
   'Configuration file must export a default function: export default () => { ... }';
 
+export const DOTTS_MODULE_HOOK_ERROR =
+  "Could not register the 'dotts' module plugin. import { ... } from 'dotts' cannot be resolved because no module hook is available.";
+
 type GlobalWithDottsApi = typeof globalThis & {
   __dotts_public_api__?: typeof publicApi;
 };
 
 let dottsPluginInstalled = false;
+let skipBunPlugin = false;
 
 function bindPublicApi(): void {
   (globalThis as GlobalWithDottsApi).__dotts_public_api__ = publicApi;
@@ -37,6 +43,7 @@ function publicApiShimSource(): string {
 }
 
 function tryInstallDottsPlugin(): boolean {
+  if (skipBunPlugin) return false;
   if (dottsPluginInstalled) return true;
   if (typeof Bun === 'undefined' || typeof Bun.plugin !== 'function') {
     return false;
@@ -59,34 +66,45 @@ function tryInstallDottsPlugin(): boolean {
   }
 }
 
+function tryInstallNodeModuleHook(runtimeFile: string): boolean {
+  // Bun exposes register() but it does not intercept import().
+  if (typeof Bun !== 'undefined') return false;
+  if (typeof register !== 'function') return false;
+
+  try {
+    const targetUrl = pathToFileURL(runtimeFile).href;
+    const source = `export async function resolve(specifier, context, nextResolve) {
+  if (specifier === 'dotts') {
+    return { shortCircuit: true, url: ${JSON.stringify(targetUrl)} };
+  }
+  return nextResolve(specifier, context);
+}`;
+    register(`data:text/javascript,${encodeURIComponent(source)}`, import.meta.url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function installRuntimeFallback(configDir: string): Promise<() => Promise<void>> {
   const runtimeDir = join(configDir, '.dotts', 'runtime');
   const runtimeFile = join(runtimeDir, 'dotts.mjs');
-  const tsconfigPath = join(configDir, 'tsconfig.json');
-  const wroteTsconfig = !(await exists(tsconfigPath));
+  const createdRuntimeFile = !(await exists(runtimeFile));
 
   await mkdir(runtimeDir, { recursive: true });
   await writeFile(runtimeFile, publicApiShimSource(), 'utf8');
 
-  if (wroteTsconfig) {
-    await writeFile(
-      tsconfigPath,
-      JSON.stringify({
-        compilerOptions: {
-          paths: {
-            dotts: ['./.dotts/runtime/dotts.mjs'],
-          },
-        },
-      }),
-      'utf8',
-    );
+  if (!tryInstallNodeModuleHook(runtimeFile)) {
+    if (createdRuntimeFile) {
+      await rm(runtimeFile, { force: true });
+    }
+    throw new Error(DOTTS_MODULE_HOOK_ERROR);
   }
 
   return async () => {
-    if (wroteTsconfig) {
-      await rm(tsconfigPath, { force: true });
+    if (createdRuntimeFile) {
+      await rm(runtimeFile, { force: true });
     }
-    await rm(runtimeDir, { recursive: true, force: true });
   };
 }
 
@@ -95,6 +113,11 @@ async function prepareDottsSpecifier(configDir: string): Promise<() => Promise<v
     return async () => {};
   }
   return installRuntimeFallback(configDir);
+}
+
+export function resetDottsLoaderForTests(options: { skipPlugin?: boolean } = {}): void {
+  skipBunPlugin = options.skipPlugin === true;
+  dottsPluginInstalled = false;
 }
 
 export async function loadConfig(configPath: string): Promise<{ app: App; config: { name: string } }> {
