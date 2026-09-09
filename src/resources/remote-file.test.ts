@@ -17,16 +17,17 @@ describe('RemoteFileResource', () => {
   it('should download a remote file', async () => {
     let downloadedUrl = '';
     let writtenPath = '';
-    let writtenContent = '';
+    let writtenContent: Uint8Array | undefined;
+    const bytes = new Uint8Array([0, 1, 2, 255]);
 
     const MockHttp = Layer.succeed(HttpService, HttpService.of({
       downloadString: (url) => Effect.sync(() => { downloadedUrl = url; return 'remote content'; }),
-      downloadBytes: (url) => Effect.sync(() => { downloadedUrl = url; return new Uint8Array(); }),
+      downloadBytes: (url) => Effect.sync(() => { downloadedUrl = url; return bytes; }),
       downloadWithMetadata: (url) => Effect.sync(() => ({ content: 'remote content', unchanged: false }))
     }));
 
     const MockFS = Layer.succeed(FileSystem, FileSystem.of({
-      writeFile: (path, content) => Effect.sync(() => { writtenPath = path; writtenContent = content; }),
+      writeFile: () => Effect.void,
       readFile: () => Effect.succeed(''),
       exists: () => Effect.succeed(false),
       mkdir: () => Effect.void,
@@ -35,6 +36,7 @@ describe('RemoteFileResource', () => {
       unlink: () => Effect.void,
       chmod: () => Effect.void,
       chown: () => Effect.void,
+      writeFileBytes: (path, content) => Effect.sync(() => { writtenPath = path; writtenContent = content; }),
     }));
 
     const res = new RemoteFileResource(stack, 'remote-1', {
@@ -48,13 +50,13 @@ describe('RemoteFileResource', () => {
 
     expect(downloadedUrl).toBe('https://example.com/file.txt');
     expect(writtenPath).toBe('/tmp/file.txt');
-    expect(writtenContent).toBe('remote content');
+    expect(writtenContent).toEqual(bytes);
   });
 
   it('should fail if sha256 hash mismatch', async () => {
     const MockHttp = Layer.succeed(HttpService, HttpService.of({
       downloadString: () => Effect.succeed('wrong content'),
-      downloadBytes: () => Effect.succeed(new Uint8Array()),
+      downloadBytes: () => Effect.succeed(new Uint8Array([1, 2, 3])),
       downloadWithMetadata: () => Effect.succeed({ content: 'content', unchanged: false })
     }));
 
@@ -68,6 +70,7 @@ describe('RemoteFileResource', () => {
       unlink: () => Effect.void,
       chmod: () => Effect.void,
       chown: () => Effect.void,
+      writeFileBytes: () => Effect.void,
     }));
 
     const res = new RemoteFileResource(stack, 'remote-fail', {
@@ -106,6 +109,7 @@ describe('RemoteFileResource', () => {
       unlink: () => Effect.void,
       chmod: (path, mode) => Effect.sync(() => { chmodPath = path; chmodMode = mode; }),
       chown: (path, uid, gid) => Effect.sync(() => { chownPath = path; chownUid = uid; chownGid = gid; }),
+      writeFileBytes: () => Effect.void,
     }));
 
     const res = new RemoteFileResource(stack, 'remote-attrs', {
