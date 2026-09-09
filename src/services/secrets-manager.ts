@@ -32,7 +32,7 @@ export const SecretManagerLive = Layer.effect(
         if (!exists) {
           const newKey = randomBytes(32).toString('hex');
           yield* fs.mkdir(dirname(masterKeyFile));
-          yield* fs.writeFile(masterKeyFile, newKey);
+          yield* fs.writeFile(masterKeyFile, newKey, { mode: SECRET_FILE_MODE });
           yield* fs.chmod(masterKeyFile, SECRET_FILE_MODE);
           return newKey;
         }
@@ -52,7 +52,9 @@ export const SecretManagerLive = Layer.effect(
     const saveSecrets = (secrets: Record<string, string>) =>
       Effect.gen(function* () {
         yield* fs.mkdir(dirname(secretsFile));
-        yield* fs.writeFile(secretsFile, JSON.stringify(secrets, null, 2));
+        yield* fs.writeFile(secretsFile, JSON.stringify(secrets, null, 2), {
+          mode: SECRET_FILE_MODE,
+        });
         yield* fs.chmod(secretsFile, SECRET_FILE_MODE);
       });
 
@@ -73,7 +75,12 @@ export const SecretManagerLive = Layer.effect(
 
           if (usesNewKey) continue;
 
-          const plaintext = yield* store.decrypt(encrypted, key);
+          // decryptNew failed: legacy candidate or corrupt blob. Leave corrupt entries as-is.
+          const plaintext = yield* store.decrypt(encrypted, key).pipe(
+            Effect.catchAll(() => Effect.succeed<string | undefined>(undefined))
+          );
+          if (plaintext === undefined) continue;
+
           next[name] = yield* store.encrypt(plaintext, key);
           changed = true;
         }

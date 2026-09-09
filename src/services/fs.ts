@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
 export interface FileSystem {
-  readonly writeFile: (path: string, content: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
+  readonly writeFile: (path: string, content: string, options?: { become?: boolean | string; mode?: number }) => Effect.Effect<void, Error>;
   readonly readFile: (path: string, options?: { become?: boolean | string }) => Effect.Effect<string, Error>;
   readonly exists: (path: string, options?: { become?: boolean | string }) => Effect.Effect<boolean, Error>;
   readonly mkdir: (path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
@@ -54,9 +54,13 @@ export const FileSystemLive = Layer.effect(
     return FileSystem.of({
       writeFile: (path, content, options) => {
         const resolved = resolvePath(path);
+        const writeOptions =
+          options?.mode !== undefined
+            ? { encoding: 'utf-8' as const, mode: options.mode }
+            : 'utf-8';
         return wrap(
           options,
-          () => NodeFS.writeFile(resolved, content, 'utf-8'),
+          () => NodeFS.writeFile(resolved, content, writeOptions),
           (exec) => exec.run(`tee ${resolved} << 'EOF'\n${content}\nEOF`, options).pipe(Effect.map(() => undefined)),
           (error) => `Failed to write file ${resolved}: ${String(error)}`
         );
