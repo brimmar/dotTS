@@ -143,6 +143,34 @@ describe('FileSystem Service', () => {
     ]);
   });
 
+  it('should check exists with become via test -e without --', async () => {
+    const calls: { file: string; args: string[] }[] = [];
+    const MockExec = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: () => Effect.succeed(''),
+        execFile: (file, args) => {
+          calls.push({ file, args });
+          return Effect.succeed('');
+        },
+      }),
+    );
+
+    const filePath = join(testDir, 'maybe-there');
+    const program = Effect.gen(function* () {
+      const fs = yield* FileSystem;
+      return yield* fs.exists(filePath, { become: true });
+    });
+
+    const exists = await Effect.runPromise(
+      program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)),
+    );
+
+    expect(calls).toEqual([{ file: 'test', args: ['-e', filePath] }]);
+    expect(calls[0]?.args.includes('--')).toBe(false);
+    expect(exists).toBe(true);
+  });
+
   it('should write a file with become via 0o600 temp, root install -m, then unlink', async () => {
     const calls: { file: string; args: string[]; become?: boolean | string }[] = [];
     let seenMode: number | undefined;
