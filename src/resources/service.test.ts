@@ -18,8 +18,14 @@ describe('ServiceResource', () => {
   };
 
   const MockExec = (commands: string[] = []) => Layer.succeed(SystemCommand, SystemCommand.of({
-    run: (cmd: string) => record(commands, cmd),
-    execFile: (file, args) => record(commands, [file, ...args].join(' ')),
+    run: (cmd: string) => Effect.fail(new Error(`unexpected run: ${cmd}`)),
+    execFile: (file, args) => {
+      const cmd = [file, ...args].join(' ');
+      commands.push(cmd);
+      if (args.includes('is-active')) return Effect.succeed('inactive');
+      if (args.includes('is-enabled')) return Effect.succeed('disabled');
+      return Effect.succeed('');
+    },
   }));
 
   it('should start and enable a service', async () => {

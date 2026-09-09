@@ -14,8 +14,15 @@ describe('GroupResource', () => {
   };
 
   const MockExec = (commands: string[] = [], exists: boolean = false) => Layer.succeed(SystemCommand, SystemCommand.of({
-    run: (cmd: string) => record(commands, cmd, exists),
-    execFile: (file, args) => record(commands, [file, ...args].join(' '), exists),
+    run: (cmd: string) => Effect.fail(new Error(`unexpected run: ${cmd}`)),
+    execFile: (file, args) => {
+      const cmd = [file, ...args].join(' ');
+      commands.push(cmd);
+      if (file === 'getent' && args[0] === 'group') {
+        return exists ? Effect.succeed('group:x:1000:') : Effect.fail(new Error('not found'));
+      }
+      return Effect.succeed('');
+    },
   }));
 
   it('should create a group if it does not exist', async () => {
