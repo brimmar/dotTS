@@ -129,4 +129,32 @@ describe('ScriptResource', () => {
     await Effect.runPromise(Effect.provide(scriptRes.apply(), SystemCommandMock));
     expect(executed).toBe(false);
   });
+
+  it('probes unless and onlyIf with intent read and leaves run as write', async () => {
+    const intents: Array<{ command: string; intent: string | undefined }> = [];
+    const SystemCommandMock = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: (command, options) => {
+          intents.push({ command, intent: options?.intent });
+          if (command === 'check-exists') return Effect.fail(new Error('1'));
+          return Effect.succeed('');
+        },
+        execFile: () => Effect.succeed(''),
+      }),
+    );
+
+    const scriptRes = new ScriptResource(new App() as any, 's1', {
+      run: 'main-command',
+      unless: 'check-exists',
+      onlyIf: 'should-run',
+    });
+
+    await Effect.runPromise(Effect.provide(scriptRes.apply(), SystemCommandMock));
+    expect(intents).toEqual([
+      { command: 'check-exists', intent: 'read' },
+      { command: 'should-run', intent: 'read' },
+      { command: 'main-command', intent: undefined },
+    ]);
+  });
 });

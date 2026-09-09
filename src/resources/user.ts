@@ -52,7 +52,10 @@ export class UserResource extends Resource {
           let needsUpdate = false;
 
           if (uid !== undefined) {
-            const currentUid = yield* exec.execFile('id', ['-u', name], { become: this.props.become });
+            const currentUid = yield* exec.execFile('id', ['-u', name], {
+              become: this.props.become,
+              intent: 'read',
+            });
             if (parseInt(currentUid) !== uid) {
               args.push('--uid', String(uid));
               needsUpdate = true;
@@ -60,7 +63,10 @@ export class UserResource extends Resource {
           }
 
           if (gid !== undefined) {
-            const currentGid = yield* exec.execFile('id', ['-g', name], { become: this.props.become });
+            const currentGid = yield* exec.execFile('id', ['-g', name], {
+              become: this.props.become,
+              intent: 'read',
+            });
             // This is simplified, gid could be name or id
             if (currentGid !== String(gid)) {
               args.push('--gid', String(gid));
@@ -69,7 +75,9 @@ export class UserResource extends Resource {
           }
 
           if (groups) {
-            const currentGroups = (yield* exec.execFile('id', ['-Gn', name], { become: this.props.become })).split(' ');
+            const currentGroups = (
+              yield* exec.execFile('id', ['-Gn', name], { become: this.props.become, intent: 'read' })
+            ).split(' ');
             const hasAllGroups = groups.every(g => currentGroups.includes(g));
             if (!hasAllGroups) {
               args.push('--groups', groups.join(','));
@@ -78,7 +86,10 @@ export class UserResource extends Resource {
           }
 
           if (shell) {
-            const passwd = yield* exec.execFile('getent', ['passwd', name], { become: this.props.become });
+            const passwd = yield* exec.execFile('getent', ['passwd', name], {
+              become: this.props.become,
+              intent: 'read',
+            });
             const currentShell = passwd.split(':')[6];
             if (currentShell !== shell) {
               args.push('--shell', shell);
