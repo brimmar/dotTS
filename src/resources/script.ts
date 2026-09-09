@@ -1,5 +1,6 @@
-import { Effect } from 'effect';
+import { Effect, Option } from 'effect';
 import { Resource, Component } from '../core/component';
+import { DryRun } from '../services/dry-run';
 import { SystemCommand } from '../services/exec';
 import { hashConfig } from '../core/hash';
 
@@ -27,27 +28,40 @@ export class ScriptResource extends Resource {
   apply() {
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
+      const dryRun = yield* Effect.serviceOption(DryRun);
 
-      if (this.props.unless) {
-        const skip = yield* Effect.match(
-          exec.run(this.props.unless, { cwd: this.props.workingDir, env: this.props.environment, become: this.props.become }),
-          {
-            onFailure: () => false,
-            onSuccess: () => true,
-          }
-        );
-        if (skip) return;
-      }
+      // Predicates are arbitrary user shell. Dry-run must not execute them
+      // (intent: 'read' would run them live, including become).
+      if (!Option.exists(dryRun, (enabled) => enabled)) {
+        if (this.props.unless) {
+          const skip = yield* Effect.match(
+            exec.run(this.props.unless, {
+              cwd: this.props.workingDir,
+              env: this.props.environment,
+              become: this.props.become,
+            }),
+            {
+              onFailure: () => false,
+              onSuccess: () => true,
+            }
+          );
+          if (skip) return;
+        }
 
-      if (this.props.onlyIf) {
-        const proceed = yield* Effect.match(
-          exec.run(this.props.onlyIf, { cwd: this.props.workingDir, env: this.props.environment, become: this.props.become }),
-          {
-            onFailure: () => false,
-            onSuccess: () => true,
-          }
-        );
-        if (!proceed) return;
+        if (this.props.onlyIf) {
+          const proceed = yield* Effect.match(
+            exec.run(this.props.onlyIf, {
+              cwd: this.props.workingDir,
+              env: this.props.environment,
+              become: this.props.become,
+            }),
+            {
+              onFailure: () => false,
+              onSuccess: () => true,
+            }
+          );
+          if (!proceed) return;
+        }
       }
 
       yield* exec.run(this.props.run, {

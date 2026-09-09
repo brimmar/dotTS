@@ -10,9 +10,13 @@ describe('ServiceResource', () => {
     get: () => Effect.succeed({ os: 'linux', distro: 'ubuntu' } as any)
   }));
 
-  const MockExec = (commands: string[] = []) => Layer.succeed(SystemCommand, SystemCommand.of({
+  const MockExec = (
+    commands: string[] = [],
+    calls: { file: string; args: string[]; intent?: 'read' | 'write' }[] = [],
+  ) => Layer.succeed(SystemCommand, SystemCommand.of({
     run: (cmd: string) => Effect.fail(new Error(`unexpected run: ${cmd}`)),
-    execFile: (file, args) => {
+    execFile: (file, args, opts) => {
+      calls.push({ file, args, intent: opts?.intent });
       const cmd = [file, ...args].join(' ');
       commands.push(cmd);
       if (args.includes('is-active') || args.includes('is-enabled')) {
@@ -26,6 +30,7 @@ describe('ServiceResource', () => {
 
   it('should start and enable a service', async () => {
     const commands: string[] = [];
+    const calls: { file: string; args: string[]; intent?: 'read' | 'write' }[] = [];
     const app = new App();
     const stack = new Stack(app, 'test');
     const res = new ServiceResource(stack, 'test-service', {
@@ -37,7 +42,7 @@ describe('ServiceResource', () => {
     await Effect.runPromise(
       res.apply().pipe(
         Effect.provide(MockPlatform),
-        Effect.provide(MockExec(commands))
+        Effect.provide(MockExec(commands, calls))
       )
     );
 
@@ -45,6 +50,10 @@ describe('ServiceResource', () => {
     expect(commands).toContain('systemctl enable nginx');
     expect(commands).toContain('systemctl show -p ActiveState --value nginx');
     expect(commands).toContain('systemctl start nginx');
+    expect(calls.find((c) => c.args.includes('UnitFileState'))?.intent).toBe('read');
+    expect(calls.find((c) => c.args.includes('ActiveState'))?.intent).toBe('read');
+    expect(calls.find((c) => c.args.includes('enable'))?.intent).toBeUndefined();
+    expect(calls.find((c) => c.args.includes('start'))?.intent).toBeUndefined();
   });
 
   it('should start and enable when is-enabled/is-active probes fail', async () => {

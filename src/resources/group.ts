@@ -37,7 +37,10 @@ export class GroupResource extends Resource {
           args.push(name);
           yield* exec.execFile('groupadd', args, { become: this.props.become });
         } else if (gid !== undefined) {
-          const groupLine = yield* exec.execFile('getent', ['group', name], { become: this.props.become });
+          const groupLine = yield* exec.execFile('getent', ['group', name], {
+            become: this.props.become,
+            intent: 'read',
+          });
           const currentGid = groupLine.split(':')[2] ?? '';
           if (parseInt(currentGid) !== gid) {
             yield* exec.execFile('groupmod', ['--gid', String(gid), name], { become: this.props.become });
@@ -60,7 +63,7 @@ export class GroupResource extends Resource {
   }
 
   private checkExists(name: string, exec: SystemCommand): Effect.Effect<boolean, Error> {
-    return exec.execFile('getent', ['group', name], { become: this.props.become }).pipe(
+    return exec.execFile('getent', ['group', name], { become: this.props.become, intent: 'read' }).pipe(
       Effect.map(() => true),
       Effect.catchAll(() => Effect.succeed(false))
     );
