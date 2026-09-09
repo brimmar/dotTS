@@ -12,13 +12,14 @@ describe('GitResource', () => {
     writeFileBytes: () => Effect.void,
   } as any));
 
-  const MockExec = (commands: string[] = []) => Layer.succeed(SystemCommand, SystemCommand.of({
+  const MockExec = (commands: string[] = [], calls: { file: string; args: string[] }[] = []) => Layer.succeed(SystemCommand, SystemCommand.of({
     run: (cmd: string, options?: any) => {
       commands.push(cmd);
       if (cmd === 'git remote get-url origin') return Effect.succeed('https://github.com/test/repo.git');
       return Effect.succeed('');
     },
     execFile: (file, args) => {
+      calls.push({ file, args });
       const cmd = [file, ...args].join(' ');
       commands.push(cmd);
       if (cmd === 'git remote get-url origin') return Effect.succeed('https://github.com/test/repo.git');
@@ -112,5 +113,51 @@ describe('GitResource', () => {
     );
 
     expect(commands).toContain('git pull');
+  });
+
+  it('should pass a url with shell metacharacters as a single argv entry', async () => {
+    const commands: string[] = [];
+    const calls: { file: string; args: string[] }[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const gitRes = new GitResource(stack, 'git-test', {
+      url: 'https://example.com/x.git; id',
+      dest: '/tmp/repo'
+    });
+
+    await Effect.runPromise(
+      gitRes.apply().pipe(
+        Effect.provide(MockFS(false)),
+        Effect.provide(MockExec(commands, calls))
+      )
+    );
+
+    expect(calls[0]).toEqual({
+      file: 'git',
+      args: ['clone', 'https://example.com/x.git; id', '/tmp/repo'],
+    });
+  });
+
+  it('should spread sparse paths into argv instead of joining them', async () => {
+    const commands: string[] = [];
+    const calls: { file: string; args: string[] }[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const gitRes = new GitResource(stack, 'git-test', {
+      url: 'https://github.com/test/repo.git',
+      dest: '/tmp/repo',
+      sparse: ['a', 'b']
+    });
+
+    await Effect.runPromise(
+      gitRes.apply().pipe(
+        Effect.provide(MockFS(false)),
+        Effect.provide(MockExec(commands, calls))
+      )
+    );
+
+    const setCall = calls.find((c) => c.args[0] === 'sparse-checkout' && c.args[1] === 'set');
+    expect(setCall?.args).toEqual(['sparse-checkout', 'set', 'a', 'b']);
+    expect(setCall?.args).not.toContain('a b');
   });
 });

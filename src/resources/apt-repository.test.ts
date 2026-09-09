@@ -62,7 +62,7 @@ describe('AptRepositoryResource', () => {
     );
 
     expect(files['/etc/apt/sources.list.d/docker.list']).toContain('[signed-by=/etc/apt/keyrings/docker.gpg]');
-    expect(commands).toContain('gpg --dearmor < /tmp/dotts-docker.key > /etc/apt/keyrings/docker.gpg');
+    expect(commands).toContain('gpg --dearmor --output /etc/apt/keyrings/docker.gpg /tmp/dotts-docker.key');
     expect(commands).toContain('apt-get update');
   });
 

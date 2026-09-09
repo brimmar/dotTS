@@ -36,41 +36,40 @@ export class GitResource extends Resource {
       const exists = yield* fs.exists(dest);
       const isGit = exists && (yield* fs.exists(`${dest}/.git`));
 
+      const become = this.props.become;
+      const inRepo = { cwd: dest, become };
+
       if (!isGit) {
-        // Clone
-        let cloneCmd = `git clone`;
-        if (depth) cloneCmd += ` --depth ${depth}`;
-        if (branch) cloneCmd += ` --branch ${branch}`;
-        if (recursive) cloneCmd += ` --recursive`;
-        if (sparse) cloneCmd += ` --no-checkout`;
-        
-        cloneCmd += ` ${url} ${dest}`;
-        yield* exec.run(cloneCmd, { become: this.props.become });
+        const cloneArgs = ['clone'];
+        if (depth) cloneArgs.push('--depth', String(depth));
+        if (branch) cloneArgs.push('--branch', branch);
+        if (recursive) cloneArgs.push('--recursive');
+        if (sparse) cloneArgs.push('--no-checkout');
+        cloneArgs.push(url, dest);
+        yield* exec.execFile('git', cloneArgs, { become });
 
         if (sparse) {
-          yield* exec.run(`git sparse-checkout init --cone`, { cwd: dest, become: this.props.become });
-          yield* exec.run(`git sparse-checkout set ${sparse.join(' ')}`, { cwd: dest, become: this.props.become });
-          yield* exec.run(`git checkout ${branch || 'HEAD'}`, { cwd: dest, become: this.props.become });
+          yield* exec.execFile('git', ['sparse-checkout', 'init', '--cone'], inRepo);
+          yield* exec.execFile('git', ['sparse-checkout', 'set', ...sparse], inRepo);
+          yield* exec.execFile('git', ['checkout', branch || 'HEAD'], inRepo);
         }
       } else {
-        // Update
-        // Verify origin URL
-        const currentUrl = yield* exec.run(`git remote get-url origin`, { cwd: dest, become: this.props.become });
+        const currentUrl = yield* exec.execFile('git', ['remote', 'get-url', 'origin'], inRepo);
         if (currentUrl !== url) {
           throw new Error(`Git destination ${dest} exists but points to ${currentUrl} instead of ${url}`);
         }
 
         if (branch) {
-          yield* exec.run(`git checkout ${branch}`, { cwd: dest, become: this.props.become });
+          yield* exec.execFile('git', ['checkout', branch], inRepo);
         }
 
         if (sparse) {
-          yield* exec.run(`git sparse-checkout set ${sparse.join(' ')}`, { cwd: dest, become: this.props.become });
+          yield* exec.execFile('git', ['sparse-checkout', 'set', ...sparse], inRepo);
         }
 
-        yield* exec.run(`git pull`, { cwd: dest, become: this.props.become });
+        yield* exec.execFile('git', ['pull'], inRepo);
         if (recursive) {
-          yield* exec.run(`git submodule update --init --recursive`, { cwd: dest, become: this.props.become });
+          yield* exec.execFile('git', ['submodule', 'update', '--init', '--recursive'], inRepo);
         }
       }
     });
