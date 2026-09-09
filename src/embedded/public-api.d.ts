@@ -260,7 +260,9 @@ export declare function secret(name: string): SecretToken;
 export type OS = 'linux' | 'darwin' | 'win32' | 'freebsd' | 'openbsd' | 'aix' | 'sunos' | 'android';
 export type Distro = 'ubuntu' | 'debian' | 'arch' | 'fedora' | 'centos' | 'rhel' | 'alpine';
 export type DarwinManagers = 'brew' | 'bun' | 'npm' | 'cargo' | 'pip';
-export type LinuxManagers = 'apt' | 'pacman' | 'bun' | 'npm' | 'cargo' | 'pip';
+export type DebianManagers = 'apt' | 'bun' | 'npm' | 'cargo' | 'pip';
+export type ArchManagers = 'pacman' | 'bun' | 'npm' | 'cargo' | 'pip';
+export type LinuxManagers = DebianManagers | ArchManagers;
 export type DebianDistro = 'ubuntu' | 'debian';
 export type ArchDistro = 'arch';
 export interface CommonApi {
@@ -288,13 +290,22 @@ export interface LinuxApi extends CommonApi {
     group: typeof group;
     aptRepository: typeof aptRepository;
 }
-export type ArchApi = Omit<LinuxApi, 'aptRepository'>;
+export interface DebianApi extends Omit<LinuxApi, 'pkg'> {
+    pkg: (name: string, props?: Omit<PackageProps, 'manager'> & {
+        manager?: DebianManagers;
+    }) => ResourceHandle;
+}
+export interface ArchApi extends Omit<LinuxApi, 'pkg' | 'aptRepository'> {
+    pkg: (name: string, props?: Omit<PackageProps, 'manager'> & {
+        manager?: ArchManagers;
+    }) => ResourceHandle;
+}
 export type ApiFor<O extends OS> = O extends 'darwin' ? DarwinApi : O extends 'linux' ? LinuxApi : CommonApi;
-export type DistroApiFor<D extends Distro> = D extends DebianDistro ? LinuxApi : ArchApi;
+export type DistroApiFor<D extends Distro> = D extends DebianDistro ? DebianApi : D extends ArchDistro ? ArchApi : CommonApi;
 /**
  * Run `fn` only on the given OS. Use the `api` argument for platform-narrowed helpers.
  * Global helpers such as `pkg` stay un-narrowed; narrowing is opt-in via `api`.
- * Mixed OS lists receive `CommonApi` only.
+ * Homogeneous linux or darwin lists keep their narrowed API; mixed lists receive `CommonApi` only.
  * @param os One OS name or a list of names.
  * @param fn Code that declares resources for that OS.
  * @example
@@ -304,8 +315,10 @@ export type DistroApiFor<D extends Distro> = D extends DebianDistro ? LinuxApi :
  * });
  * ```
  */
-export declare function onPlatform(os: OS[], fn: (api: CommonApi) => void | Promise<void>): void;
-export declare function onPlatform<O extends OS>(os: O, fn: (api: ApiFor<O>) => void | Promise<void>): void;
+export declare function onPlatform(os: 'linux'[], fn: (api: LinuxApi) => void | Promise<void>): void | Promise<void>;
+export declare function onPlatform(os: 'darwin'[], fn: (api: DarwinApi) => void | Promise<void>): void | Promise<void>;
+export declare function onPlatform(os: OS[], fn: (api: CommonApi) => void | Promise<void>): void | Promise<void>;
+export declare function onPlatform<O extends OS>(os: O, fn: (api: ApiFor<O>) => void | Promise<void>): void | Promise<void>;
 /**
  * Run `fn` only on the given Linux distro. Use the `api` argument for distro-narrowed helpers.
  * Unknown distros never match. Homogeneous Debian or Arch lists keep their
@@ -323,7 +336,7 @@ export declare function onPlatform<O extends OS>(os: O, fn: (api: ApiFor<O>) => 
  * });
  * ```
  */
-export declare function onDistro(distro: DebianDistro[], fn: (api: LinuxApi) => void | Promise<void>): void;
-export declare function onDistro(distro: ArchDistro[], fn: (api: ArchApi) => void | Promise<void>): void;
-export declare function onDistro(distro: Distro[], fn: (api: CommonApi) => void | Promise<void>): void;
-export declare function onDistro<D extends Distro>(distro: D, fn: (api: DistroApiFor<D>) => void | Promise<void>): void;
+export declare function onDistro(distro: DebianDistro[], fn: (api: DebianApi) => void | Promise<void>): void | Promise<void>;
+export declare function onDistro(distro: ArchDistro[], fn: (api: ArchApi) => void | Promise<void>): void | Promise<void>;
+export declare function onDistro(distro: Distro[], fn: (api: CommonApi) => void | Promise<void>): void | Promise<void>;
+export declare function onDistro<D extends Distro>(distro: D, fn: (api: DistroApiFor<D>) => void | Promise<void>): void | Promise<void>;
