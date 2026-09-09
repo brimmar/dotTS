@@ -320,7 +320,9 @@ export type Distro =
   | 'alpine';
 
 export type DarwinManagers = 'brew' | 'bun' | 'npm' | 'cargo' | 'pip';
-export type LinuxManagers = 'apt' | 'pacman' | 'bun' | 'npm' | 'cargo' | 'pip';
+export type DebianManagers = 'apt' | 'bun' | 'npm' | 'cargo' | 'pip';
+export type ArchManagers = 'pacman' | 'bun' | 'npm' | 'cargo' | 'pip';
+export type LinuxManagers = DebianManagers | ArchManagers;
 export type DebianDistro = 'ubuntu' | 'debian';
 export type ArchDistro = 'arch';
 
@@ -348,11 +350,21 @@ export interface LinuxApi extends CommonApi {
   aptRepository: typeof aptRepository;
 }
 
-export type ArchApi = Omit<LinuxApi, 'aptRepository'>;
+export interface DebianApi extends Omit<LinuxApi, 'pkg'> {
+  pkg: (name: string, props?: Omit<PackageProps, 'manager'> & { manager?: DebianManagers }) => ResourceHandle;
+}
+
+export interface ArchApi extends Omit<LinuxApi, 'pkg' | 'aptRepository'> {
+  pkg: (name: string, props?: Omit<PackageProps, 'manager'> & { manager?: ArchManagers }) => ResourceHandle;
+}
 
 export type ApiFor<O extends OS> = O extends 'darwin' ? DarwinApi : O extends 'linux' ? LinuxApi : CommonApi;
 
-export type DistroApiFor<D extends Distro> = D extends DebianDistro ? LinuxApi : ArchApi;
+export type DistroApiFor<D extends Distro> = D extends DebianDistro
+  ? DebianApi
+  : D extends ArchDistro
+    ? ArchApi
+    : CommonApi;
 
 const platformApi = {
   file,
@@ -374,7 +386,7 @@ const platformApi = {
 /**
  * Run `fn` only on the given OS. Use the `api` argument for platform-narrowed helpers.
  * Global helpers such as `pkg` stay un-narrowed; narrowing is opt-in via `api`.
- * Mixed OS lists receive `CommonApi` only.
+ * Homogeneous linux or darwin lists keep their narrowed API; mixed lists receive `CommonApi` only.
  * @param os One OS name or a list of names.
  * @param fn Code that declares resources for that OS.
  * @example
@@ -384,21 +396,27 @@ const platformApi = {
  * });
  * ```
  */
-export function onPlatform(os: OS[], fn: (api: CommonApi) => void | Promise<void>): void;
-export function onPlatform<O extends OS>(os: O, fn: (api: ApiFor<O>) => void | Promise<void>): void;
-export function onPlatform(os: OS | OS[], fn: (api: typeof platformApi) => void | Promise<void>): void {
+export function onPlatform(os: 'linux'[], fn: (api: LinuxApi) => void | Promise<void>): void | Promise<void>;
+export function onPlatform(os: 'darwin'[], fn: (api: DarwinApi) => void | Promise<void>): void | Promise<void>;
+export function onPlatform(os: OS[], fn: (api: CommonApi) => void | Promise<void>): void | Promise<void>;
+export function onPlatform<O extends OS>(os: O, fn: (api: ApiFor<O>) => void | Promise<void>): void | Promise<void>;
+export function onPlatform(
+  os: OS | OS[],
+  fn: (api: typeof platformApi) => void | Promise<void>,
+): void | Promise<void> {
   const platform = ActiveContext.getPlatform();
   if (!platform) return;
 
   const matches = Array.isArray(os) ? os.includes(platform.os as OS) : platform.os === os;
   if (matches) {
-    fn(platformApi);
+    return fn(platformApi);
   }
 }
 
 /**
  * Run `fn` only on the given Linux distro. Use the `api` argument for distro-narrowed helpers.
- * Unknown distros never match. Mixed distro lists receive `CommonApi` only.
+ * Unknown distros never match. Homogeneous Debian or Arch lists keep their
+ * narrowed API; mixed lists receive `CommonApi` only.
  * @param distro One distro name or a list of names.
  * @param fn Code that declares resources for that distro.
  * @example
@@ -412,15 +430,20 @@ export function onPlatform(os: OS | OS[], fn: (api: typeof platformApi) => void 
  * });
  * ```
  */
-export function onDistro(distro: Distro[], fn: (api: CommonApi) => void | Promise<void>): void;
-export function onDistro<D extends Distro>(distro: D, fn: (api: DistroApiFor<D>) => void | Promise<void>): void;
-export function onDistro(distro: Distro | Distro[], fn: (api: typeof platformApi) => void | Promise<void>): void {
+export function onDistro(distro: DebianDistro[], fn: (api: DebianApi) => void | Promise<void>): void | Promise<void>;
+export function onDistro(distro: ArchDistro[], fn: (api: ArchApi) => void | Promise<void>): void | Promise<void>;
+export function onDistro(distro: Distro[], fn: (api: CommonApi) => void | Promise<void>): void | Promise<void>;
+export function onDistro<D extends Distro>(distro: D, fn: (api: DistroApiFor<D>) => void | Promise<void>): void | Promise<void>;
+export function onDistro(
+  distro: Distro | Distro[],
+  fn: (api: typeof platformApi) => void | Promise<void>,
+): void | Promise<void> {
   const platform = ActiveContext.getPlatform();
   if (!platform || !platform.distro) return;
 
   const wanted = Array.isArray(distro) ? distro : [distro];
   const matches = (wanted as readonly string[]).includes(platform.distro);
   if (matches) {
-    fn(platformApi);
+    return fn(platformApi);
   }
 }
