@@ -13,14 +13,7 @@ describe('dotts apply', () => {
     const configPath = join(testDir, 'dotts-apply-ok.ts');
     await mkdir(testDir, { recursive: true });
     await writeFile(configPath, `
-      export const config = {
-        name: 'test-config',
-        packages: [],
-        symlinks: [],
-        files: [],
-        directories: [],
-        scripts: []
-      };
+      export default () => {};
     `);
 
     // Note: dottsApply is an async function that handles its own Effect running

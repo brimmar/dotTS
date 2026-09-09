@@ -15,12 +15,7 @@ describe('dotts check', () => {
     const configPath = join(testDir, 'dotts-ok.ts');
     await mkdir(testDir, { recursive: true });
     await writeFile(configPath, `
-      export const config = {
-        name: 'test-config',
-        packages: [],
-        symlinks: [],
-        files: [],
-      };
+      export default () => {};
     `);
 
     await dottsCheck(configPath);
