@@ -32,6 +32,7 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
         unlink: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would unlink: ${path}`))),
         chmod: (path, mode) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would chmod: ${path} to ${mode}`))),
         chown: (path, uid, gid) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would chown: ${path} to ${uid}:${gid}`))),
+        writeFileBytes: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would write bytes: ${path}`))),
       }))
     : FileSystemLive;
 

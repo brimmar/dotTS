@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'bun:test';
+import { existsSync, readFileSync, statSync } from 'fs';
+import { rm, stat } from 'fs/promises';
+import { tmpdir } from 'os';
+import { basename, dirname, join } from 'path';
 import { Effect, Layer } from 'effect';
 import { FileSystem, FileSystemLive } from './fs';
-import { SystemCommandLive } from './exec';
-import { join } from 'path';
-import { tmpdir } from 'os';
-import { rm, stat } from 'fs/promises';
+import { SystemCommand, SystemCommandLive } from './exec';
 
 describe('FileSystem Service', () => {
   const testDir = join(tmpdir(), 'dotts-fs-test-' + Math.random().toString(36).slice(2));
@@ -55,6 +56,27 @@ describe('FileSystem Service', () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
+  it('should write binary bytes including null and 0xFF', async () => {
+    const filePath = join(testDir, 'binary.bin');
+    const bytes = new Uint8Array([0, 1, 2, 255]);
+
+    const program = Effect.gen(function* (_) {
+      const fs = yield* _(FileSystem);
+      yield* _(fs.mkdir(testDir));
+      yield* _(fs.writeFileBytes(filePath, bytes));
+    });
+
+    await Effect.runPromise(program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive)
+    ));
+
+    const got = new Uint8Array(readFileSync(filePath));
+    expect(Array.from(got)).toEqual([0, 1, 2, 255]);
+
+    await rm(testDir, { recursive: true, force: true });
+  });
+
   it('should change file permissions (chmod)', async () => {
     const filePath = join(testDir, 'chmod-test.txt');
     const program = Effect.gen(function* (_) {
@@ -92,5 +114,94 @@ describe('FileSystem Service', () => {
     ));
     
     await rm(testDir, { recursive: true, force: true });
+  });
+
+  it('should write bytes with become via mkdtemp, root cp, then unlink', async () => {
+    const calls: { command: string; become?: boolean | string }[] = [];
+    let seenMode: number | undefined;
+    let seenTemp: string | undefined;
+
+    const MockExec = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: (command, options) =>
+          Effect.sync(() => {
+            calls.push({ command, become: options?.become });
+            const match = /^cp '([^']+)' '(.+)'$/.exec(command);
+            if (match?.[1]) {
+              seenTemp = match[1];
+              seenMode = statSync(seenTemp).mode & 0o777;
+            }
+            return '';
+          }),
+      }),
+    );
+
+    const filePath = join(testDir, 'become.bin');
+    const program = Effect.gen(function* () {
+      const fs = yield* FileSystem;
+      yield* fs.mkdir(testDir);
+      yield* fs.writeFileBytes(filePath, new Uint8Array([0, 255]), { become: true });
+    });
+
+    await Effect.runPromise(program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)));
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.command.startsWith('cp ')).toBe(true);
+    expect(calls[0]?.command.includes(filePath)).toBe(true);
+    expect(calls[0]?.become).toBe(true);
+    expect(seenMode).toBe(0o600);
+    if (!seenTemp) {
+      throw new Error('expected cp of a temp path');
+    }
+    expect(seenTemp.startsWith(join(tmpdir(), 'dotts-'))).toBe(true);
+    expect(basename(seenTemp)).toBe('file');
+    expect(existsSync(seenTemp)).toBe(false);
+    expect(existsSync(dirname(seenTemp))).toBe(false);
+  });
+
+  it('should copy as root then chown when become is a username', async () => {
+    const calls: { command: string; become?: boolean | string }[] = [];
+    let seenTemp: string | undefined;
+
+    const MockExec = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: (command, options) =>
+          Effect.sync(() => {
+            calls.push({ command, become: options?.become });
+            const match = /^cp '([^']+)' '(.+)'$/.exec(command);
+            if (match?.[1]) {
+              seenTemp = match[1];
+            }
+            return '';
+          }),
+      }),
+    );
+
+    const filePath = join(testDir, 'alice.bin');
+    const program = Effect.gen(function* () {
+      const fs = yield* FileSystem;
+      yield* fs.mkdir(testDir);
+      yield* fs.writeFileBytes(filePath, new Uint8Array([0, 255]), { become: 'alice' });
+    });
+
+    await Effect.runPromise(program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)));
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.command.startsWith('cp ')).toBe(true);
+    expect(calls[0]?.command.includes(filePath)).toBe(true);
+    expect(calls[0]?.become).toBe(true);
+    expect(calls[1]).toEqual({
+      command: `chown 'alice:' '${filePath}'`,
+      become: true,
+    });
+    if (!seenTemp) {
+      throw new Error('expected cp of a temp path');
+    }
+    expect(seenTemp.startsWith(join(tmpdir(), 'dotts-'))).toBe(true);
+    expect(basename(seenTemp)).toBe('file');
+    expect(existsSync(seenTemp)).toBe(false);
+    expect(existsSync(dirname(seenTemp))).toBe(false);
   });
 });

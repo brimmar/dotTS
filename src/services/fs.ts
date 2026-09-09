@@ -1,7 +1,7 @@
 import { Context, Effect, Layer } from 'effect';
 import * as NodeFS from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { homedir, tmpdir } from 'node:os';
 
 export interface FileSystem {
   readonly writeFile: (path: string, content: string, options?: { become?: boolean | string; mode?: number }) => Effect.Effect<void, Error>;
@@ -13,6 +13,11 @@ export interface FileSystem {
   readonly unlink: (path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly chmod: (path: string, mode: number, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly chown: (path: string, uid: number, gid: number, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
+  readonly writeFileBytes: (
+    path: string,
+    content: Uint8Array,
+    options?: { become?: boolean | string },
+  ) => Effect.Effect<void, Error>;
 }
 
 export const FileSystem = Context.GenericTag<FileSystem>('FileSystem');
@@ -29,6 +34,21 @@ function resolvePath(p: string): string {
   if (p === '~') return homedir();
   if (p.startsWith('~/') || p.startsWith('~\\')) return `${homedir()}${p.slice(1)}`;
   return resolve(p);
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function namedBecomeUser(become: boolean | string | undefined): string | undefined {
+  if (typeof become === 'string' && become !== 'root') {
+    return become;
+  }
+  return undefined;
+}
+
+function rmTempDir(dir: string) {
+  return Effect.ignore(Effect.tryPromise(() => NodeFS.rm(dir, { recursive: true, force: true })));
 }
 
 export const FileSystemLive = Layer.effect(
@@ -62,6 +82,43 @@ export const FileSystemLive = Layer.effect(
           options,
           () => NodeFS.writeFile(resolved, content, writeOptions),
           (exec) => exec.run(`tee ${resolved} << 'EOF'\n${content}\nEOF`, options).pipe(Effect.map(() => undefined)),
+          (error) => `Failed to write file ${resolved}: ${String(error)}`
+        );
+      },
+      writeFileBytes: (path, content, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
+          options,
+          () => NodeFS.writeFile(resolved, content),
+          (exec) =>
+            Effect.tryPromise({
+              try: () => NodeFS.mkdtemp(join(tmpdir(), 'dotts-')),
+              catch: (error) => new Error(`Failed to create temp dir: ${String(error)}`),
+            }).pipe(
+              Effect.flatMap((dir) => {
+                const temp = join(dir, 'file');
+                const asRoot = { become: true as const };
+                return Effect.tryPromise({
+                  try: () => NodeFS.writeFile(temp, content, { mode: 0o600 }),
+                  catch: (error) => new Error(`Failed to write temp file ${temp}: ${String(error)}`),
+                }).pipe(
+                  Effect.flatMap(() =>
+                    exec.run(`cp ${shellQuote(temp)} ${shellQuote(resolved)}`, asRoot).pipe(
+                      Effect.as(undefined),
+                    ),
+                  ),
+                  Effect.flatMap((): Effect.Effect<void, Error> => {
+                    const user = namedBecomeUser(options?.become);
+                    if (!user) return Effect.void;
+                    return exec.run(
+                      `chown ${shellQuote(`${user}:`)} ${shellQuote(resolved)}`,
+                      asRoot,
+                    ).pipe(Effect.as(undefined));
+                  }),
+                  Effect.ensuring(rmTempDir(dir)),
+                );
+              }),
+            ),
           (error) => `Failed to write file ${resolved}: ${String(error)}`
         );
       },
