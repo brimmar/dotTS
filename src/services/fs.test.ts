@@ -73,4 +73,34 @@ describe('FileSystem Service', () => {
     
     await rm(testDir, { recursive: true, force: true });
   });
+
+  it('should rmdir an empty directory and leave a non-empty one', async () => {
+    const emptyDir = join(testDir, 'empty');
+    const fullDir = join(testDir, 'full');
+    const keep = join(fullDir, 'keep.txt');
+
+    const program = Effect.gen(function* (_) {
+      const fs = yield* _(FileSystem);
+      yield* _(fs.mkdir(emptyDir));
+      yield* _(fs.mkdir(fullDir));
+      yield* _(fs.writeFile(keep, 'stay'));
+      yield* _(fs.rmdir(emptyDir));
+      yield* _(fs.rmdir(fullDir));
+      const emptyGone = yield* _(fs.exists(emptyDir));
+      const fullStays = yield* _(fs.exists(fullDir));
+      const keepStays = yield* _(fs.exists(keep));
+      return { emptyGone, fullStays, keepStays };
+    });
+
+    const result = await Effect.runPromise(program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive)
+    ));
+
+    expect(result.emptyGone).toBe(false);
+    expect(result.fullStays).toBe(true);
+    expect(result.keepStays).toBe(true);
+
+    await rm(testDir, { recursive: true, force: true });
+  });
 });

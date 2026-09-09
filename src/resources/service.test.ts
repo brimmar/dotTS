@@ -60,4 +60,23 @@ describe('ServiceResource', () => {
 
     expect(commands).toContain('systemctl restart nginx');
   });
+
+  it('should treat a missing or inactive service as success on destroy', async () => {
+    const commands: string[] = [];
+    const MockMissing = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: (cmd: string) => {
+        commands.push(cmd);
+        if (cmd.includes('stop')) return Effect.fail(new Error('Failed to stop nginx.service: Unit nginx.service not loaded.'));
+        if (cmd.includes('disable')) return Effect.fail(new Error('Failed to disable unit: Unit file nginx.service does not exist.'));
+        return Effect.succeed('');
+      }
+    }));
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new ServiceResource(stack, 'test-service', { name: 'nginx' });
+
+    await Effect.runPromise(res.destroy().pipe(Effect.provide(MockMissing)));
+    expect(commands).toContain('systemctl stop nginx');
+    expect(commands).toContain('systemctl disable nginx');
+  });
 });

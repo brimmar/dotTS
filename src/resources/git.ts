@@ -78,9 +78,7 @@ export class GitResource extends Resource {
   }
 
   destroy() {
-    return Effect.gen(this, function* () {
-      const fs = yield* FileSystem;
-      yield* fs.rm(this.props.dest);
-    });
+    // Leave dest on disk. A clone may contain unmanaged files.
+    return Effect.void;
   }
 }

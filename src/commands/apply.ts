@@ -29,6 +29,7 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
         mkdir: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would create directory: ${path}`))),
         symlink: (target, path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would create symlink: ${path} -> ${target}`))),
         rm: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would remove: ${path}`))),
+        rmdir: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would rmdir: ${path}`))),
         unlink: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would unlink: ${path}`))),
         chmod: (path, mode) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would chmod: ${path} to ${mode}`))),
         chown: (path, uid, gid) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would chown: ${path} to ${uid}:${gid}`))),

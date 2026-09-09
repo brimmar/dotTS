@@ -11,6 +11,7 @@ export interface UserProps {
   shell?: string;
   home?: string;
   createHome?: boolean;
+  removeHome?: boolean;
   state?: 'present' | 'absent';
   dependsOn?: Component[];
   become?: boolean | string;
@@ -93,18 +94,26 @@ export class UserResource extends Resource {
         }
       } else {
         if (exists) {
-          yield* exec.run(`userdel --remove ${name}`, { become: this.props.become });
+          yield* this.deleteUser(exec);
         }
       }
     });
   }
 
   destroy() {
-    const { name } = this.props;
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`userdel --remove ${name}`, { become: this.props.become });
+      yield* this.deleteUser(exec);
     });
+  }
+
+  private deleteUser(exec: SystemCommand): Effect.Effect<void, Error> {
+    const { name, removeHome } = this.props;
+    const cmd = removeHome ? `userdel --remove ${name}` : `userdel ${name}`;
+    return ignoreIfAbsent(
+      exec.run(cmd, { become: this.props.become }),
+      ['does not exist', 'no such user', 'unknown user', 'not found'],
+    );
   }
 
   private checkExists(name: string, exec: SystemCommand): Effect.Effect<boolean, Error> {
@@ -113,4 +122,22 @@ export class UserResource extends Resource {
       Effect.catchAll(() => Effect.succeed(false))
     );
   }
+}
+
+function ignoreIfAbsent(
+  effect: Effect.Effect<string, Error>,
+  tokens: string[],
+): Effect.Effect<void, Error> {
+  return Effect.flatMap(
+    Effect.match(effect, {
+      onFailure: (error) => error,
+      onSuccess: () => undefined as Error | undefined,
+    }),
+    (error) => {
+      if (!error) return Effect.void;
+      const msg = error.message.toLowerCase();
+      if (tokens.some((token) => msg.includes(token))) return Effect.void;
+      return Effect.fail(error);
+    },
+  );
 }

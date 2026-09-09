@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Schedule, Duration } from 'effect';
 import { Component, Resource, flatten } from './component';
 import { StateService, type AppState } from '../services/state';
 import pc from 'picocolors';
-import { sortResourcesByTier } from './graph';
+import { isPathWithin, resourceManagedPath, sortDestroyResources, sortResourcesByTier } from './graph';
 import { performance } from 'node:perf_hooks';
 import { App } from './app';
 import { rehydrate } from './registry';
@@ -70,20 +70,38 @@ export const RunnerLive = Layer.effect(
 
         let deleted = 0;
         const destroyScope = new App();
+        const toDestroy: Resource[] = [];
         for (const id of Object.keys(currentState)) {
           if (newState[id]) continue;
           const oldState = currentState[id];
-          if (!oldState?.kind) {
-            console.warn(`cannot destroy ${id}: missing kind; it will disappear from state`);
+          if (!oldState || !oldState.kind) {
+            console.warn(`cannot destroy ${id}: missing kind; keeping it in state until purged`);
+            if (oldState) newState[id] = oldState;
             continue;
           }
-          const res = rehydrate(oldState.kind, id, oldState.metadata ?? {}, destroyScope);
-          yield* withRetry(res.destroy(), res);
-          deleted++;
-          console.log(pc.red(`- Delete: ${id}`));
+          toDestroy.push(rehydrate(oldState.kind, id, oldState.metadata || {}, destroyScope));
         }
 
-        yield* stateService.save(newState);
+        const persisted: AppState = { ...newState };
+        for (const res of toDestroy) {
+          const previous = currentState[res.id];
+          if (previous) persisted[res.id] = previous;
+        }
+
+        for (const res of sortDestroyResources(toDestroy)) {
+          const dest = resourceManagedPath(res.props);
+          if (dest && remainingUsesPath(dest, newState)) {
+            console.warn(`skip destroy ${res.id}: remaining resources still under ${dest}`);
+            continue;
+          }
+          yield* withRetry(res.destroy(), res);
+          delete persisted[res.id];
+          yield* stateService.save(persisted);
+          deleted++;
+          console.log(pc.red(`- Delete: ${res.id}`));
+        }
+
+        yield* stateService.save(persisted);
 
         const endTime = performance.now();
         const duration = ((endTime - startTime) / 1000).toFixed(2);
@@ -100,6 +118,14 @@ export const RunnerLive = Layer.effect(
 );
 
 type ResourceResult = 'created' | 'updated' | 'converged';
+
+function remainingUsesPath(dest: string, remaining: AppState): boolean {
+  for (const state of Object.values(remaining)) {
+    const path = resourceManagedPath(state.metadata);
+    if (path && isPathWithin(dest, path)) return true;
+  }
+  return false;
+}
 
 function runResource(res: Resource, currentState: AppState, newState: AppState): Effect.Effect<ResourceResult, Error, any> {
   return Effect.gen(function* () {

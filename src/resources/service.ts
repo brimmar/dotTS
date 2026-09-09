@@ -70,8 +70,27 @@ export class ServiceResource extends Resource {
     const { name } = this.props;
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`systemctl stop ${name}`, { become: this.props.become });
-      yield* exec.run(`systemctl disable ${name}`, { become: this.props.become });
+      const absent = ['does not exist', 'not found', 'not-found', 'not loaded', 'inactive', 'not-active'];
+      yield* ignoreIfAbsent(exec.run(`systemctl stop ${name}`, { become: this.props.become }), absent);
+      yield* ignoreIfAbsent(exec.run(`systemctl disable ${name}`, { become: this.props.become }), absent);
     });
   }
+}
+
+function ignoreIfAbsent(
+  effect: Effect.Effect<string, Error>,
+  tokens: string[],
+): Effect.Effect<void, Error> {
+  return Effect.flatMap(
+    Effect.match(effect, {
+      onFailure: (error) => error,
+      onSuccess: () => undefined as Error | undefined,
+    }),
+    (error) => {
+      if (!error) return Effect.void;
+      const msg = error.message.toLowerCase();
+      if (tokens.some((token) => msg.includes(token))) return Effect.void;
+      return Effect.fail(error);
+    },
+  );
 }

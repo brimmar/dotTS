@@ -105,4 +105,22 @@ describe('GitResource', () => {
 
     expect(commands).toContain('git pull');
   });
+
+  it('should not delete dest on destroy', async () => {
+    let removed = false;
+    const MockFS = Layer.succeed(FileSystem, FileSystem.of({
+      rm: () => Effect.sync(() => { removed = true; }),
+      rmdir: () => Effect.sync(() => { removed = true; }),
+    } as any));
+
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const gitRes = new GitResource(stack, 'git-test', {
+      url: 'https://github.com/test/repo.git',
+      dest: '/tmp/repo'
+    });
+
+    await Effect.runPromise(gitRes.destroy().pipe(Effect.provide(MockFS)));
+    expect(removed).toBe(false);
+  });
 });
