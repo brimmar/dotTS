@@ -19,6 +19,7 @@ export interface UserProps {
 }
 
 export class UserResource extends Resource {
+  override readonly kind = 'user' as const;
   constructor(scope: Component, id: string, override readonly props: UserProps) {
     super(scope, id, props);
   }

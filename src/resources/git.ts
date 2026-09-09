@@ -18,6 +18,7 @@ export interface GitResourceProps {
 }
 
 export class GitResource extends Resource {
+  override readonly kind = 'git' as const;
   constructor(scope: Component, id: string, override readonly props: GitResourceProps) {
     super(scope, id, props);
   }

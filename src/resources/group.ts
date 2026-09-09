@@ -14,6 +14,7 @@ export interface GroupProps {
 }
 
 export class GroupResource extends Resource {
+  override readonly kind = 'group' as const;
   constructor(scope: Component, id: string, override readonly props: GroupProps) {
     super(scope, id, props);
   }

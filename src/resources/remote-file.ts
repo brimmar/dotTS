@@ -20,6 +20,7 @@ export interface RemoteFileResourceProps {
 }
 
 export class RemoteFileResource extends Resource {
+  override readonly kind = 'remote' as const;
   constructor(scope: Component, id: string, override readonly props: RemoteFileResourceProps) {
     super(scope, id, props);
   }
