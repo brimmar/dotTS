@@ -199,6 +199,7 @@ describe('Runner', () => {
 
     expect(res.applied).toBe(true);
   });
+<<<<<<< HEAD
 
   it('should destroy resources that left the graph', async () => {
     const app = new App();
