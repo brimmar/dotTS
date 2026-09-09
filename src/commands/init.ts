@@ -1,20 +1,19 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join, relative, sep } from 'node:path';
+import { exists, mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { DottsError } from '../core/errors';
+import { dottsPrepare, tsconfigJson } from './prepare';
 
-export async function dottsInit(projectDir: string) {
-  await mkdir(projectDir, { recursive: true });
-  
-  const publicPath = relative(projectDir, join(process.cwd(), 'src/public')).split(sep).join('/');
-  
-  const b = String.fromCharCode(96);
-  const content = `import { pkg, file, onPlatform, onDistro, App } from '${publicPath}';
+const GITIGNORE = `node_modules
+.dotts/state.json
+.dotts/secrets.json
+`;
 
-export default async (app: App) => {
-  // Common packages
+const DOTTS_TEMPLATE = `import { pkg, file, onPlatform, onDistro } from 'dotts';
+
+export default () => {
   pkg('git');
   pkg('neovim');
 
-  // Platform-specific configuration
   onPlatform('darwin', () => {
     pkg('iterm2');
   });
@@ -23,19 +22,35 @@ export default async (app: App) => {
     pkg('tilix');
   });
 
-  // Distribution-specific configuration
   onDistro('ubuntu', () => {
     pkg('build-essential');
   });
 
-  // Managed files
   file('~/.gitconfig', {
-    content: ${b}[user]
+    content: ${'`'}[user]
   name = My Name
-  email = my@email.com${b},
+  email = my@email.com${'`'},
   });
 };
 `;
-  
-  await writeFile(join(projectDir, 'dotts.ts'), content);
+
+export function parseInitArgs(args: string[]): { projectDir: string; force: boolean } {
+  const force = args.includes('--force');
+  const projectDir = args.find((arg) => !arg.startsWith('-')) || './my-dotfiles';
+  return { projectDir, force };
+}
+
+export async function dottsInit(projectDir: string, options: { force?: boolean } = {}) {
+  await mkdir(projectDir, { recursive: true });
+  const configPath = join(projectDir, 'dotts.ts');
+  if (!options.force && (await exists(configPath))) {
+    throw new DottsError(
+      `Refusing to overwrite existing ${configPath}`,
+      'Pass --force to re-initialize, or use a different directory.',
+    );
+  }
+  await writeFile(configPath, DOTTS_TEMPLATE);
+  await writeFile(join(projectDir, '.gitignore'), GITIGNORE);
+  await writeFile(join(projectDir, 'tsconfig.json'), tsconfigJson());
+  await dottsPrepare(projectDir);
 }
