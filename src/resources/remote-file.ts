@@ -67,7 +67,7 @@ export class RemoteFileResource extends Resource {
   destroy() {
     return Effect.gen(this, function* () {
       const fs = yield* FileSystem;
-      yield* fs.rm(this.props.path, { become: this.props.become });
+      yield* fs.unlink(this.props.path, { become: this.props.become });
     });
   }
 }

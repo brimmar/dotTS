@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'bun:test';
+import { existsSync } from 'fs';
+import { mkdir, rm, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join, resolve } from 'path';
 import { Effect, Layer } from 'effect';
 import { App, Stack } from '../core/app';
 import { FileResource } from './file';
-import { FileSystem } from '../services/fs';
+import { FileSystem, FileSystemLive } from '../services/fs';
+import { SystemCommand, SystemCommandLive } from '../services/exec';
 import { SecretManager } from '../services/secrets-manager';
 import { TemplateService, TemplateServiceLive } from '../services/template';
 
@@ -13,9 +18,9 @@ describe('FileResource', () => {
     exists: () => Effect.sync(() => state.exists),
     mkdir: () => Effect.void,
     symlink: () => Effect.void,
-    rm: () => Effect.sync(() => { state.exists = false; }),
+    rm: (path) => Effect.sync(() => { state.rm = path; state.exists = false; }),
     rmdir: () => Effect.void,
-    unlink: () => Effect.sync(() => { state.exists = false; }),
+    unlink: (path) => Effect.sync(() => { state.unlink = path; state.exists = false; }),
     chmod: (path, mode) => Effect.sync(() => { state.chmod = { path, mode }; }),
     chown: (path, uid, gid) => Effect.sync(() => { state.chown = { path, uid, gid }; }),
   }));
@@ -47,7 +52,7 @@ describe('FileResource', () => {
   });
 
   it('should remove the file on destroy', async () => {
-    const state = { exists: true };
+    const state: { exists: boolean; unlink?: string; rm?: string } = { exists: true };
     const app = new App();
     const stack = new Stack(app, 'test');
     const fileRes = new FileResource(stack, 'test-file', { path: '/tmp/test.txt', content: 'to be deleted' });
@@ -66,6 +71,74 @@ describe('FileResource', () => {
 
     expect(existsBefore).toBe(true);
     expect(existsAfter).toBe(false);
+    expect(state.unlink).toBe('/tmp/test.txt');
+    expect(state.rm).toBeUndefined();
+  });
+
+  it('should destroy with become via rm -f argv, never rm -rf', async () => {
+    const calls: { file: string; args: string[] }[] = [];
+    const MockExec = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: () => Effect.fail(new Error('run should not be used')),
+      execFile: (file, args) => {
+        calls.push({ file, args });
+        return Effect.succeed('');
+      },
+    }));
+
+    const path = '/tmp/file; rm -rf /';
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const fileRes = new FileResource(stack, 'test-file', {
+      path,
+      content: 'to be deleted',
+      become: true,
+    });
+
+    await Effect.runPromise(fileRes.destroy().pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(MockExec),
+    ));
+
+    expect(calls).toEqual([{ file: 'rm', args: ['-f', '--', resolve(path)] }]);
+    expect(calls.some((c) => c.args.includes('-rf'))).toBe(false);
+  });
+
+  it('should not recursively delete a directory on destroy', async () => {
+    const testDir = join(tmpdir(), 'dotts-file-dir-destroy-' + Math.random().toString(36).slice(2));
+    const dirPath = join(testDir, 'was-a-file');
+    await mkdir(dirPath, { recursive: true });
+    const keep = join(dirPath, 'keep.txt');
+    await writeFile(keep, 'stay');
+
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const fileRes = new FileResource(stack, 'test-file', { path: dirPath, content: 'x' });
+
+    await Effect.runPromise(fileRes.destroy().pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive),
+    ));
+
+    expect(existsSync(keep)).toBe(true);
+    await rm(testDir, { recursive: true, force: true });
+  });
+
+  it('should succeed destroy when the file is already gone', async () => {
+    const testDir = join(tmpdir(), 'dotts-file-missing-destroy-' + Math.random().toString(36).slice(2));
+    await mkdir(testDir, { recursive: true });
+    const path = join(testDir, 'gone.txt');
+
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const fileRes = new FileResource(stack, 'test-file', { path, content: 'x' });
+
+    await Effect.runPromise(fileRes.destroy().pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive),
+    ));
+
+    expect(existsSync(path)).toBe(false);
+    await rm(testDir, { recursive: true, force: true });
   });
 
   it('should apply file attributes (mode, owner, group)', async () => {

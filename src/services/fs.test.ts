@@ -169,4 +169,111 @@ describe('FileSystem Service', () => {
     await rmdirBecome('ENOTEMPTY: directory not empty');
     await expect(rmdirBecome('EACCES: permission denied')).rejects.toThrow(/EACCES/);
   });
+
+  it('should unlink with become via rm -f argv', async () => {
+    const calls: { file: string; args: string[] }[] = [];
+    const MockExec = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: () => Effect.fail(new Error('run should not be used')),
+      execFile: (file, args) => {
+        calls.push({ file, args });
+        return Effect.succeed('');
+      },
+    }));
+
+    const target = join(testDir, 'file; rm -rf /');
+    const program = Effect.gen(function* (_) {
+      const fs = yield* _(FileSystem);
+      yield* _(fs.unlink(target, { become: true }));
+    });
+
+    await Effect.runPromise(program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(MockExec),
+    ));
+
+    expect(calls).toEqual([{ file: 'rm', args: ['-f', '--', resolve(target)] }]);
+    expect(calls.some((c) => c.args.includes('-rf'))).toBe(false);
+  });
+
+  it('should rm with become via rm -rf argv', async () => {
+    const calls: { file: string; args: string[] }[] = [];
+    const MockExec = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: () => Effect.fail(new Error('run should not be used')),
+      execFile: (file, args) => {
+        calls.push({ file, args });
+        return Effect.succeed('');
+      },
+    }));
+
+    const target = join(testDir, 'tree; rm -rf /');
+    const program = Effect.gen(function* (_) {
+      const fs = yield* _(FileSystem);
+      yield* _(fs.rm(target, { become: true }));
+    });
+
+    await Effect.runPromise(program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(MockExec),
+    ));
+
+    expect(calls).toEqual([{ file: 'rm', args: ['-rf', '--', resolve(target)] }]);
+  });
+
+  it('should not recursively delete a directory on unlink', async () => {
+    const dirPath = join(testDir, 'not-a-file');
+    const keep = join(dirPath, 'keep.txt');
+    const program = Effect.gen(function* (_) {
+      const fs = yield* _(FileSystem);
+      yield* _(fs.mkdir(dirPath));
+      yield* _(fs.writeFile(keep, 'stay'));
+      yield* _(fs.unlink(dirPath));
+      const dirStays = yield* _(fs.exists(dirPath));
+      const keepStays = yield* _(fs.exists(keep));
+      return { dirStays, keepStays };
+    });
+
+    const stillThere = await Effect.runPromise(program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive),
+    ));
+
+    expect(stillThere.dirStays).toBe(true);
+    expect(stillThere.keepStays).toBe(true);
+
+    await rm(testDir, { recursive: true, force: true });
+  });
+
+  it('should succeed unlinking a missing file', async () => {
+    const program = Effect.gen(function* (_) {
+      const fs = yield* _(FileSystem);
+      yield* _(fs.unlink(join(testDir, 'gone.txt')));
+    });
+
+    await Effect.runPromise(program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive),
+    ));
+  });
+
+  it('should ignore ENOENT and EISDIR on become unlink', async () => {
+    const MockExec = (message: string) => Layer.succeed(SystemCommand, SystemCommand.of({
+      run: () => Effect.fail(new Error('run should not be used')),
+      execFile: () => Effect.fail(new Error(message)),
+    }));
+
+    const unlinkBecome = (message: string) => {
+      const program = Effect.gen(function* (_) {
+        const fs = yield* _(FileSystem);
+        yield* _(fs.unlink(join(testDir, 'gone'), { become: true }));
+      });
+      return Effect.runPromise(program.pipe(
+        Effect.provide(FileSystemLive),
+        Effect.provide(MockExec(message)),
+      ));
+    };
+
+    await unlinkBecome('ENOENT: no such file or directory');
+    await unlinkBecome('EISDIR: Is a directory');
+    await expect(unlinkBecome('EACCES: permission denied')).rejects.toThrow(/EACCES/);
+  });
 });
