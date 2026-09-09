@@ -32,6 +32,12 @@ jobs:
           - os: ubuntu-24.04-arm
             target: linux-arm64
             artifact: dotts-linux-arm64
+          - os: macos-14
+            target: darwin-arm64
+            artifact: dotts-darwin-arm64
+          - os: macos-13
+            target: darwin-x64
+            artifact: dotts-darwin-x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
