@@ -50,6 +50,70 @@ describe('typecheckFile', () => {
     ).toBe(true);
   });
 
+  it('accepts node:fs when Node types are available', async () => {
+    const typesDir = await writeFixtureTypes();
+    const configPath = join(dir, 'dotts.ts');
+    await writeFile(
+      configPath,
+      `import { readFileSync } from 'node:fs';
+import { pkg } from 'dotts';
+export default () => {
+  pkg('git');
+  readFileSync('/etc/os-release', 'utf8');
+};
+`,
+    );
+
+    expect(typecheckFile({ configPath, typesDir })).toEqual([]);
+  });
+
+  it('fails on a type error in a helper imported from a parent directory', async () => {
+    const typesDir = await writeFixtureTypes();
+    const sharedDir = join(dir, 'shared');
+    const projectDir = join(dir, 'project');
+    await mkdir(sharedDir, { recursive: true });
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(sharedDir, 'helper.ts'), 'export const n: number = "nope";\n');
+    const configPath = join(projectDir, 'dotts.ts');
+    await writeFile(
+      configPath,
+      `import { pkg } from 'dotts';
+import { n } from '../shared/helper';
+export default () => {
+  pkg('git');
+  void n;
+};
+`,
+    );
+
+    const diagnostics = typecheckFile({ configPath, typesDir });
+    expect(diagnostics.some((d) => d.file.includes('helper.ts') && d.message.toLowerCase().includes('string'))).toBe(
+      true,
+    );
+  });
+
+  it('does not fail on suggestion-only diagnostics', async () => {
+    const typesDir = join(dir, '.dotts', 'types');
+    await mkdir(typesDir, { recursive: true });
+    await writeFile(
+      join(typesDir, 'index.d.ts'),
+      `/** @deprecated use pkg2 */
+export declare function pkg(name: string): { id: string };
+`,
+    );
+    const configPath = join(dir, 'dotts.ts');
+    await writeFile(
+      configPath,
+      `import { pkg } from 'dotts';
+export default () => {
+  pkg('git');
+};
+`,
+    );
+
+    expect(typecheckFile({ configPath, typesDir })).toEqual([]);
+  });
+
   it('tells the user to run prepare when types are missing', async () => {
     await mkdir(dir, { recursive: true });
     const configPath = join(dir, 'dotts.ts');
