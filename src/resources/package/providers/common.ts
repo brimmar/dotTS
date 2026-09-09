@@ -7,7 +7,7 @@ function checkWithWhich(name: string) {
   return Effect.gen(function* () {
     const exec = yield* SystemCommand;
     return yield* Effect.match(
-      exec.run(`which ${name}`),
+      exec.execFile('which', [name]),
       {
         onFailure: () => false,
         onSuccess: () => true,
@@ -21,20 +21,20 @@ export class BrewProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}@${version}` : name;
-      yield* exec.run(`brew install ${pkg}`, options);
+      yield* exec.execFile('brew', ['install', pkg], { become: options?.become });
     });
   }
   uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`brew uninstall ${name}`, options);
+      yield* exec.execFile('brew', ['uninstall', name], { become: options?.become });
     });
   }
   isInstalled(name: string, version?: string) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.run(`brew list --versions ${name}`),
+        exec.execFile('brew', ['list', '--versions', name]),
         {
           onFailure: () => '',
           onSuccess: (out) => out,
@@ -52,20 +52,20 @@ export class AptProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}=${version}` : name;
-      yield* exec.run(`apt install -y ${pkg}`, options);
+      yield* exec.execFile('apt-get', ['install', '-y', pkg], { become: options?.become });
     });
   }
   uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`apt-get remove -y ${name}`, options);
+      yield* exec.execFile('apt-get', ['remove', '-y', name], { become: options?.become });
     });
   }
   isInstalled(name: string, version?: string) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.run(`dpkg -s ${name}`),
+        exec.execFile('dpkg', ['-s', name]),
         {
           onFailure: () => '',
           onSuccess: (out) => out,
@@ -85,20 +85,20 @@ export class PacmanProvider implements PackageProvider {
       if (version) {
          p.log.warn(`Pacman provider does not support specific versions easily. Installing latest ${name}.`);
       }
-      yield* exec.run(`pacman -S --noconfirm ${name}`, options);
+      yield* exec.execFile('pacman', ['-S', '--noconfirm', name], { become: options?.become });
     });
   }
   uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`pacman -Rs --noconfirm ${name}`, options);
+      yield* exec.execFile('pacman', ['-Rs', '--noconfirm', name], { become: options?.become });
     });
   }
   isInstalled(name: string, version?: string) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.run(`pacman -Qi ${name}`),
+        exec.execFile('pacman', ['-Qi', name]),
         {
           onFailure: () => '',
           onSuccess: (out) => out,
@@ -116,13 +116,13 @@ export class BunProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}@${version}` : name;
-      yield* exec.run(`bun add -g ${pkg}`, options);
+      yield* exec.execFile('bun', ['add', '-g', pkg], { become: options?.become });
     });
   }
   uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`bun remove -g ${name}`, options);
+      yield* exec.execFile('bun', ['remove', '-g', name], { become: options?.become });
     });
   }
   isInstalled(name: string, _version?: string) {
@@ -135,20 +135,20 @@ export class NpmProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}@${version}` : name;
-      yield* exec.run(`npm install -g ${pkg}`, options);
+      yield* exec.execFile('npm', ['install', '-g', pkg], { become: options?.become });
     });
   }
   uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`npm uninstall -g ${name}`, options);
+      yield* exec.execFile('npm', ['uninstall', '-g', name], { become: options?.become });
     });
   }
   isInstalled(name: string, version?: string) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.run(`npm list -g ${name}`),
+        exec.execFile('npm', ['list', '-g', name]),
         {
           onFailure: () => '',
           onSuccess: (out) => out,
@@ -165,21 +165,21 @@ export class CargoProvider implements PackageProvider {
   install(name: string, version?: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      const versionFlag = version ? `--version ${version}` : '';
-      yield* exec.run(`cargo install ${name} ${versionFlag}`, options);
+      const args = version ? ['install', name, '--version', version] : ['install', name];
+      yield* exec.execFile('cargo', args, { become: options?.become });
     });
   }
   uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`cargo uninstall ${name}`, options);
+      yield* exec.execFile('cargo', ['uninstall', name], { become: options?.become });
     });
   }
   isInstalled(name: string, version?: string) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.run(`cargo install --list`),
+        exec.execFile('cargo', ['install', '--list']),
         {
           onFailure: () => '',
           onSuccess: (out) => out,
@@ -199,20 +199,20 @@ export class PipProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}==${version}` : name;
-      yield* exec.run(`pip install ${pkg}`, options);
+      yield* exec.execFile('pip', ['install', pkg], { become: options?.become });
     });
   }
   uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`pip uninstall -y ${name}`, options);
+      yield* exec.execFile('pip', ['uninstall', '-y', name], { become: options?.become });
     });
   }
   isInstalled(name: string, version?: string) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.run(`pip show ${name}`),
+        exec.execFile('pip', ['show', name]),
         {
           onFailure: () => '',
           onSuccess: (out) => out,
