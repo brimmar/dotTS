@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from 'effect';
-import { execFile as nodeExecFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
 
 export interface ExecOptions {
   cwd?: string;
@@ -23,8 +23,8 @@ export const SystemCommand = Context.GenericTag<SystemCommand>('SystemCommand');
 
 /**
  * Prefix argv with sudo when `become` is set.
- * `true` / `'root'` → sudo without a username flag.
- * other username → sudo with `-u` then that user, then file and args.
+ * `true` / `'root'` → sudo -- file args.
+ * other username → sudo -u user -- file args.
  */
 export function buildSudoArgs(
   file: string,
@@ -35,9 +35,9 @@ export function buildSudoArgs(
     return { file, args };
   }
   if (become === true || become === 'root') {
-    return { file: 'sudo', args: [file, ...args] };
+    return { file: 'sudo', args: ['--', file, ...args] };
   }
-  return { file: 'sudo', args: ['-u', become, file, ...args] };
+  return { file: 'sudo', args: ['-u', become, '--', file, ...args] };
 }
 
 function spawnExecFile(file: string, args: string[], options?: ExecOptions): Promise<string> {
@@ -45,21 +45,53 @@ function spawnExecFile(file: string, args: string[], options?: ExecOptions): Pro
   const env = options?.env ? { ...process.env, ...options.env } : undefined;
 
   return new Promise((resolve, reject) => {
-    const child = nodeExecFile(
-      spawned.file,
-      spawned.args,
-      { cwd: options?.cwd, env, encoding: 'utf8' },
-      (error, stdout) => {
-        if (error) {
-          reject(error);
-          return;
-        }
+    const child = spawn(spawned.file, spawned.args, {
+      cwd: options?.cwd,
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on('error', fail);
+    child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      if (code === 0) {
         resolve(stdout.trim());
-      },
-    );
+        return;
+      }
+      const detail = stderr.trim() || stdout.trim();
+      reject(
+        new Error(
+          `Command failed: ${spawned.file} ${spawned.args.join(' ')}${detail ? `\n${detail}` : ''}`,
+        ),
+      );
+    });
+
     if (options?.stdin !== undefined) {
-      child.stdin?.write(options.stdin);
-      child.stdin?.end();
+      child.stdin.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code !== 'EPIPE') fail(err);
+      });
+      child.stdin.end(options.stdin);
+    } else {
+      child.stdin.end();
     }
   });
 }
