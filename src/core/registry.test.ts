@@ -4,6 +4,7 @@ import { rehydrate, registerResource, resourceFactories } from './registry';
 import { PackageResource } from '../resources/package';
 import { FileResource } from '../resources/file';
 import { UnarchiveResource } from '../resources/unarchive';
+import { GitResource } from '../resources/git';
 import { Resource, Component } from './component';
 import { Effect } from 'effect';
 
@@ -49,6 +50,13 @@ describe('registry', () => {
     const scope = new App();
     const res = rehydrate('unarchive', 'unarchive-1', { src: '/tmp/a.tgz', dest: '/tmp/out' }, scope);
     expect(res).toBeInstanceOf(UnarchiveResource);
+    await Effect.runPromise(res.destroy() as Effect.Effect<void, Error, never>);
+  });
+
+  it('rehydrates git without deleting dest on destroy', async () => {
+    const scope = new App();
+    const res = rehydrate('git', 'git-1', { url: 'https://example.com/repo.git', dest: '/tmp/repo' }, scope);
+    expect(res).toBeInstanceOf(GitResource);
     await Effect.runPromise(res.destroy() as Effect.Effect<void, Error, never>);
   });
 

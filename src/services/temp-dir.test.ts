@@ -10,6 +10,7 @@ describe('TempDirService', () => {
     const MockFS = Layer.succeed(FileSystem, FileSystem.of({
       mkdir: (path: string) => Effect.sync(() => { createdDir = path; }),
       rm: (path: string) => Effect.sync(() => { removedDir = path; }),
+      rmdir: () => Effect.void,
       exists: () => Effect.succeed(false),
       writeFile: () => Effect.void,
       readFile: () => Effect.succeed(''),

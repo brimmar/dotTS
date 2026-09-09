@@ -14,6 +14,7 @@ describe('ScriptResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command, options) => Effect.sync(() => { 
           executedCommand = command; 
           executedCwd = options?.cwd || '';
@@ -42,6 +43,7 @@ describe('ScriptResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command) => {
           if (command === 'check-exists') return Effect.succeed('0'); // Sockets/shell success
           executed = true;
@@ -64,6 +66,7 @@ describe('ScriptResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command) => {
           if (command === 'check-exists') return Effect.fail(new Error('1')); // shell fail
           executed = true;
@@ -86,6 +89,7 @@ describe('ScriptResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command) => {
           if (command === 'should-run') return Effect.succeed('0');
           executed = true;
@@ -108,6 +112,7 @@ describe('ScriptResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command) => {
           if (command === 'should-not-run') return Effect.fail(new Error('1'));
           executed = true;

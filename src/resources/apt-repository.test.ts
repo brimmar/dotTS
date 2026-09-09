@@ -28,7 +28,11 @@ describe('AptRepositoryResource', () => {
     run: (cmd: string) => {
       commands.push(cmd);
       return Effect.succeed('');
-    }
+    },
+    execFile: (file, args) => {
+      commands.push([file, ...args].join(' '));
+      return Effect.succeed('');
+    },
   }));
 
   it('should add a repository and download key', async () => {

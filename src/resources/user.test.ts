@@ -5,14 +5,17 @@ import { UserResource } from './user';
 import { SystemCommand } from '../services/exec';
 
 describe('UserResource', () => {
-  const MockExec = (commands: string[] = [], exists: boolean = false) => Layer.succeed(SystemCommand, SystemCommand.of({
-    run: (cmd: string) => {
-      commands.push(cmd);
-      if (cmd.startsWith('id ')) {
-        return exists ? Effect.succeed('uid=1000(testuser)...') : Effect.fail(new Error('not found'));
-      }
-      return Effect.succeed('');
+  const record = (commands: string[], cmd: string, exists: boolean) => {
+    commands.push(cmd);
+    if (cmd.startsWith('id ')) {
+      return exists ? Effect.succeed('uid=1000(testuser)...') : Effect.fail(new Error('not found'));
     }
+    return Effect.succeed('');
+  };
+
+  const MockExec = (commands: string[] = [], exists: boolean = false) => Layer.succeed(SystemCommand, SystemCommand.of({
+    run: (cmd: string) => record(commands, cmd, exists),
+    execFile: (file, args) => record(commands, [file, ...args].join(' '), exists),
   }));
 
   it('should create a user if it does not exist', async () => {
@@ -49,6 +52,58 @@ describe('UserResource', () => {
       )
     );
 
+    expect(commands).toContain('userdel testuser');
+    expect(commands.some((c) => c.includes('--remove'))).toBe(false);
+  });
+
+  it('should not remove home on destroy unless removeHome is set', async () => {
+    const commands: string[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new UserResource(stack, 'test-user', { name: 'testuser' });
+
+    await Effect.runPromise(
+      res.destroy().pipe(
+        Effect.provide(MockExec(commands, true))
+      )
+    );
+
+    expect(commands).toContain('userdel testuser');
+    expect(commands.some((c) => c.includes('--remove'))).toBe(false);
+  });
+
+  it('should pass --remove on destroy when removeHome is set', async () => {
+    const commands: string[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new UserResource(stack, 'test-user', { name: 'testuser', removeHome: true });
+
+    await Effect.runPromise(
+      res.destroy().pipe(
+        Effect.provide(MockExec(commands, true))
+      )
+    );
+
     expect(commands).toContain('userdel --remove testuser');
+  });
+
+  it('should treat a missing user as success on destroy', async () => {
+    const commands: string[] = [];
+    const MockMissing = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: (cmd: string) => {
+        commands.push(cmd);
+        return Effect.fail(new Error("userdel: user 'testuser' does not exist"));
+      },
+      execFile: (file, args) => {
+        commands.push([file, ...args].join(' '));
+        return Effect.fail(new Error("userdel: user 'testuser' does not exist"));
+      },
+    }));
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new UserResource(stack, 'test-user', { name: 'testuser' });
+
+    await Effect.runPromise(res.destroy().pipe(Effect.provide(MockMissing)));
+    expect(commands).toContain('userdel testuser');
   });
 });

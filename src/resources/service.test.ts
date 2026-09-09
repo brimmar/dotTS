@@ -10,13 +10,16 @@ describe('ServiceResource', () => {
     get: () => Effect.succeed({ os: 'linux', distro: 'ubuntu' } as any)
   }));
 
+  const record = (commands: string[], cmd: string) => {
+    commands.push(cmd);
+    if (cmd.includes('is-active')) return Effect.succeed('inactive');
+    if (cmd.includes('is-enabled')) return Effect.succeed('disabled');
+    return Effect.succeed('');
+  };
+
   const MockExec = (commands: string[] = []) => Layer.succeed(SystemCommand, SystemCommand.of({
-    run: (cmd: string) => {
-      commands.push(cmd);
-      if (cmd.includes('is-active')) return Effect.succeed('inactive');
-      if (cmd.includes('is-enabled')) return Effect.succeed('disabled');
-      return Effect.succeed('');
-    }
+    run: (cmd: string) => record(commands, cmd),
+    execFile: (file, args) => record(commands, [file, ...args].join(' ')),
   }));
 
   it('should start and enable a service', async () => {
@@ -59,5 +62,43 @@ describe('ServiceResource', () => {
     );
 
     expect(commands).toContain('systemctl restart nginx');
+  });
+
+  it('should treat a missing service as success on destroy', async () => {
+    const commands: string[] = [];
+    const MockMissing = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: () => Effect.succeed(''),
+      execFile: (file, args) => {
+        const cmd = [file, ...args].join(' ');
+        commands.push(cmd);
+        if (cmd.includes('stop')) return Effect.fail(new Error('Failed to stop nginx.service: Unit nginx.service not loaded.'));
+        if (cmd.includes('disable')) return Effect.fail(new Error('Failed to disable unit: Unit file nginx.service does not exist.'));
+        return Effect.succeed('');
+      },
+    }));
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new ServiceResource(stack, 'test-service', { name: 'nginx' });
+
+    await Effect.runPromise(res.destroy().pipe(Effect.provide(MockMissing)));
+    expect(commands).toContain('systemctl stop nginx');
+    expect(commands).toContain('systemctl disable nginx');
+  });
+
+  it('should not treat an error that merely mentions inactive as absence', async () => {
+    const MockInactive = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: () => Effect.succeed(''),
+      execFile: (_file, args) => {
+        if (args[0] === 'stop') {
+          return Effect.fail(new Error('Failed to stop nginx.service: D-Bus connection inactive'));
+        }
+        return Effect.succeed('');
+      },
+    }));
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new ServiceResource(stack, 'test-service', { name: 'nginx' });
+
+    await expect(Effect.runPromise(res.destroy().pipe(Effect.provide(MockInactive)))).rejects.toThrow(/connection inactive/);
   });
 });
