@@ -24,6 +24,7 @@ export const RunnerLive = Layer.effect(
         const newState: AppState = {};
         
         const rawResources = flatten(component);
+        warnLeftoverScriptLineState(currentState, rawResources);
         const tiers = sortResourcesByTier(rawResources);
 
         let created = 0;
@@ -93,6 +94,19 @@ export const RunnerLive = Layer.effect(
 );
 
 type ResourceResult = 'created' | 'updated' | 'converged';
+
+function warnLeftoverScriptLineState(currentState: AppState, resources: Resource[]) {
+  const currentIds = new Set(resources.map((res) => res.id));
+  const leftover = Object.keys(currentState).some(
+    (id) => (id.startsWith('script-') || id.startsWith('line-')) && !currentIds.has(id),
+  );
+  if (!leftover) return;
+  console.warn(
+    pc.yellow(
+      'Leftover script-/line- state hashes will be treated as deleted and the new hashed ids as creates. Non-idempotent scripts will re-run on this upgrade.',
+    ),
+  );
+}
 
 function runResource(res: Resource, currentState: AppState, newState: AppState): Effect.Effect<ResourceResult, Error, any> {
   return Effect.gen(function* () {
