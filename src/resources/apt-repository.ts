@@ -60,9 +60,9 @@ export class AptRepositoryResource extends Resource {
             
             // Check if it needs dearmoring (ASCII armored starts with -----BEGIN PGP PUBLIC KEY BLOCK-----)
             if (keyContent.includes('-----BEGIN PGP PUBLIC KEY BLOCK-----')) {
-              yield* exec.run(`gpg --dearmor < ${tempKeyPath} > ${keyringPath}`, { become: this.props.become });
+              yield* exec.execFile('gpg', ['--dearmor', '--output', keyringPath, tempKeyPath], { become: this.props.become });
             } else {
-              yield* exec.run(`cp ${tempKeyPath} ${keyringPath}`, { become: this.props.become });
+              yield* exec.execFile('cp', [tempKeyPath, keyringPath], { become: this.props.become });
             }
             yield* fs.rm(tempKeyPath);
             changed = true;
@@ -83,7 +83,7 @@ export class AptRepositoryResource extends Resource {
 
         // 3. Update apt
         if (changed) {
-          yield* exec.run(`apt-get update`, { become: this.props.become });
+          yield* exec.execFile('apt-get', ['update'], { become: this.props.become });
         }
       } else {
         // state === 'absent'
@@ -97,7 +97,7 @@ export class AptRepositoryResource extends Resource {
           removed = true;
         }
         if (removed) {
-          yield* exec.run(`apt-get update`, { become: this.props.become });
+          yield* exec.execFile('apt-get', ['update'], { become: this.props.become });
         }
       }
     });
@@ -113,7 +113,7 @@ export class AptRepositoryResource extends Resource {
       const exec = yield* SystemCommand;
       yield* fs.rm(listPath);
       yield* fs.rm(keyringPath);
-      yield* exec.run(`apt-get update`, { become: this.props.become });
+      yield* exec.execFile('apt-get', ['update'], { become: this.props.become });
     });
   }
 }
