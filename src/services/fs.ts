@@ -36,6 +36,14 @@ function resolvePath(p: string): string {
   return resolve(p);
 }
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function unlinkTemp(temp: string) {
+  return Effect.ignore(Effect.tryPromise(() => NodeFS.unlink(temp)));
+}
+
 export const FileSystemLive = Layer.effect(
   FileSystem,
   Effect.gen(function* () {
@@ -74,11 +82,12 @@ export const FileSystemLive = Layer.effect(
           (exec) => {
             const temp = `${tmpdir()}/dotts-${Date.now()}-${Math.random().toString(36).slice(2)}`;
             return Effect.tryPromise({
-              try: () => NodeFS.writeFile(temp, content),
+              try: () => NodeFS.writeFile(temp, content, { mode: 0o600 }),
               catch: (error) => new Error(`Failed to write temp file ${temp}: ${String(error)}`),
             }).pipe(
-              Effect.flatMap(() => exec.run(`cp ${temp} ${resolved}`, options)),
-              Effect.map(() => undefined)
+              Effect.flatMap(() => exec.run(`cp ${shellQuote(temp)} ${shellQuote(resolved)}`, options)),
+              Effect.map(() => undefined),
+              Effect.ensuring(unlinkTemp(temp)),
             );
           },
           (error) => `Failed to write file ${resolved}: ${String(error)}`
