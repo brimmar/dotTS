@@ -4,11 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dottsInit } from './commands/init';
 
-function exportedNames(src: string): string[] {
-  const names: string[] = [];
+function exportedNames(src: string): Set<string> {
+  const names = new Set<string>();
   const stripped = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  for (const match of stripped.matchAll(/export\s+(?:type|class|function|const|interface|enum)\s+(\w+)/g)) {
-    if (match[1]) names.push(match[1]);
+  for (const match of stripped.matchAll(
+    /export\s+(?:declare\s+)?(?:type|class|function|const|interface|enum)\s+(\w+)/g,
+  )) {
+    if (match[1]) names.add(match[1]);
   }
   for (const match of stripped.matchAll(/export\s+(?:type\s+)?\{([^}]+)\}/g)) {
     const body = match[1];
@@ -17,10 +19,10 @@ function exportedNames(src: string): string[] {
       const id = part.trim();
       if (!id) continue;
       const name = id.split(/\s+as\s+/).pop()?.trim();
-      if (name && /^\w+$/.test(name)) names.push(name);
+      if (name && /^\w+$/.test(name)) names.add(name);
     }
   }
-  return [...new Set(names)];
+  return names;
 }
 
 describe('dotts init', () => {
@@ -65,7 +67,18 @@ describe('embedded public API types', () => {
   it('names every export from src/public.ts', async () => {
     const src = await Bun.file(join(import.meta.dir, 'public.ts')).text();
     const dts = await Bun.file(join(import.meta.dir, 'embedded/public-api.d.ts')).text();
-    const missing = exportedNames(src).filter((name) => !dts.includes(name));
+    const srcNames = exportedNames(src);
+    const dtsNames = exportedNames(dts);
+    const missing = [...srcNames].filter((name) => !dtsNames.has(name)).sort();
     expect(missing).toEqual([]);
+  });
+
+  it('onPlatform and onDistro callbacks receive api', async () => {
+    const dts = await Bun.file(join(import.meta.dir, 'embedded/public-api.d.ts')).text();
+    expect(dts).toContain('fn: (api: CommonApi)');
+    expect(dts).toContain('fn: (api: ApiFor<O>)');
+    expect(dts).toContain('fn: (api: LinuxApi)');
+    expect(dts).toContain('fn: (api: ArchApi)');
+    expect(dts).toContain('fn: (api: DistroApiFor<D>)');
   });
 });
