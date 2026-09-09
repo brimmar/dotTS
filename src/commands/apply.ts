@@ -39,6 +39,7 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
   const ExecLayer = options.dryRun
     ? Layer.succeed(SystemCommand, SystemCommand.of({
         run: (cmd) => Effect.sync(() => { p.log.info(pc.gray(`[DRY RUN] Would execute: ${cmd}`)); return ''; }),
+        execFile: (file, args) => Effect.sync(() => { p.log.info(pc.gray(`[DRY RUN] Would execute: ${file} ${args.join(' ')}`)); return ''; }),
       }))
     : SystemCommandLive;
 
