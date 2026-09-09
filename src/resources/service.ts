@@ -36,29 +36,29 @@ export class ServiceResource extends Resource {
       }
 
       if (enabled !== undefined) {
-        const isEnabled = (yield* exec.run(`systemctl is-enabled ${name}`, { become: this.props.become })).trim() === 'enabled';
+        const isEnabled = (yield* exec.execFile('systemctl', ['is-enabled', name], { become: this.props.become })).trim() === 'enabled';
         if (enabled && !isEnabled) {
-          yield* exec.run(`systemctl enable ${name}`, { become: this.props.become });
+          yield* exec.execFile('systemctl', ['enable', name], { become: this.props.become });
         } else if (!enabled && isEnabled) {
-          yield* exec.run(`systemctl disable ${name}`, { become: this.props.become });
+          yield* exec.execFile('systemctl', ['disable', name], { become: this.props.become });
         }
       }
 
       if (state) {
-        const isActive = (yield* exec.run(`systemctl is-active ${name}`, { become: this.props.become })).trim() === 'active';
+        const isActive = (yield* exec.execFile('systemctl', ['is-active', name], { become: this.props.become })).trim() === 'active';
 
         switch (state) {
           case 'started':
-            if (!isActive) yield* exec.run(`systemctl start ${name}`, { become: this.props.become });
+            if (!isActive) yield* exec.execFile('systemctl', ['start', name], { become: this.props.become });
             break;
           case 'stopped':
-            if (isActive) yield* exec.run(`systemctl stop ${name}`, { become: this.props.become });
+            if (isActive) yield* exec.execFile('systemctl', ['stop', name], { become: this.props.become });
             break;
           case 'restarted':
-            yield* exec.run(`systemctl restart ${name}`, { become: this.props.become });
+            yield* exec.execFile('systemctl', ['restart', name], { become: this.props.become });
             break;
           case 'reloaded':
-            yield* exec.run(`systemctl reload ${name}`, { become: this.props.become });
+            yield* exec.execFile('systemctl', ['reload', name], { become: this.props.become });
             break;
         }
       }
@@ -69,8 +69,8 @@ export class ServiceResource extends Resource {
     const { name } = this.props;
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`systemctl stop ${name}`, { become: this.props.become });
-      yield* exec.run(`systemctl disable ${name}`, { become: this.props.become });
+      yield* exec.execFile('systemctl', ['stop', name], { become: this.props.become });
+      yield* exec.execFile('systemctl', ['disable', name], { become: this.props.become });
     });
   }
 }
