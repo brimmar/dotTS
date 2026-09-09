@@ -1,8 +1,27 @@
 import { Effect } from 'effect';
 import { Resource, Component } from '../core/component';
-import { SystemCommand } from '../services/exec';
+import { SystemCommand, type ExecOptions } from '../services/exec';
 import { PlatformService } from '../services/platform';
 import { hashConfig } from '../core/hash';
+
+function isMissingExecutable(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes('ENOENT');
+}
+
+/** is-enabled exits 1 when disabled; is-active exits 3 when inactive. Missing systemctl still fails. */
+function systemctlProbe(
+  exec: SystemCommand,
+  args: string[],
+  options: ExecOptions | undefined,
+  whenFailed: string,
+) {
+  return exec.execFile('systemctl', args, options).pipe(
+    Effect.catchAll((error) =>
+      isMissingExecutable(error) ? Effect.fail(error) : Effect.succeed(whenFailed),
+    ),
+  );
+}
 
 export interface ServiceProps {
   name: string;
@@ -36,7 +55,9 @@ export class ServiceResource extends Resource {
       }
 
       if (enabled !== undefined) {
-        const isEnabled = (yield* exec.execFile('systemctl', ['is-enabled', name], { become: this.props.become })).trim() === 'enabled';
+        const isEnabled =
+          (yield* systemctlProbe(exec, ['is-enabled', name], { become: this.props.become }, 'disabled')).trim() ===
+          'enabled';
         if (enabled && !isEnabled) {
           yield* exec.execFile('systemctl', ['enable', name], { become: this.props.become });
         } else if (!enabled && isEnabled) {
@@ -45,7 +66,9 @@ export class ServiceResource extends Resource {
       }
 
       if (state) {
-        const isActive = (yield* exec.execFile('systemctl', ['is-active', name], { become: this.props.become })).trim() === 'active';
+        const isActive =
+          (yield* systemctlProbe(exec, ['is-active', name], { become: this.props.become }, 'inactive')).trim() ===
+          'active';
 
         switch (state) {
           case 'started':
