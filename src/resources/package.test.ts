@@ -17,16 +17,16 @@ describe('PackageResource', () => {
     const app = new App();
     const stack = new Stack(app, 'test');
     
-    const executedCommands: string[] = [];
+    const executedCommands: [string, string[]][] = [];
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) => {
-          executedCommands.push(command);
-          if (command.includes('list')) return Effect.fail(new Error('Not found'));
+        run: () => Effect.succeed(''),
+        execFile: (file, args) => {
+          executedCommands.push([file, args]);
+          if (file === 'brew' && args[0] === 'list') return Effect.fail(new Error('Not found'));
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -42,22 +42,22 @@ describe('PackageResource', () => {
       )
     );
     
-    expect(executedCommands).toContain('brew install neovim');
+    expect(executedCommands).toContainEqual(['brew', ['install', 'neovim']]);
   });
 
   it('should execute the correct uninstall command on destroy', async () => {
     const app = new App();
     const stack = new Stack(app, 'test');
     
-    let executedCommand = '';
+    let executedCommand: [string, string[]] | undefined;
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) => {
-          executedCommand = command;
+        run: () => Effect.succeed(''),
+        execFile: (file, args) => {
+          executedCommand = [file, args];
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -73,23 +73,23 @@ describe('PackageResource', () => {
       )
     );
     
-    expect(executedCommand).toBe('brew uninstall neovim');
+    expect(executedCommand).toEqual(['brew', ['uninstall', 'neovim']]);
   });
 
   it('should infer the manager from the platform if not specified', async () => {
     const app = new App();
     const stack = new Stack(app, 'test');
     
-    const executedCommands: string[] = [];
+    const executedCommands: [string, string[]][] = [];
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) => {
-          executedCommands.push(command);
-          if (command.includes('list')) return Effect.fail(new Error('Not found'));
+        run: () => Effect.succeed(''),
+        execFile: (file, args) => {
+          executedCommands.push([file, args]);
+          if (file === 'brew' && args[0] === 'list') return Effect.fail(new Error('Not found'));
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -104,23 +104,23 @@ describe('PackageResource', () => {
       )
     );
     
-    expect(executedCommands).toContain('brew install neovim');
+    expect(executedCommands).toContainEqual(['brew', ['install', 'neovim']]);
   });
 
   it('should skip install if already installed on the system', async () => {
     const app = new App();
     const stack = new Stack(app, 'test');
     
-    const executedCommands: string[] = [];
+    const executedCommands: [string, string[]][] = [];
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) => {
-          executedCommands.push(command);
-          if (command.includes('list')) return Effect.succeed('neovim 0.9.0');
+        run: () => Effect.succeed(''),
+        execFile: (file, args) => {
+          executedCommands.push([file, args]);
+          if (file === 'brew' && args[0] === 'list') return Effect.succeed('neovim 0.9.0');
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -136,23 +136,23 @@ describe('PackageResource', () => {
       )
     );
     
-    expect(executedCommands).not.toContain('brew install neovim');
+    expect(executedCommands).not.toContainEqual(['brew', ['install', 'neovim']]);
   });
 
   it('should install a specific version if requested', async () => {
     const app = new App();
     const stack = new Stack(app, 'test');
     
-    const executedCommands: string[] = [];
+    const executedCommands: [string, string[]][] = [];
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) => {
-          executedCommands.push(command);
-          if (command.includes('list')) return Effect.fail(new Error('Not found'));
+        run: () => Effect.succeed(''),
+        execFile: (file, args) => {
+          executedCommands.push([file, args]);
+          if (file === 'brew' && args[0] === 'list') return Effect.fail(new Error('Not found'));
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -169,6 +169,44 @@ describe('PackageResource', () => {
       )
     );
     
-    expect(executedCommands).toContain('brew install neovim@0.9.0');
+    expect(executedCommands).toContainEqual(['brew', ['install', 'neovim@0.9.0']]);
+  });
+
+  it('should pass a package name with shell metacharacters as a single argv entry', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+
+    const executedCommands: [string, string[]][] = [];
+    let runUsed = false;
+    const SystemCommandMock = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: () => {
+          runUsed = true;
+          return Effect.succeed('');
+        },
+        execFile: (file, args) => {
+          executedCommands.push([file, args]);
+          if (file === 'brew' && args[0] === 'list') return Effect.fail(new Error('Not found'));
+          return Effect.succeed('');
+        },
+      })
+    );
+
+    const pkgRes = new PackageResource(stack, 'my-pkg', {
+      name: 'neovim; touch /tmp/pwned',
+      manager: 'brew',
+    });
+
+    await Effect.runPromise(
+      pkgRes.apply().pipe(
+        Effect.provide(SystemCommandMock),
+        Effect.provide(PlatformMock)
+      )
+    );
+
+    const install = executedCommands.find(([file, args]) => file === 'brew' && args[0] === 'install');
+    expect(install?.[1]).toEqual(['install', 'neovim; touch /tmp/pwned']);
+    expect(runUsed).toBe(false);
   });
 });
