@@ -146,7 +146,7 @@ dir('~/.config/myapp');
 script(run: string, props?: ScriptProps): ResourceHandle
 ```
 
-Runs a shell command. The resource id is a hash of `run`. Props: `unless?: string` (skip when this command exits 0), `onlyIf?: string` (run only when this command exits 0), `workingDir?: string`, `environment?: Record<string, string>`.
+Runs a shell command. The resource id is a hash of `run` plus stable props (`workingDir`, `unless`, `onlyIf`, `become`, `environment`). Props: `unless?: string` (skip when this command exits 0), `onlyIf?: string` (run only when this command exits 0), `workingDir?: string`, `environment?: Record<string, string>`.
 
 ```ts
 import { script } from 'dotts';
