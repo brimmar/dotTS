@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { ActiveContext } from './core/context';
 import { App, Stack } from './core/app';
@@ -22,37 +23,37 @@ describe('Functional Helpers', () => {
   it('pkg() should create a PackageResource', () => {
     const res = pkg('git');
     expect(res).toBeInstanceOf(PackageResource);
-    expect(stack.children).toContain(res);
+    expect(stack.children.map((child) => child.id)).toContain(res.id);
   });
 
   it('file() should create a FileResource', () => {
     const res = file('/tmp/test', { content: 'hello' });
     expect(res).toBeInstanceOf(FileResource);
-    expect(stack.children).toContain(res);
+    expect(stack.children.map((child) => child.id)).toContain(res.id);
   });
 
   it('link() should create a SymlinkResource', () => {
     const res = link('/tmp/link', '/tmp/target');
     expect(res).toBeInstanceOf(SymlinkResource);
-    expect(stack.children).toContain(res);
+    expect(stack.children.map((child) => child.id)).toContain(res.id);
   });
 
   it('dir() should create a DirectoryResource', () => {
     const res = dir('/tmp/dir');
     expect(res).toBeInstanceOf(DirectoryResource);
-    expect(stack.children).toContain(res);
+    expect(stack.children.map((child) => child.id)).toContain(res.id);
   });
 
   it('script() should create a ScriptResource', () => {
     const res = script('echo ok');
     expect(res).toBeInstanceOf(ScriptResource);
-    expect(stack.children).toContain(res);
+    expect(stack.children.map((child) => child.id)).toContain(res.id);
   });
 
   it('remoteFile() should create a RemoteFileResource', () => {
     const res = remoteFile('/tmp/remote', { url: 'https://example.com' });
     expect(res).toBeInstanceOf(RemoteFileResource);
-    expect(stack.children).toContain(res);
+    expect(stack.children.map((child) => child.id)).toContain(res.id);
   });
 
   it('secret() should return a SecretToken', () => {
@@ -107,5 +108,27 @@ describe('Functional Helpers', () => {
     called = false;
     onDistro(['arch', 'fedora'], () => { called = true; });
     expect(called).toBe(false);
+  });
+
+  it('pkg() uses a stable colon-prefixed id', () => {
+    const res = pkg('git');
+    expect(res.id).toBe('pkg:git');
+  });
+
+  it('script() ids are a stable hash of the command', () => {
+    const a = script('echo hello');
+    const b = script('echo hello');
+    const c = script('echo hello;');
+    const digest = createHash('sha256').update('echo hello').digest('hex').slice(0, 16);
+
+    expect(a.id).toBe(b.id);
+    expect(a.id).not.toBe(c.id);
+    expect(a.id).toBe(`script:${digest}`);
+  });
+
+  it('file(), link(), and dir() use path-based ids', () => {
+    expect(file('/tmp/test', { content: 'hello' }).id).toBe('file:/tmp/test');
+    expect(link('/tmp/link', '/tmp/target').id).toBe('link:/tmp/link');
+    expect(dir('/tmp/dir').id).toBe('dir:/tmp/dir');
   });
 });

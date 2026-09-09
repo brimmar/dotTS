@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { Effect } from 'effect';
-import { Component, Resource } from './component';
+import { Component, Resource, type ResourceHandle } from './component';
 import { App, Stack } from './app';
 
 class TestResource extends Resource {
@@ -50,5 +50,13 @@ describe('Component Architecture', () => {
     const res2 = new TestResource(stack, 'res-2', { dependsOn: [res1] });
     
     expect(res2.dependencies).toContain(res1);
+  });
+
+  it('Resource is a ResourceHandle', () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new TestResource(stack, 'res-1');
+    const handle: ResourceHandle = res;
+    expect(handle.id).toBe('res-1');
   });
 });
