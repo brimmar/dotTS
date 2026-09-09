@@ -144,4 +144,42 @@ describe('Runner', () => {
     // Even if they are in the same tier, they should be serialized
     expect(maxActive).toBe(1);
   });
+
+  it('should still call apply when the resource hash matches last run', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new TestResource(stack, 'res-1');
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(MockState({ 'res-1': { hash: 'hash', metadata: {} } })),
+    );
+
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    expect(res.applied).toBe(true);
+  });
+
+  it('should still call apply when the resource hash changed', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new TestResource(stack, 'res-1', 'new');
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(MockState({ 'res-1': { hash: 'old', metadata: {} } })),
+    );
+
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    expect(res.applied).toBe(true);
+  });
 });
