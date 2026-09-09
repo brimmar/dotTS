@@ -35,6 +35,26 @@ describe('FileSystem Service', () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
+  it('should write a file with the given mode immediately', async () => {
+    const filePath = join(testDir, 'mode-write.txt');
+    const program = Effect.gen(function* (_) {
+      const fs = yield* _(FileSystem);
+      yield* _(fs.mkdir(testDir));
+      yield* _(fs.writeFile(filePath, 'secret', { mode: 0o600 }));
+      return true;
+    });
+
+    await Effect.runPromise(program.pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive)
+    ));
+
+    const s = await stat(filePath);
+    expect(s.mode & 0o777).toBe(0o600);
+
+    await rm(testDir, { recursive: true, force: true });
+  });
+
   it('should change file permissions (chmod)', async () => {
     const filePath = join(testDir, 'chmod-test.txt');
     const program = Effect.gen(function* (_) {
