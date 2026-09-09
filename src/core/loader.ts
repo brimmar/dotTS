@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { exists, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { register } from 'node:module';
 import { arch, platform } from 'node:os';
@@ -66,7 +67,7 @@ function tryInstallDottsPlugin(): boolean {
   }
 }
 
-function tryInstallNodeModuleHook(runtimeFile: string): boolean {
+async function tryInstallNodeModuleHook(runtimeFile: string): Promise<boolean> {
   // Bun exposes register() but it does not intercept import().
   if (typeof Bun !== 'undefined') return false;
   if (typeof register !== 'function') return false;
@@ -79,7 +80,13 @@ function tryInstallNodeModuleHook(runtimeFile: string): boolean {
   }
   return nextResolve(specifier, context);
 }`;
-    register(`data:text/javascript,${encodeURIComponent(source)}`, import.meta.url);
+    const result = register(
+      `data:text/javascript,${encodeURIComponent(source)}`,
+      import.meta.url,
+    ) as unknown;
+    if (result && typeof (result as Promise<unknown>).then === 'function') {
+      await (result as Promise<unknown>);
+    }
     return true;
   } catch {
     return false;
@@ -88,23 +95,25 @@ function tryInstallNodeModuleHook(runtimeFile: string): boolean {
 
 async function installRuntimeFallback(configDir: string): Promise<() => Promise<void>> {
   const runtimeDir = join(configDir, '.dotts', 'runtime');
-  const runtimeFile = join(runtimeDir, 'dotts.mjs');
-  const createdRuntimeFile = !(await exists(runtimeFile));
+  const runtimeFile = join(
+    runtimeDir,
+    `dotts-${process.pid}-${randomBytes(8).toString('hex')}.mjs`,
+  );
 
   await mkdir(runtimeDir, { recursive: true });
-  await writeFile(runtimeFile, publicApiShimSource(), 'utf8');
 
-  if (!tryInstallNodeModuleHook(runtimeFile)) {
-    if (createdRuntimeFile) {
-      await rm(runtimeFile, { force: true });
+  try {
+    await writeFile(runtimeFile, publicApiShimSource(), 'utf8');
+    if (!(await tryInstallNodeModuleHook(runtimeFile))) {
+      throw new Error(DOTTS_MODULE_HOOK_ERROR);
     }
-    throw new Error(DOTTS_MODULE_HOOK_ERROR);
+  } catch (error) {
+    await rm(runtimeFile, { force: true });
+    throw error;
   }
 
   return async () => {
-    if (createdRuntimeFile) {
-      await rm(runtimeFile, { force: true });
-    }
+    await rm(runtimeFile, { force: true });
   };
 }
 

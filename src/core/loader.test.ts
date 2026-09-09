@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { exists, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { exists, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { PackageResource } from '../resources/package';
 import { DOTTS_MODULE_HOOK_ERROR, loadConfig, resetDottsLoaderForTests } from './loader';
+
+const UNIQUE_RUNTIME_SHIM = /^dotts-\d+-[0-9a-f]+\.mjs$/;
+
+async function leftoverRuntimeShims(runtimeDir: string): Promise<string[]> {
+  const names = await readdir(runtimeDir);
+  return names.filter((name) => UNIQUE_RUNTIME_SHIM.test(name));
+}
 
 describe('loadConfig', () => {
   const testDir = join(tmpdir(), 'dotts-loader-test-' + Math.random().toString(36).slice(2));
@@ -93,7 +100,8 @@ describe('loadConfig', () => {
     const resources = app.children[0]!.children;
     expect(resources.some((r) => r instanceof PackageResource && r.props.name === 'jq')).toBe(true);
     expect(await readFile(userState, 'utf8')).toBe('keep me');
-    expect(await exists(join(runtimeDir, 'dotts.mjs'))).toBe(true);
+    expect(await readFile(join(runtimeDir, 'dotts.mjs'), 'utf8')).toBe('export const leftover = true;\n');
+    expect(await leftoverRuntimeShims(runtimeDir)).toEqual([]);
     expect(await exists(join(testDir, 'tsconfig.json'))).toBe(false);
   });
 
@@ -103,6 +111,7 @@ describe('loadConfig', () => {
     const configPath = join(testDir, 'no-plugin.ts');
     await mkdir(runtimeDir, { recursive: true });
     await writeFile(userState, 'keep me', 'utf8');
+    await writeFile(join(runtimeDir, 'dotts.mjs'), 'export const leftover = true;\n', 'utf8');
     await writeFile(
       configPath,
       `
@@ -117,7 +126,8 @@ describe('loadConfig', () => {
 
     await expect(loadConfig(configPath)).rejects.toThrow(DOTTS_MODULE_HOOK_ERROR);
     expect(await readFile(userState, 'utf8')).toBe('keep me');
-    expect(await exists(join(runtimeDir, 'dotts.mjs'))).toBe(false);
+    expect(await readFile(join(runtimeDir, 'dotts.mjs'), 'utf8')).toBe('export const leftover = true;\n');
+    expect(await leftoverRuntimeShims(runtimeDir)).toEqual([]);
     expect(await exists(join(testDir, 'tsconfig.json'))).toBe(false);
     expect(await exists(join(testDir, 'node_modules/dotts'))).toBe(false);
   });
