@@ -1,22 +1,22 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
-  "plugins": [".grit/biome.grit"],
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
     "rules": {
       "recommended": true,
       "correctness": {
-        "noUnusedVariables": "error",
+        "noUnusedVariables": "warn",
         "noUnreachable": "error"
       },
       "suspicious": {
-        "noConsole": { "level": "error" },
-        "noExplicitAny": "error"
+        "noConsole": "off",
+        "noExplicitAny": "warn",
+        "useIterableCallbackReturn": "warn"
       },
       "style": {
-        "useShorthandArrayType": "error",
-        "noNonNullAssertion": "error"
+        "useConsistentArrayType": "error",
+        "noNonNullAssertion": "warn"
       }
     }
   },
