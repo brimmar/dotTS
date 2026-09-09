@@ -21,6 +21,7 @@ export interface FileResourceProps {
 }
 
 export class FileResource extends Resource {
+  override readonly kind = 'file' as const;
   constructor(scope: Component, id: string, override readonly props: FileResourceProps) {
     super(scope, id, props);
   }

@@ -15,6 +15,7 @@ export interface ServiceProps {
 }
 
 export class ServiceResource extends Resource {
+  override readonly kind = 'service' as const;
   constructor(scope: Component, id: string, override readonly props: ServiceProps) {
     super(scope, id, props);
   }

@@ -4,6 +4,8 @@ import { StateService, type AppState } from '../services/state';
 import pc from 'picocolors';
 import { sortResourcesByTier } from './graph';
 import { performance } from 'node:perf_hooks';
+import { App } from './app';
+import { rehydrate } from './registry';
 
 export interface Runner {
   readonly run: (component: Component) => Effect.Effect<void, Error, never>;
@@ -67,12 +69,18 @@ export const RunnerLive = Layer.effect(
         }
 
         let deleted = 0;
+        const destroyScope = new App();
         for (const id of Object.keys(currentState)) {
-          if (!newState[id]) {
-            console.log(pc.red(`- Delete: ${id}`));
-            deleted++;
-            // TODO: Re-hydrate and destroy resource
+          if (newState[id]) continue;
+          const oldState = currentState[id];
+          if (!oldState?.kind) {
+            console.warn(`cannot destroy ${id}: missing kind; it will disappear from state`);
+            continue;
           }
+          const res = rehydrate(oldState.kind, id, oldState.metadata ?? {}, destroyScope);
+          yield* withRetry(res.destroy(), res);
+          deleted++;
+          console.log(pc.red(`- Delete: ${id}`));
         }
 
         yield* stateService.save(newState);
@@ -114,7 +122,7 @@ function runResource(res: Resource, currentState: AppState, newState: AppState):
 
     yield* withRetry(res.apply(), res);
 
-    newState[id] = { hash, metadata: res.props || {} };
+    newState[id] = { hash, kind: res.kind, metadata: res.props || {} };
     return result;
   });
 }

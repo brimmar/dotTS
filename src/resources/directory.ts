@@ -15,6 +15,7 @@ export interface DirectoryResourceProps {
 }
 
 export class DirectoryResource extends Resource {
+  override readonly kind = 'dir' as const;
   constructor(scope: Component, id: string, override readonly props: DirectoryResourceProps) {
     super(scope, id, props);
   }

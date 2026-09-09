@@ -16,6 +16,7 @@ export interface ScriptResourceProps {
 }
 
 export class ScriptResource extends Resource {
+  override readonly kind = 'script' as const;
   constructor(scope: Component, id: string, override readonly props: ScriptResourceProps) {
     super(scope, id, props);
   }

@@ -4,6 +4,7 @@ import { sortResources, sortResourcesByTier } from './graph';
 import { Effect } from 'effect';
 
 class MockResource extends Resource {
+  override readonly kind = 'test' as const;
   constructor(scope: any, id: string, props?: any) {
     super(scope, id, props);
   }
