@@ -26,8 +26,10 @@ function secretTokenDecl(src: string): string {
 
 function publicPropsTypes(src: string): string {
   const cut = src.search(/\/\*\* Constructor stubs/);
-  const body = cut === -1 ? src : src.slice(0, cut);
-  return dropModuleSpecifiers(body);
+  if (cut === -1) {
+    throw new Error('Constructor stubs marker missing in public-props.d.ts');
+  }
+  return dropModuleSpecifiers(src.slice(0, cut));
 }
 
 export async function generatePublicApiDts(): Promise<string> {

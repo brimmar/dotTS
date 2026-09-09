@@ -29,7 +29,8 @@
     "build:npm:types": "tsc --project tsconfig.npm.json",
     "build:npm:js": "bun build ./src/public.ts --outdir dist --target bun --format esm --external effect --external zod --external mustache --external picocolors --external '@clack/prompts'",
     "prepublishOnly": "bun run ci && bun run build:npm",
-    "ci": "bun run test && bun run lint && bun run type-check && bun run build"
+    "generate:public-api-dts": "bun scripts/generate-public-api-dts.ts",
+    "ci": "bun run test && bun run lint && bun run type-check && bun run generate:public-api-dts && git diff --exit-code -- src/embedded/public-api.d.ts && bun run build"
   },
   "license": "MIT",
   "repository": {

@@ -1,5 +1,6 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { exists, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { DottsError } from '../core/errors';
 import { dottsPrepare, tsconfigJson } from './prepare';
 
 const GITIGNORE = `node_modules
@@ -22,7 +23,7 @@ export default () => {
   });
 
   onDistro('ubuntu', () => {
-    pkg('git');
+    pkg('build-essential');
   });
 
   file('~/.gitconfig', {
@@ -33,9 +34,16 @@ export default () => {
 };
 `;
 
-export async function dottsInit(projectDir: string) {
+export async function dottsInit(projectDir: string, options: { force?: boolean } = {}) {
   await mkdir(projectDir, { recursive: true });
-  await writeFile(join(projectDir, 'dotts.ts'), DOTTS_TEMPLATE);
+  const configPath = join(projectDir, 'dotts.ts');
+  if (!options.force && (await exists(configPath))) {
+    throw new DottsError(
+      `Refusing to overwrite existing ${configPath}`,
+      'Pass --force to re-initialize, or use a different directory.',
+    );
+  }
+  await writeFile(configPath, DOTTS_TEMPLATE);
   await writeFile(join(projectDir, '.gitignore'), GITIGNORE);
   await writeFile(join(projectDir, 'tsconfig.json'), tsconfigJson());
   await dottsPrepare(projectDir);
