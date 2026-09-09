@@ -36,7 +36,12 @@ export class ServiceResource extends Resource {
       }
 
       if (enabled !== undefined) {
-        const isEnabled = (yield* exec.execFile('systemctl', ['is-enabled', name], { become: this.props.become })).trim() === 'enabled';
+        const unitFileState = (
+          yield* exec.execFile('systemctl', ['show', '-p', 'UnitFileState', '--value', name], {
+            become: this.props.become,
+          })
+        ).trim();
+        const isEnabled = unitFileState === 'enabled';
         if (enabled && !isEnabled) {
           yield* exec.execFile('systemctl', ['enable', name], { become: this.props.become });
         } else if (!enabled && isEnabled) {
@@ -45,7 +50,12 @@ export class ServiceResource extends Resource {
       }
 
       if (state) {
-        const isActive = (yield* exec.execFile('systemctl', ['is-active', name], { become: this.props.become })).trim() === 'active';
+        const activeState = (
+          yield* exec.execFile('systemctl', ['show', '-p', 'ActiveState', '--value', name], {
+            become: this.props.become,
+          })
+        ).trim();
+        const isActive = activeState === 'active';
 
         switch (state) {
           case 'started':

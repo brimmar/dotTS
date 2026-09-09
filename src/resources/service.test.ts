@@ -15,8 +15,11 @@ describe('ServiceResource', () => {
     execFile: (file, args) => {
       const cmd = [file, ...args].join(' ');
       commands.push(cmd);
-      if (args.includes('is-active')) return Effect.succeed('inactive');
-      if (args.includes('is-enabled')) return Effect.succeed('disabled');
+      if (args.includes('is-active') || args.includes('is-enabled')) {
+        return Effect.fail(new Error(`Command failed: ${cmd}`));
+      }
+      if (args.includes('UnitFileState')) return Effect.succeed('disabled');
+      if (args.includes('ActiveState')) return Effect.succeed('inactive');
       return Effect.succeed('');
     },
   }));
@@ -38,10 +41,59 @@ describe('ServiceResource', () => {
       )
     );
 
-    expect(commands).toContain('systemctl is-enabled nginx');
+    expect(commands).toContain('systemctl show -p UnitFileState --value nginx');
     expect(commands).toContain('systemctl enable nginx');
-    expect(commands).toContain('systemctl is-active nginx');
+    expect(commands).toContain('systemctl show -p ActiveState --value nginx');
     expect(commands).toContain('systemctl start nginx');
+  });
+
+  it('should start and enable when is-enabled/is-active probes fail', async () => {
+    const commands: string[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new ServiceResource(stack, 'test-service', {
+      name: 'nginx',
+      state: 'started',
+      enabled: true,
+    });
+
+    await Effect.runPromise(
+      res.apply().pipe(
+        Effect.provide(MockPlatform),
+        Effect.provide(MockExec(commands)),
+      ),
+    );
+
+    expect(commands.some((cmd) => cmd.includes('is-enabled') || cmd.includes('is-active'))).toBe(false);
+    expect(commands).toContain('systemctl show -p UnitFileState --value nginx');
+    expect(commands).toContain('systemctl enable nginx');
+    expect(commands).toContain('systemctl show -p ActiveState --value nginx');
+    expect(commands).toContain('systemctl start nginx');
+  });
+
+  it('should fail when systemctl is missing', async () => {
+    const MockMissing = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: (cmd: string) => Effect.fail(new Error(`unexpected run: ${cmd}`)),
+        execFile: (file, args) =>
+          Effect.fail(new Error(`spawn ${file} ENOENT: ${args.join(' ')}`)),
+      }),
+    );
+
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new ServiceResource(stack, 'test-service', {
+      name: 'nginx',
+      state: 'started',
+      enabled: true,
+    });
+
+    await expect(
+      Effect.runPromise(
+        res.apply().pipe(Effect.provide(MockPlatform), Effect.provide(MockMissing)),
+      ),
+    ).rejects.toThrow(/ENOENT/);
   });
 
   it('should restart a service', async () => {
@@ -60,6 +112,7 @@ describe('ServiceResource', () => {
       )
     );
 
+    expect(commands).toContain('systemctl show -p ActiveState --value nginx');
     expect(commands).toContain('systemctl restart nginx');
   });
 });
