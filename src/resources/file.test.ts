@@ -23,6 +23,7 @@ describe('FileResource', () => {
     unlink: (path) => Effect.sync(() => { state.unlink = path; state.exists = false; }),
     chmod: (path, mode) => Effect.sync(() => { state.chmod = { path, mode }; }),
     chown: (path, uid, gid) => Effect.sync(() => { state.chown = { path, uid, gid }; }),
+    writeFileBytes: () => Effect.void,
   }));
 
   const MockSM = Layer.succeed(SecretManager, SecretManager.of({

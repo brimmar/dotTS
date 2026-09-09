@@ -18,6 +18,7 @@ describe('TempDirService', () => {
       unlink: () => Effect.void,
       chmod: () => Effect.void,
       chown: () => Effect.void,
+      writeFileBytes: () => Effect.void,
     }));
 
     const program = Effect.gen(function* () {
