@@ -40,6 +40,7 @@ export class ServiceResource extends Resource {
         const unitFileState = (
           yield* exec.execFile('systemctl', ['show', '-p', 'UnitFileState', '--value', name], {
             become: this.props.become,
+            intent: 'read',
           })
         ).trim();
         const isEnabled = unitFileState === 'enabled';
@@ -54,6 +55,7 @@ export class ServiceResource extends Resource {
         const activeState = (
           yield* exec.execFile('systemctl', ['show', '-p', 'ActiveState', '--value', name], {
             become: this.props.become,
+            intent: 'read',
           })
         ).trim();
         const isActive = activeState === 'active';

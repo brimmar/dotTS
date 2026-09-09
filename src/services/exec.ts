@@ -6,6 +6,7 @@ export interface ExecOptions {
   env?: Record<string, string>;
   become?: boolean | string;
   stdin?: string;
+  intent?: 'read' | 'write';
 }
 
 export type RunOptions = ExecOptions;
