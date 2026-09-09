@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
@@ -35,13 +35,9 @@ describe('dotts apply', () => {
     await writeFile(
       configPath,
       `
-      export const config = {
-        name: 'dry-run-file',
-        packages: [],
-        symlinks: [],
-        files: [{ path: ${JSON.stringify(target)}, content: 'hello' }],
-        directories: [],
-        scripts: []
+      import { file } from 'dotts';
+      export default () => {
+        file(${JSON.stringify(target)}, { content: 'hello' });
       };
     `,
     );
@@ -58,13 +54,9 @@ describe('dotts apply', () => {
     await writeFile(
       configPath,
       `
-      export const config = {
-        name: 'dry-run-state',
-        packages: [],
-        symlinks: [],
-        files: [{ path: ${JSON.stringify(target)}, content: 'hello' }],
-        directories: [],
-        scripts: []
+      import { file } from 'dotts';
+      export default () => {
+        file(${JSON.stringify(target)}, { content: 'hello' });
       };
     `,
     );
@@ -77,6 +69,26 @@ describe('dotts apply', () => {
     } finally {
       process.chdir(prev);
     }
+  });
+
+  it('dry-run of script() does not evaluate unless', async () => {
+    const dir = join(tmpdir(), 'dotts-dry-run-script-' + Math.random().toString(36).slice(2));
+    const marker = join(dir, 'dotts-dry-run-should-not-run');
+    const configPath = join(dir, 'dotts.ts');
+    await mkdir(marker, { recursive: true });
+    await writeFile(
+      configPath,
+      `
+      import { script } from 'dotts';
+      export default () => {
+        script('echo would-write', { unless: ${JSON.stringify(`rm -rf ${marker}`)} });
+      };
+    `,
+    );
+
+    await dottsApply(configPath, { dryRun: true });
+    expect(existsSync(marker)).toBe(true);
+    await rm(dir, { recursive: true, force: true });
   });
 });
 

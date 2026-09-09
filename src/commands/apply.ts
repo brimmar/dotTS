@@ -3,6 +3,7 @@ import pc from 'picocolors';
 import { Effect, Layer } from 'effect';
 import { Runner, RunnerLive } from '../core/runner';
 import { FileSystem, FileSystemLive } from '../services/fs';
+import { DryRun } from '../services/dry-run';
 import { SystemCommand, SystemCommandLive } from '../services/exec';
 import { SecretManager, SecretManagerLive } from '../services/secrets-manager';
 import { SecretStoreLive } from '../services/secrets';
@@ -177,7 +178,8 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
     Layer.provideMerge(HttpServiceLive),
     Layer.provideMerge(SecretStoreLive),
     Layer.provideMerge(ExecLayer),
-    Layer.provideMerge(FSLayer.pipe(Layer.provideMerge(ExecLayer)))
+    Layer.provideMerge(FSLayer.pipe(Layer.provideMerge(ExecLayer))),
+    Layer.provideMerge(options.dryRun ? Layer.succeed(DryRun, true) : Layer.empty),
   );
   
   return await Effect.runPromise(Effect.provide(program, MainLayer));
