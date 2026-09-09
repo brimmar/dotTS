@@ -123,14 +123,21 @@ describe('FileSystem Service', () => {
     ]);
   });
 
-  it('should write a file with become via tee argv and stdin', async () => {
-    const calls: { file: string; args: string[]; stdin?: string }[] = [];
+  it('should write a file with become via 0o600 temp, cp argv, then unlink', async () => {
+    const calls: { file: string; args: string[] }[] = [];
+    let seenMode: number | undefined;
+    let seenTemp: string | undefined;
+
     const MockExec = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
         run: () => Effect.succeed(''),
-        execFile: (file, args, opts) => {
-          calls.push({ file, args, stdin: opts?.stdin });
+        execFile: (file, args) => {
+          calls.push({ file, args });
+          if (file === 'cp' && args[0]) {
+            seenTemp = args[0];
+            seenMode = statSync(seenTemp).mode & 0o777;
+          }
           return Effect.succeed('');
         },
       }),
@@ -144,7 +151,14 @@ describe('FileSystem Service', () => {
 
     await Effect.runPromise(program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)));
 
-    expect(calls).toEqual([{ file: 'tee', args: [filePath], stdin: 'secret' }]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.file).toBe('cp');
+    expect(calls[0]?.args[1]).toBe(filePath);
+    expect(seenMode).toBe(0o600);
+    if (!seenTemp) {
+      throw new Error('expected cp of a temp path');
+    }
+    expect(existsSync(seenTemp)).toBe(false);
   });
 
   it('should write bytes with become via 0o600 temp, cp argv, then unlink', async () => {

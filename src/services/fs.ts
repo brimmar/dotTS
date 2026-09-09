@@ -40,6 +40,23 @@ function unlinkTemp(temp: string) {
   return Effect.ignore(Effect.tryPromise(() => NodeFS.unlink(temp)));
 }
 
+function copyViaTemp(
+  exec: SystemCommand,
+  dest: string,
+  content: string | Uint8Array,
+  options?: { become?: boolean | string },
+) {
+  const temp = `${tmpdir()}/dotts-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return Effect.tryPromise({
+    try: () => NodeFS.writeFile(temp, content, { mode: 0o600 }),
+    catch: (error) => new Error(`Failed to write temp file ${temp}: ${String(error)}`),
+  }).pipe(
+    Effect.flatMap(() => exec.execFile('cp', [temp, dest], options)),
+    Effect.map(() => undefined),
+    Effect.ensuring(unlinkTemp(temp)),
+  );
+}
+
 export const FileSystemLive = Layer.effect(
   FileSystem,
   Effect.gen(function* () {
@@ -66,8 +83,7 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.writeFile(resolved, content, 'utf-8'),
-          (exec) =>
-            exec.execFile('tee', [resolved], { ...options, stdin: content }).pipe(Effect.map(() => undefined)),
+          (exec) => copyViaTemp(exec, resolved, content, options),
           (error) => `Failed to write file ${resolved}: ${String(error)}`
         );
       },
@@ -76,17 +92,7 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.writeFile(resolved, content),
-          (exec) => {
-            const temp = `${tmpdir()}/dotts-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-            return Effect.tryPromise({
-              try: () => NodeFS.writeFile(temp, content, { mode: 0o600 }),
-              catch: (error) => new Error(`Failed to write temp file ${temp}: ${String(error)}`),
-            }).pipe(
-              Effect.flatMap(() => exec.execFile('cp', [temp, resolved], options)),
-              Effect.map(() => undefined),
-              Effect.ensuring(unlinkTemp(temp)),
-            );
-          },
+          (exec) => copyViaTemp(exec, resolved, content, options),
           (error) => `Failed to write file ${resolved}: ${String(error)}`
         );
       },
