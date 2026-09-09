@@ -1,119 +1,102 @@
 export declare class SecretToken {
-  readonly name: string;
-  constructor(name: string);
-  toString(): string;
+    readonly name: string;
+    constructor(name: string);
+    toString(): string;
 }
 
 export interface ResourceHandle {
-  readonly id: string;
+    readonly id: string;
 }
-
 export interface ResourceBaseProps {
-  dependsOn?: ResourceHandle[];
-  become?: boolean | string;
-  retries?: number;
-  retryDelay?: number;
+    dependsOn?: ResourceHandle[];
+    become?: boolean | string;
+    retries?: number;
+    retryDelay?: number;
 }
-
 export type PackageManager = 'brew' | 'apt' | 'npm' | 'pacman' | 'bun' | 'cargo' | 'pip';
-
 export interface PackageProps extends ResourceBaseProps {
-  manager?: PackageManager;
-  version?: string;
+    manager?: PackageManager;
+    version?: string;
 }
-
 export interface FileProps extends ResourceBaseProps {
-  content: string | SecretToken;
-  vars?: Record<string, unknown>;
-  mode?: number;
-  uid?: number;
-  gid?: number;
+    content: string | SecretToken;
+    vars?: Record<string, unknown>;
+    mode?: number;
+    uid?: number;
+    gid?: number;
 }
-
 export interface LinkProps extends ResourceBaseProps {
-  source?: string;
-  path?: string;
+    source?: string;
+    path?: string;
 }
-
 export interface DirectoryProps extends ResourceBaseProps {
-  mode?: number;
-  uid?: number;
-  gid?: number;
+    mode?: number;
+    uid?: number;
+    gid?: number;
 }
-
 export interface ScriptProps extends ResourceBaseProps {
-  unless?: string;
-  onlyIf?: string;
-  workingDir?: string;
-  environment?: Record<string, string>;
+    unless?: string;
+    onlyIf?: string;
+    workingDir?: string;
+    environment?: Record<string, string>;
 }
-
 export interface RemoteFileProps extends ResourceBaseProps {
-  url: string;
-  sha256?: string;
-  mode?: number;
-  uid?: number;
-  gid?: number;
+    url: string;
+    sha256?: string;
+    mode?: number;
+    uid?: number;
+    gid?: number;
 }
-
 export interface GitProps extends ResourceBaseProps {
-  dest: string;
-  branch?: string;
-  sparse?: string[];
-  depth?: number;
-  recursive?: boolean;
+    dest: string;
+    branch?: string;
+    sparse?: string[];
+    depth?: number;
+    recursive?: boolean;
 }
-
 export interface LineInFileProps extends ResourceBaseProps {
-  regexp?: string | RegExp;
-  state?: 'present' | 'absent';
+    regexp?: string | RegExp;
+    state?: 'present' | 'absent';
 }
-
 export interface ServiceProps extends ResourceBaseProps {
-  state?: 'started' | 'stopped' | 'restarted' | 'reloaded';
-  enabled?: boolean;
+    state?: 'started' | 'stopped' | 'restarted' | 'reloaded';
+    enabled?: boolean;
 }
-
 export interface UserProps extends ResourceBaseProps {
-  uid?: number;
-  gid?: number | string;
-  groups?: string[];
-  shell?: string;
-  home?: string;
-  createHome?: boolean;
-  state?: 'present' | 'absent';
+    uid?: number;
+    gid?: number | string;
+    groups?: string[];
+    shell?: string;
+    home?: string;
+    createHome?: boolean;
+    state?: 'present' | 'absent';
 }
-
 export interface GroupProps extends ResourceBaseProps {
-  gid?: number;
-  state?: 'present' | 'absent';
+    gid?: number;
+    state?: 'present' | 'absent';
 }
-
 export interface AptRepositoryProps extends ResourceBaseProps {
-  uri: string;
-  distribution: string;
-  components: string[];
-  key?: string;
-  state?: 'present' | 'absent';
+    uri: string;
+    distribution: string;
+    components: string[];
+    key?: string;
+    state?: 'present' | 'absent';
 }
-
 export interface UnarchiveProps extends ResourceBaseProps {
-  src: string;
-  dest: string;
-  stripComponents?: number;
-  mode?: number;
-  uid?: number;
-  gid?: number;
+    src: string;
+    dest: string;
+    stripComponents?: number;
+    mode?: number;
+    uid?: number;
+    gid?: number;
 }
 
 export declare class App {
-  constructor();
+    constructor();
 }
-
 export declare class Stack {
-  constructor(scope: App, id: string);
+    constructor(scope: App, id: string);
 }
-
 /**
  * Declares a software package to install with the platform package manager.
  * @param name Package name as the manager knows it.
@@ -125,7 +108,6 @@ export declare class Stack {
  * ```
  */
 export declare function pkg(name: string, props?: PackageProps): ResourceHandle;
-
 /**
  * Writes a file at the given path, optionally rendering Mustache variables.
  * @param path Destination path, including `~` for the home directory.
@@ -138,7 +120,6 @@ export declare function pkg(name: string, props?: PackageProps): ResourceHandle;
  * ```
  */
 export declare function file(path: string, props: FileProps): ResourceHandle;
-
 /**
  * Creates a symbolic link at `path` pointing at `source`.
  * @param path Location of the symlink.
@@ -150,7 +131,6 @@ export declare function file(path: string, props: FileProps): ResourceHandle;
  * ```
  */
 export declare function link(path: string, source: string, props?: LinkProps): ResourceHandle;
-
 /**
  * Ensures a directory exists at the given path.
  * @param path Directory to create.
@@ -161,10 +141,10 @@ export declare function link(path: string, source: string, props?: LinkProps): R
  * ```
  */
 export declare function dir(path: string, props?: DirectoryProps): ResourceHandle;
-
 /**
- * Runs a shell command. The resource id is a hash of `run`, so the same command
- * always maps to the same id.
+ * Runs a shell command. The resource id is a hash of `run` plus stable props
+ * (`workingDir`, `unless`, `onlyIf`, `become`), so the same command in a
+ * different directory does not collide.
  * @param run Command to execute.
  * @param props Optional `unless`, `onlyIf`, working directory, and env vars.
  * @example
@@ -175,7 +155,6 @@ export declare function dir(path: string, props?: DirectoryProps): ResourceHandl
  * ```
  */
 export declare function script(run: string, props?: ScriptProps): ResourceHandle;
-
 /**
  * Downloads a remote file to `path`.
  * @param path Destination path.
@@ -189,7 +168,6 @@ export declare function script(run: string, props?: ScriptProps): ResourceHandle
  * ```
  */
 export declare function remoteFile(path: string, props: RemoteFileProps): ResourceHandle;
-
 /**
  * Clones a git repository to `props.dest`.
  * @param url Repository URL.
@@ -203,7 +181,6 @@ export declare function remoteFile(path: string, props: RemoteFileProps): Resour
  * ```
  */
 export declare function git(url: string, props: GitProps): ResourceHandle;
-
 /**
  * Ensures a line is present or absent in a file.
  * @param path File to edit.
@@ -215,7 +192,6 @@ export declare function git(url: string, props: GitProps): ResourceHandle;
  * ```
  */
 export declare function lineInFile(path: string, line: string, props?: LineInFileProps): ResourceHandle;
-
 /**
  * Manages a systemd service.
  * @param name systemd unit name.
@@ -227,7 +203,6 @@ export declare function lineInFile(path: string, line: string, props?: LineInFil
  * ```
  */
 export declare function service(name: string, props?: ServiceProps): ResourceHandle;
-
 /**
  * Manages a login user.
  * @param name Account name.
@@ -238,7 +213,6 @@ export declare function service(name: string, props?: ServiceProps): ResourceHan
  * ```
  */
 export declare function user(name: string, props?: UserProps): ResourceHandle;
-
 /**
  * Manages a system group.
  * @param name Group name.
@@ -249,7 +223,6 @@ export declare function user(name: string, props?: UserProps): ResourceHandle;
  * ```
  */
 export declare function group(name: string, props?: GroupProps): ResourceHandle;
-
 /**
  * Adds or removes an apt source list entry.
  * @param name Short name used for the list and keyring files.
@@ -265,7 +238,6 @@ export declare function group(name: string, props?: GroupProps): ResourceHandle;
  * ```
  */
 export declare function aptRepository(name: string, props: AptRepositoryProps): ResourceHandle;
-
 /**
  * Extracts an archive to a destination directory.
  * @param id Stable id fragment used as `unarchive:${id}`.
@@ -276,7 +248,6 @@ export declare function aptRepository(name: string, props: AptRepositoryProps): 
  * ```
  */
 export declare function unarchive(id: string, props: UnarchiveProps): ResourceHandle;
-
 /**
  * Returns a token that stands in for a named secret in file templates.
  * @param name Secret name stored by `dotts secrets`.
@@ -286,33 +257,73 @@ export declare function unarchive(id: string, props: UnarchiveProps): ResourceHa
  * ```
  */
 export declare function secret(name: string): SecretToken;
-
 export type OS = 'linux' | 'darwin' | 'win32' | 'freebsd' | 'openbsd' | 'aix' | 'sunos' | 'android';
 export type Distro = 'ubuntu' | 'debian' | 'arch' | 'fedora' | 'centos' | 'rhel' | 'alpine';
-
+export type DarwinManagers = 'brew' | 'bun' | 'npm' | 'cargo' | 'pip';
+export type LinuxManagers = 'apt' | 'pacman' | 'bun' | 'npm' | 'cargo' | 'pip';
+export type DebianDistro = 'ubuntu' | 'debian';
+export type ArchDistro = 'arch';
+export interface CommonApi {
+    file: typeof file;
+    link: typeof link;
+    dir: typeof dir;
+    script: typeof script;
+    remoteFile: typeof remoteFile;
+    git: typeof git;
+    lineInFile: typeof lineInFile;
+    unarchive: typeof unarchive;
+    secret: typeof secret;
+}
+export interface DarwinApi extends CommonApi {
+    pkg: (name: string, props?: Omit<PackageProps, 'manager'> & {
+        manager?: DarwinManagers;
+    }) => ResourceHandle;
+}
+export interface LinuxApi extends CommonApi {
+    pkg: (name: string, props?: Omit<PackageProps, 'manager'> & {
+        manager?: LinuxManagers;
+    }) => ResourceHandle;
+    service: typeof service;
+    user: typeof user;
+    group: typeof group;
+    aptRepository: typeof aptRepository;
+}
+export type ArchApi = Omit<LinuxApi, 'aptRepository'>;
+export type ApiFor<O extends OS> = O extends 'darwin' ? DarwinApi : O extends 'linux' ? LinuxApi : CommonApi;
+export type DistroApiFor<D extends Distro> = D extends DebianDistro ? LinuxApi : D extends ArchDistro ? ArchApi : CommonApi;
 /**
- * Runs `callback` only when the current OS matches.
+ * Run `fn` only on the given OS. Use the `api` argument for platform-narrowed helpers.
+ * Global helpers such as `pkg` stay un-narrowed; narrowing is opt-in via `api`.
+ * Mixed OS lists receive `CommonApi` only.
  * @param os One OS name or a list of names.
- * @param callback Code that declares resources for that OS.
+ * @param fn Code that declares resources for that OS.
  * @example
  * ```ts
- * onPlatform('darwin', () => {
- *   pkg('iterm2');
+ * onPlatform('darwin', (d) => {
+ *   d.pkg('iterm2', { manager: 'brew' });
  * });
  * ```
  */
-export declare function onPlatform(os: OS | OS[], callback: () => void | Promise<void>): void;
-
+export declare function onPlatform(os: OS[], fn: (api: CommonApi) => void | Promise<void>): void | Promise<void>;
+export declare function onPlatform<O extends OS>(os: O, fn: (api: ApiFor<O>) => void | Promise<void>): void | Promise<void>;
 /**
- * Runs `callback` only when the current Linux distro matches.
- * Unknown distros never match.
+ * Run `fn` only on the given Linux distro. Use the `api` argument for distro-narrowed helpers.
+ * Unknown distros never match. Homogeneous Debian or Arch lists keep their
+ * narrowed API; mixed lists receive `CommonApi` only.
  * @param distro One distro name or a list of names.
- * @param callback Code that declares resources for that distro.
+ * @param fn Code that declares resources for that distro.
  * @example
  * ```ts
- * onDistro(['ubuntu', 'debian'], () => {
- *   pkg('build-essential');
+ * onDistro('ubuntu', (d) => {
+ *   d.aptRepository('nodejs', {
+ *     uri: 'https://deb.nodesource.com/node_22.x',
+ *     distribution: 'nodistro',
+ *     components: ['main'],
+ *   });
  * });
  * ```
  */
-export declare function onDistro(distro: Distro | Distro[], callback: () => void | Promise<void>): void;
+export declare function onDistro(distro: DebianDistro[], fn: (api: LinuxApi) => void | Promise<void>): void | Promise<void>;
+export declare function onDistro(distro: ArchDistro[], fn: (api: ArchApi) => void | Promise<void>): void | Promise<void>;
+export declare function onDistro(distro: Distro[], fn: (api: CommonApi) => void | Promise<void>): void | Promise<void>;
+export declare function onDistro<D extends Distro>(distro: D, fn: (api: DistroApiFor<D>) => void | Promise<void>): void | Promise<void>;
