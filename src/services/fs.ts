@@ -1,6 +1,6 @@
 import { Context, Effect, Layer } from 'effect';
 import * as NodeFS from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 
 export interface FileSystem {
@@ -40,8 +40,15 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-function unlinkTemp(temp: string) {
-  return Effect.ignore(Effect.tryPromise(() => NodeFS.unlink(temp)));
+function namedBecomeUser(become: boolean | string | undefined): string | undefined {
+  if (typeof become === 'string' && become !== 'root') {
+    return become;
+  }
+  return undefined;
+}
+
+function rmTempDir(dir: string) {
+  return Effect.ignore(Effect.tryPromise(() => NodeFS.rm(dir, { recursive: true, force: true })));
 }
 
 export const FileSystemLive = Layer.effect(
@@ -83,17 +90,34 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.writeFile(resolved, content),
-          (exec) => {
-            const temp = `${tmpdir()}/dotts-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-            return Effect.tryPromise({
-              try: () => NodeFS.writeFile(temp, content, { mode: 0o600 }),
-              catch: (error) => new Error(`Failed to write temp file ${temp}: ${String(error)}`),
+          (exec) =>
+            Effect.tryPromise({
+              try: () => NodeFS.mkdtemp(join(tmpdir(), 'dotts-')),
+              catch: (error) => new Error(`Failed to create temp dir: ${String(error)}`),
             }).pipe(
-              Effect.flatMap(() => exec.run(`cp ${shellQuote(temp)} ${shellQuote(resolved)}`, options)),
-              Effect.map(() => undefined),
-              Effect.ensuring(unlinkTemp(temp)),
-            );
-          },
+              Effect.flatMap((dir) => {
+                const temp = join(dir, 'file');
+                const asRoot = { become: true as const };
+                return Effect.tryPromise({
+                  try: () => NodeFS.writeFile(temp, content, { mode: 0o600 }),
+                  catch: (error) => new Error(`Failed to write temp file ${temp}: ${String(error)}`),
+                }).pipe(
+                  Effect.flatMap(() =>
+                    exec.run(`cp ${shellQuote(temp)} ${shellQuote(resolved)}`, asRoot),
+                  ),
+                  Effect.flatMap(() => {
+                    const user = namedBecomeUser(options?.become);
+                    if (!user) return Effect.void;
+                    return exec.run(
+                      `chown ${shellQuote(`${user}:`)} ${shellQuote(resolved)}`,
+                      asRoot,
+                    );
+                  }),
+                  Effect.map(() => undefined),
+                  Effect.ensuring(rmTempDir(dir)),
+                );
+              }),
+            ),
           (error) => `Failed to write file ${resolved}: ${String(error)}`
         );
       },
