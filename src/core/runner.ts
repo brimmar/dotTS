@@ -27,7 +27,7 @@ export const RunnerLive = Layer.effect(
 
         let created = 0;
         let updated = 0;
-        let skipped = 0;
+        let converged = 0;
 
         for (const tier of tiers) {
           const groups = new Map<string | undefined, Resource[]>();
@@ -47,7 +47,7 @@ export const RunnerLive = Layer.effect(
                         const result = yield* runResource(res, currentState, newState);
                         if (result === 'created') created++;
                         else if (result === 'updated') updated++;
-                        else skipped++;
+                        else converged++;
                       })
                     ),
                     { concurrency: 'unbounded' }
@@ -57,7 +57,7 @@ export const RunnerLive = Layer.effect(
                     const result = yield* runResource(res, currentState, newState);
                     if (result === 'created') created++;
                     else if (result === 'updated') updated++;
-                    else skipped++;
+                    else converged++;
                   }
                 }
               })
@@ -84,14 +84,14 @@ export const RunnerLive = Layer.effect(
         console.log(`${pc.green(`+ ${created} created`)}`);
         console.log(`${pc.yellow(`~ ${updated} updated`)}`);
         console.log(`${pc.red(`- ${deleted} deleted`)}`);
-        console.log(`${pc.gray(`  ${skipped} skipped`)}`);
+        console.log(`${pc.gray(`  ${converged} converged`)}`);
         console.log(pc.cyan(`Total duration: ${duration}s`));
       }) as Effect.Effect<void, Error, never>,
     });
   })
 );
 
-type ResourceResult = 'created' | 'updated' | 'skipped';
+type ResourceResult = 'created' | 'updated' | 'converged';
 
 function runResource(res: Resource, currentState: AppState, newState: AppState): Effect.Effect<ResourceResult, Error, any> {
   return Effect.gen(function* () {
@@ -103,16 +103,16 @@ function runResource(res: Resource, currentState: AppState, newState: AppState):
 
     if (!oldState) {
       console.log(pc.green(`+ Create: ${id}`));
-      yield* withRetry(res.apply(), res);
       result = 'created';
     } else if (oldState.hash !== hash) {
       console.log(pc.yellow(`~ Update: ${id}`));
-      yield* withRetry(res.apply(), res);
       result = 'updated';
     } else {
-      console.log(pc.gray(`  No-op:  ${id}`));
-      result = 'skipped';
+      console.log(pc.gray(`~ Converge: ${id}`));
+      result = 'converged';
     }
+
+    yield* withRetry(res.apply(), res);
 
     newState[id] = { hash, metadata: res.props || {} };
     return result;
