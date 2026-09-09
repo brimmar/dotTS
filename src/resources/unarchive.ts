@@ -39,7 +39,7 @@ export class UnarchiveResource extends Resource {
       yield* fs.mkdir(dest, { become });
 
       if (src.endsWith('.zip')) {
-        yield* exec.run(`unzip -o ${src} -d ${dest}`, { become });
+        yield* exec.execFile('unzip', ['-o', src, '-d', dest], { become });
       } else if (
         src.endsWith('.tar') ||
         src.endsWith('.tar.gz') ||
@@ -51,11 +51,14 @@ export class UnarchiveResource extends Resource {
         if (src.endsWith('.tar.gz') || src.endsWith('.tgz')) flags += 'z';
         else if (src.endsWith('.tar.xz')) flags += 'J';
         else if (src.endsWith('.tar.bz2')) flags += 'j';
-        
+
         flags += 'f';
 
-        const stripCmd = stripComponents > 0 ? `--strip-components=${stripComponents}` : '';
-        yield* exec.run(`tar ${flags} ${src} -C ${dest} ${stripCmd}`, { become });
+        const tarArgs = [flags, src, '-C', dest];
+        if (stripComponents > 0) {
+          tarArgs.push(`--strip-components=${stripComponents}`);
+        }
+        yield* exec.execFile('tar', tarArgs, { become });
       } else {
         throw new Error(`Unsupported archive format: ${src}`);
       }
@@ -74,9 +77,7 @@ export class UnarchiveResource extends Resource {
   }
 
   destroy() {
-    return Effect.gen(this, function* () {
-      const fs = yield* FileSystem;
-      yield* fs.rm(this.props.dest, { become: this.props.become });
-    });
+    // Dest may already hold unrelated files. Do not rm it.
+    return Effect.void;
   }
 }
