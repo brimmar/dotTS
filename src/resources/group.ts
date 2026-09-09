@@ -60,7 +60,7 @@ export class GroupResource extends Resource {
   }
 
   private checkExists(name: string, exec: SystemCommand): Effect.Effect<boolean, Error> {
-    return exec.execFile('getent', ['group', name], { become: this.props.become }).pipe(
+    return exec.execFile('getent', ['group', name], { become: this.props.become, intent: 'read' }).pipe(
       Effect.map(() => true),
       Effect.catchAll(() => Effect.succeed(false))
     );

@@ -7,7 +7,7 @@ function checkWithWhich(name: string) {
   return Effect.gen(function* () {
     const exec = yield* SystemCommand;
     return yield* Effect.match(
-      exec.execFile('which', [name]),
+      exec.execFile('which', [name], { intent: 'read' }),
       {
         onFailure: () => false,
         onSuccess: () => true,
@@ -34,7 +34,7 @@ export class BrewProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.execFile('brew', ['list', '--versions', name]),
+        exec.execFile('brew', ['list', '--versions', name], { intent: 'read' }),
         {
           onFailure: () => '',
           onSuccess: (out) => out,
@@ -65,7 +65,7 @@ export class AptProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.execFile('dpkg', ['-s', name]),
+        exec.execFile('dpkg', ['-s', name], { intent: 'read' }),
         {
           onFailure: () => '',
           onSuccess: (out) => out,
@@ -98,7 +98,7 @@ export class PacmanProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.execFile('pacman', ['-Qi', name]),
+        exec.execFile('pacman', ['-Qi', name], { intent: 'read' }),
         {
           onFailure: () => '',
           onSuccess: (out) => out,
@@ -148,7 +148,7 @@ export class NpmProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.execFile('npm', ['list', '-g', name]),
+        exec.execFile('npm', ['list', '-g', name], { intent: 'read' }),
         {
           onFailure: () => '',
           onSuccess: (out) => out,
@@ -179,7 +179,7 @@ export class CargoProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.execFile('cargo', ['install', '--list']),
+        exec.execFile('cargo', ['install', '--list'], { intent: 'read' }),
         {
           onFailure: () => '',
           onSuccess: (out) => out,
@@ -212,7 +212,7 @@ export class PipProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const output = yield* Effect.match(
-        exec.execFile('pip', ['show', name]),
+        exec.execFile('pip', ['show', name], { intent: 'read' }),
         {
           onFailure: () => '',
           onSuccess: (out) => out,

@@ -54,7 +54,7 @@ export class GitResource extends Resource {
           yield* exec.execFile('git', ['checkout', branch || 'HEAD'], inRepo);
         }
       } else {
-        const currentUrl = yield* exec.execFile('git', ['remote', 'get-url', 'origin'], inRepo);
+        const currentUrl = yield* exec.execFile('git', ['remote', 'get-url', 'origin'], { ...inRepo, intent: 'read' });
         if (currentUrl !== url) {
           throw new Error(`Git destination ${dest} exists but points to ${currentUrl} instead of ${url}`);
         }

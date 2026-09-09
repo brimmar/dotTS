@@ -6,7 +6,7 @@ import { FileSystem, FileSystemLive } from '../services/fs';
 import { SystemCommand, SystemCommandLive } from '../services/exec';
 import { SecretManager, SecretManagerLive } from '../services/secrets-manager';
 import { SecretStoreLive } from '../services/secrets';
-import { StateServiceLive } from '../services/state';
+import { StateService, StateServiceLive, type AppState } from '../services/state';
 import { PlatformServiceLive } from '../services/platform';
 import { TemplateServiceLive } from '../services/template';
 import { RemoteRepoService, RemoteRepoServiceLive } from '../services/remote-repo';
@@ -19,29 +19,113 @@ export interface ApplyOptions {
   dryRun?: boolean;
 }
 
+/** Live reads; mutating methods log and do not touch disk. */
+export function dryRunFileSystem(live: FileSystem): FileSystem {
+  return FileSystem.of({
+    readFile: (path, options) => live.readFile(path, options),
+    exists: (path, options) => live.exists(path, options),
+    writeFile: (path) =>
+      Effect.sync(() => {
+        p.log.info(pc.gray(`[DRY RUN] Would write file: ${path}`));
+      }),
+    writeFileBytes: (path) =>
+      Effect.sync(() => {
+        p.log.info(pc.gray(`[DRY RUN] Would write bytes: ${path}`));
+      }),
+    mkdir: (path) =>
+      Effect.sync(() => {
+        p.log.info(pc.gray(`[DRY RUN] Would create directory: ${path}`));
+      }),
+    symlink: (target, path) =>
+      Effect.sync(() => {
+        p.log.info(pc.gray(`[DRY RUN] Would create symlink: ${path} -> ${target}`));
+      }),
+    rm: (path) =>
+      Effect.sync(() => {
+        p.log.info(pc.gray(`[DRY RUN] Would remove: ${path}`));
+      }),
+    unlink: (path) =>
+      Effect.sync(() => {
+        p.log.info(pc.gray(`[DRY RUN] Would unlink: ${path}`));
+      }),
+    chmod: (path, mode) =>
+      Effect.sync(() => {
+        p.log.info(pc.gray(`[DRY RUN] Would chmod: ${path} to ${mode}`));
+      }),
+    chown: (path, uid, gid) =>
+      Effect.sync(() => {
+        p.log.info(pc.gray(`[DRY RUN] Would chown: ${path} to ${uid}:${gid}`));
+      }),
+  });
+}
+
+function dryRunSystemCommand(live: SystemCommand): SystemCommand {
+  return SystemCommand.of({
+    execFile: (file, args, options) => {
+      if (options?.intent === 'read') {
+        return live.execFile(file, args, options);
+      }
+      return Effect.sync(() => {
+        p.log.info(pc.gray(`[DRY RUN] Would execute: ${file} ${args.join(' ')}`));
+        return '';
+      });
+    },
+    run: (command, options) => {
+      if (options?.intent === 'read') {
+        return live.run(command, options);
+      }
+      return Effect.sync(() => {
+        p.log.info(pc.gray(`[DRY RUN] Would execute: ${command}`));
+        return '';
+      });
+    },
+  });
+}
+
 export async function dottsApply(configPath: string, options: ApplyOptions = {}) {
-  // Create Mock services if dry-run is enabled
-  const FSLayer = options.dryRun 
-    ? Layer.succeed(FileSystem, FileSystem.of({
-        writeFile: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would write file: ${path}`))),
-        readFile: () => Effect.succeed(''),
-        exists: () => Effect.succeed(true),
-        mkdir: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would create directory: ${path}`))),
-        symlink: (target, path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would create symlink: ${path} -> ${target}`))),
-        rm: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would remove: ${path}`))),
-        unlink: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would unlink: ${path}`))),
-        chmod: (path, mode) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would chmod: ${path} to ${mode}`))),
-        chown: (path, uid, gid) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would chown: ${path} to ${uid}:${gid}`))),
-        writeFileBytes: (path) => Effect.sync(() => p.log.info(pc.gray(`[DRY RUN] Would write bytes: ${path}`))),
-      }))
+  const FSLayer = options.dryRun
+    ? Layer.effect(
+        FileSystem,
+        Effect.gen(function* () {
+          const live = yield* FileSystem;
+          return dryRunFileSystem(live);
+        }),
+      ).pipe(Layer.provide(FileSystemLive.pipe(Layer.provide(SystemCommandLive))))
     : FileSystemLive;
 
   const ExecLayer = options.dryRun
-    ? Layer.succeed(SystemCommand, SystemCommand.of({
-        run: (cmd) => Effect.sync(() => { p.log.info(pc.gray(`[DRY RUN] Would execute: ${cmd}`)); return ''; }),
-        execFile: (file, args) => Effect.sync(() => { p.log.info(pc.gray(`[DRY RUN] Would execute: ${file} ${args.join(' ')}`)); return ''; }),
-      }))
+    ? Layer.effect(
+        SystemCommand,
+        Effect.gen(function* () {
+          const live = yield* SystemCommand;
+          return dryRunSystemCommand(live);
+        }),
+      ).pipe(Layer.provide(SystemCommandLive))
     : SystemCommandLive;
+
+  const StateLayer = options.dryRun
+    ? Layer.effect(
+        StateService,
+        Effect.gen(function* () {
+          const fs = yield* FileSystem;
+          let statePath = join(process.cwd(), '.dotts/state.json');
+          return StateService.of({
+            setPath: (path) =>
+              Effect.sync(() => {
+                statePath = path;
+              }),
+            load: () =>
+              Effect.gen(function* () {
+                const exists = yield* fs.exists(statePath);
+                if (!exists) return {};
+                const content = yield* fs.readFile(statePath);
+                return JSON.parse(content) as AppState;
+              }),
+            save: () => Effect.void,
+          });
+        }),
+      )
+    : StateServiceLive;
 
   const program = Effect.gen(function* (_) {
     const remoteRepo = yield* _(RemoteRepoService);
@@ -88,7 +172,7 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
     Layer.provideMerge(TempDirServiceLive),
     Layer.provideMerge(SecretManagerLive),
     Layer.provideMerge(PlatformServiceLive),
-    Layer.provideMerge(StateServiceLive),
+    Layer.provideMerge(StateLayer),
     Layer.provideMerge(TemplateServiceLive),
     Layer.provideMerge(HttpServiceLive),
     Layer.provideMerge(SecretStoreLive),

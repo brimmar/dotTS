@@ -47,6 +47,16 @@ describe('SystemCommand Service', () => {
     expect(result).toBe('hello-world');
   });
 
+  it('ignores intent on the live path', async () => {
+    const program = Effect.gen(function* () {
+      const exec = yield* SystemCommand;
+      return yield* exec.execFile('echo', ['hello'], { intent: 'read' });
+    });
+
+    const result = await Effect.runPromise(Effect.provide(program, SystemCommandLive));
+    expect(result).toBe('hello');
+  });
+
   it('should execFile echo hello', async () => {
     const program = Effect.gen(function* () {
       const exec = yield* SystemCommand;
