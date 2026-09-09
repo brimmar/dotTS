@@ -14,6 +14,7 @@ export interface GroupProps {
 }
 
 export class GroupResource extends Resource {
+  override readonly kind = 'group' as const;
   constructor(scope: Component, id: string, override readonly props: GroupProps) {
     super(scope, id, props);
   }
@@ -55,7 +56,10 @@ export class GroupResource extends Resource {
     const { name } = this.props;
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`groupdel ${name}`, { become: this.props.become });
+      yield* ignoreIfAbsent(
+        exec.run(`groupdel ${name}`, { become: this.props.become }),
+        ['does not exist', 'no such group', 'unknown group', 'not found'],
+      );
     });
   }
 
@@ -65,4 +69,22 @@ export class GroupResource extends Resource {
       Effect.catchAll(() => Effect.succeed(false))
     );
   }
+}
+
+function ignoreIfAbsent(
+  effect: Effect.Effect<string, Error>,
+  tokens: string[],
+): Effect.Effect<void, Error> {
+  return Effect.flatMap(
+    Effect.match(effect, {
+      onFailure: (error) => error,
+      onSuccess: () => undefined as Error | undefined,
+    }),
+    (error) => {
+      if (!error) return Effect.void;
+      const msg = error.message.toLowerCase();
+      if (tokens.some((token) => msg.includes(token))) return Effect.void;
+      return Effect.fail(error);
+    },
+  );
 }

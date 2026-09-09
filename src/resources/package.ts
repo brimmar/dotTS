@@ -19,6 +19,7 @@ export interface PackageResourceProps {
 }
 
 export class PackageResource extends Resource {
+  override readonly kind = 'pkg' as const;
   constructor(scope: Component, id: string, override readonly props: PackageResourceProps) {
     super(scope, id, props);
   }

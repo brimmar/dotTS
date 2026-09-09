@@ -14,6 +14,7 @@ describe('FileResource', () => {
     mkdir: () => Effect.void,
     symlink: () => Effect.void,
     rm: () => Effect.sync(() => { state.exists = false; }),
+    rmdir: () => Effect.void,
     unlink: () => Effect.sync(() => { state.exists = false; }),
     chmod: (path, mode) => Effect.sync(() => { state.chmod = { path, mode }; }),
     chown: (path, uid, gid) => Effect.sync(() => { state.chown = { path, uid, gid }; }),

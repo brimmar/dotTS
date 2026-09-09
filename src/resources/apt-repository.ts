@@ -21,6 +21,7 @@ export interface AptRepositoryProps {
 }
 
 export class AptRepositoryResource extends Resource {
+  override readonly kind = 'apt-repo' as const;
   constructor(scope: Component, id: string, override readonly props: AptRepositoryProps) {
     super(scope, id, props);
   }

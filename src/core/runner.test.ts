@@ -1,13 +1,17 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { Effect, Layer } from 'effect';
 import { Runner, RunnerLive } from './runner';
 import { App, Stack } from './app';
 import { Resource, Component } from './component';
-import { StateService } from '../services/state';
+import { StateService, type AppState } from '../services/state';
+import { registerResource } from './registry';
 
 class TestResource extends Resource {
+  override readonly kind = 'test' as const;
   public applied = false;
   public destroyed = false;
+  static destroyedIds: string[] = [];
+  static failDestroyIds: string[] = [];
 
   constructor(scope: Component, id: string, public readonly _hash: string = 'hash', props: any = {}) {
     super(scope, id, props);
@@ -18,7 +22,13 @@ class TestResource extends Resource {
   }
 
   override destroy() {
-    return Effect.sync(() => { this.destroyed = true; });
+    return Effect.gen(this, function* () {
+      this.destroyed = true;
+      TestResource.destroyedIds.push(this.id);
+      if (TestResource.failDestroyIds.includes(this.id)) {
+        return yield* Effect.fail(new Error(`destroy failed: ${this.id}`));
+      }
+    });
   }
 
   override hash() {
@@ -26,11 +36,18 @@ class TestResource extends Resource {
   }
 }
 
+registerResource('test', (scope, id, metadata) => new TestResource(scope, id, 'hash', metadata));
+
 describe('Runner', () => {
-  const MockState = (initialState: any = {}) => Layer.succeed(StateService, StateService.of({
+  beforeEach(() => {
+    TestResource.destroyedIds = [];
+    TestResource.failDestroyIds = [];
+  });
+
+  const MockState = (initialState: any = {}, onSave?: (state: AppState) => void) => Layer.succeed(StateService, StateService.of({
     setPath: () => Effect.void,
     load: () => Effect.succeed(initialState),
-    save: () => Effect.void,
+    save: (state) => Effect.sync(() => { onSave?.(state); }),
   }));
 
   it('should create new resources', async () => {
@@ -156,7 +173,7 @@ describe('Runner', () => {
     });
 
     const TestRunnerLayer = RunnerLive.pipe(
-      Layer.provide(MockState({ 'res-1': { hash: 'hash', metadata: {} } })),
+      Layer.provide(MockState({ 'res-1': { hash: 'hash', kind: 'test', metadata: {} } })),
     );
 
     await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
@@ -175,11 +192,233 @@ describe('Runner', () => {
     });
 
     const TestRunnerLayer = RunnerLive.pipe(
-      Layer.provide(MockState({ 'res-1': { hash: 'old', metadata: {} } })),
+      Layer.provide(MockState({ 'res-1': { hash: 'old', kind: 'test', metadata: {} } })),
     );
 
     await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
 
     expect(res.applied).toBe(true);
+  });
+
+  it('should destroy resources that left the graph', async () => {
+    const app = new App();
+    new Stack(app, 'test');
+    let saved: AppState | undefined;
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(MockState(
+        { gone: { hash: 'hash', kind: 'test', metadata: {} } },
+        (state) => { saved = state; },
+      )),
+    );
+
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    expect(TestResource.destroyedIds).toContain('gone');
+    expect(saved?.gone).toBeUndefined();
+  });
+
+  it('should not destroy resources that remain in the graph', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new TestResource(stack, 'res-1');
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(MockState({ 'res-1': { hash: 'hash', kind: 'test', metadata: {} } })),
+    );
+
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    expect(res.applied).toBe(true);
+    expect(TestResource.destroyedIds).toEqual([]);
+  });
+
+  it('should warn and keep old state that is missing kind', async () => {
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (msg?: unknown) => { warnings.push(String(msg)); };
+
+    const app = new App();
+    new Stack(app, 'test');
+    let saved: AppState | undefined;
+    const gone = { hash: 'hash', metadata: {} };
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    try {
+      const TestRunnerLayer = RunnerLive.pipe(
+        Layer.provide(MockState(
+          { gone },
+          (state) => { saved = state; },
+        )),
+      );
+
+      await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+      expect(TestResource.destroyedIds).toEqual([]);
+      expect(warnings.some((w) => w.includes('cannot destroy gone: missing kind; keeping it in state until purged'))).toBe(true);
+      expect(saved?.gone?.hash).toBe('hash');
+      expect(saved?.gone?.kind).toBeUndefined();
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  it('should destroy dependents before dependencies', async () => {
+    const app = new App();
+    new Stack(app, 'test');
+    let saved: AppState | undefined;
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(MockState(
+        {
+          parent: { hash: 'hash', kind: 'test', metadata: { path: '/tmp/parent' } },
+          child: {
+            hash: 'hash',
+            kind: 'test',
+            metadata: { path: '/tmp/parent/child', dependsOn: [{ id: 'parent' }] },
+          },
+        },
+        (state) => { saved = state; },
+      )),
+    );
+
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    expect(TestResource.destroyedIds).toEqual(['child', 'parent']);
+    expect(saved?.parent).toBeUndefined();
+    expect(saved?.child).toBeUndefined();
+  });
+
+  it('should skip destroy when a remaining resource still lives under dest', async () => {
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (msg?: unknown) => { warnings.push(String(msg)); };
+
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    new TestResource(stack, 'child', 'hash', { path: '/tmp/parent/child' });
+    let saved: AppState | undefined;
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    try {
+      const TestRunnerLayer = RunnerLive.pipe(
+        Layer.provide(MockState(
+          { parent: { hash: 'hash', kind: 'test', metadata: { path: '/tmp/parent' } } },
+          (state) => { saved = state; },
+        )),
+      );
+
+      await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+      expect(TestResource.destroyedIds).toEqual([]);
+      expect(warnings.some((w) => w.includes('skip destroy parent'))).toBe(true);
+      expect(saved?.parent).toBeDefined();
+      expect(saved?.child).toBeDefined();
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  it('should persist state after each successful destroy', async () => {
+    const app = new App();
+    new Stack(app, 'test');
+    const saves: AppState[] = [];
+    TestResource.failDestroyIds = ['parent'];
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(MockState(
+        {
+          parent: { hash: 'hash', kind: 'test', metadata: { path: '/tmp/parent' } },
+          child: {
+            hash: 'hash',
+            kind: 'test',
+            metadata: { path: '/tmp/parent/child', dependsOn: [{ id: 'parent' }] },
+          },
+        },
+        (state) => { saves.push({ ...state }); },
+      )),
+    );
+
+    await expect(Effect.runPromise(Effect.provide(program, TestRunnerLayer))).rejects.toThrow(/destroy failed: parent/);
+    expect(TestResource.destroyedIds).toEqual(['child', 'parent']);
+    expect(saves.length).toBeGreaterThan(0);
+    const last = saves[saves.length - 1];
+    expect(last?.child).toBeUndefined();
+    expect(last?.parent).toBeDefined();
+  });
+
+  it('should fail the run when kind is unknown', async () => {
+    const app = new App();
+    new Stack(app, 'test');
+    let saved: AppState | undefined;
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(MockState(
+        { gone: { hash: 'hash', kind: 'not-a-resource', metadata: {} } },
+        (state) => { saved = state; },
+      )),
+    );
+
+    await expect(Effect.runPromise(Effect.provide(program, TestRunnerLayer))).rejects.toThrow(/Unknown resource kind: not-a-resource/);
+    expect(saved).toBeUndefined();
+  });
+
+  it('should treat hyphen state ids as the colon form and not destroy', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new TestResource(stack, 'file:/tmp/x');
+    let saved: AppState | undefined;
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(MockState(
+        { 'file-/tmp/x': { hash: 'hash', kind: 'test', metadata: {} } },
+        (state) => { saved = state; },
+      )),
+    );
+
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    expect(res.applied).toBe(true);
+    expect(TestResource.destroyedIds).toEqual([]);
+    expect(saved?.['file:/tmp/x']).toBeDefined();
+    expect(saved?.['file-/tmp/x']).toBeUndefined();
   });
 });

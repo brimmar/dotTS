@@ -50,4 +50,20 @@ describe('GroupResource', () => {
 
     expect(commands).toContain('groupdel developers');
   });
+
+  it('should treat a missing group as success on destroy', async () => {
+    const commands: string[] = [];
+    const MockMissing = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: (cmd: string) => {
+        commands.push(cmd);
+        return Effect.fail(new Error("groupdel: group 'developers' does not exist"));
+      }
+    }));
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new GroupResource(stack, 'test-group', { name: 'developers' });
+
+    await Effect.runPromise(res.destroy().pipe(Effect.provide(MockMissing)));
+    expect(commands).toContain('groupdel developers');
+  });
 });
