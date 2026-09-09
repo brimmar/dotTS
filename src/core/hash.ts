@@ -31,24 +31,30 @@ function normalize(value: unknown, seen: WeakSet<object>): unknown {
     return { $ref: value.id };
   }
 
+  // Path of the current walk. Delete after recurse so DAG aliases are
+  // rehashed; only back-edges become { $cycle: true }.
   if (seen.has(value)) {
     return { $cycle: true };
   }
   seen.add(value);
 
-  if (Array.isArray(value)) {
-    return value.map((item) => normalize(item, seen));
-  }
-
-  const record = value as Record<string, unknown>;
-  const result: Record<string, unknown> = {};
-  const keys = Object.keys(record).sort();
-  for (const key of keys) {
-    const nested = record[key];
-    if (nested === undefined || typeof nested === 'function') {
-      continue;
+  try {
+    if (Array.isArray(value)) {
+      return value.map((item) => normalize(item, seen));
     }
-    result[key] = normalize(nested, seen);
+
+    const record = value as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
+    const keys = Object.keys(record).sort();
+    for (const key of keys) {
+      const nested = record[key];
+      if (nested === undefined || typeof nested === 'function') {
+        continue;
+      }
+      result[key] = normalize(nested, seen);
+    }
+    return result;
+  } finally {
+    seen.delete(value);
   }
-  return result;
 }

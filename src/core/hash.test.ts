@@ -76,6 +76,14 @@ describe('Hashing Utility', () => {
     expect(hashConfig(new SecretToken('db'))).not.toBe(hashConfig(new SecretToken('api')));
   });
 
+  it('shared DAG objects hash equal to two deep-equal copies', () => {
+    const shared = { x: 1, nested: { y: 2 } };
+    const dag = { a: shared, b: shared };
+    const copies = { a: { x: 1, nested: { y: 2 } }, b: { x: 1, nested: { y: 2 } } };
+
+    expect(hashConfig(dag)).toBe(hashConfig(copies));
+  });
+
   it('does not hang on circular dependsOn cycles', () => {
     const a: Record<string, unknown> = { id: 'a', isResource: true, children: [] };
     const b: Record<string, unknown> = { id: 'b', isResource: true, children: [] };
