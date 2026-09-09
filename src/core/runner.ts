@@ -6,6 +6,7 @@ import { isPathWithin, resourceManagedPath, sortDestroyResources, sortResourcesB
 import { performance } from 'node:perf_hooks';
 import { App } from './app';
 import { rehydrate } from './registry';
+import { migrateStateId, migrateStateKeys } from './ids';
 
 export interface Runner {
   readonly run: (component: Component) => Effect.Effect<void, Error, never>;
@@ -21,7 +22,7 @@ export const RunnerLive = Layer.effect(
     return Runner.of({
       run: (component: Component): Effect.Effect<void, Error, never> => Effect.gen(function* () {
         const startTime = performance.now();
-        const currentState = yield* stateService.load();
+        const currentState = migrateStateKeys(yield* stateService.load());
         const newState: AppState = {};
         
         const rawResources = flatten(component);
@@ -72,7 +73,7 @@ export const RunnerLive = Layer.effect(
         const destroyScope = new App();
         const toDestroy: Resource[] = [];
         for (const id of Object.keys(currentState)) {
-          if (newState[id]) continue;
+          if (hasStateId(newState, id)) continue;
           const oldState = currentState[id];
           if (!oldState || !oldState.kind) {
             console.warn(`cannot destroy ${id}: missing kind; keeping it in state until purged`);
@@ -119,6 +120,16 @@ export const RunnerLive = Layer.effect(
 
 type ResourceResult = 'created' | 'updated' | 'converged';
 
+function hasStateId(state: AppState, id: string): boolean {
+  if (id in state) return true;
+  const canonical = migrateStateId(id);
+  if (canonical in state) return true;
+  for (const key of Object.keys(state)) {
+    if (migrateStateId(key) === canonical) return true;
+  }
+  return false;
+}
+
 function remainingUsesPath(dest: string, remaining: AppState): boolean {
   for (const state of Object.values(remaining)) {
     const path = resourceManagedPath(state.metadata);
@@ -131,7 +142,8 @@ function runResource(res: Resource, currentState: AppState, newState: AppState):
   return Effect.gen(function* () {
     const id = res.id;
     const hash = res.hash();
-    const oldState = currentState[id];
+    const stateId = migrateStateId(id);
+    const oldState = stateId in currentState ? currentState[stateId] : currentState[id];
 
     let result: ResourceResult;
 

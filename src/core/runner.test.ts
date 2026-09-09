@@ -395,4 +395,30 @@ describe('Runner', () => {
     await expect(Effect.runPromise(Effect.provide(program, TestRunnerLayer))).rejects.toThrow(/Unknown resource kind: not-a-resource/);
     expect(saved).toBeUndefined();
   });
+
+  it('should treat hyphen state ids as the colon form and not destroy', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new TestResource(stack, 'file:/tmp/x');
+    let saved: AppState | undefined;
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(MockState(
+        { 'file-/tmp/x': { hash: 'hash', kind: 'test', metadata: {} } },
+        (state) => { saved = state; },
+      )),
+    );
+
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    expect(res.applied).toBe(true);
+    expect(TestResource.destroyedIds).toEqual([]);
+    expect(saved?.['file:/tmp/x']).toBeDefined();
+    expect(saved?.['file-/tmp/x']).toBeUndefined();
+  });
 });
