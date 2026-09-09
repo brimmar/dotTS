@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import * as ts from 'typescript';
@@ -30,18 +30,25 @@ function mapDiagnostic(diagnostic: ts.Diagnostic): TypecheckDiagnostic {
   };
 }
 
-function ensureEmbeddedTypes(): string {
-  const fromSource = resolve(join(import.meta.dir, '../embedded/types'));
+export function ensureEmbeddedTypes(
+  fromSource = resolve(join(import.meta.dir, '../embedded/types')),
+): string {
   if (existsSync(join(fromSource, 'node', 'index.d.ts'))) return fromSource;
 
   const dest = join(tmpdir(), `dotts-embedded-types-${embeddedTypesStamp}`);
-  if (existsSync(join(dest, 'node', 'index.d.ts'))) return dest;
+  if (existsSync(join(dest, '.complete'))) return dest;
 
+  const staging = `${dest}.${process.pid}.tmp`;
+  rmSync(staging, { recursive: true, force: true });
+  mkdirSync(staging, { recursive: true });
   for (const [rel, assetPath] of Object.entries(nodeTypeAssets)) {
-    const file = join(dest, rel);
+    const file = join(staging, rel);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, readFileSync(assetPath));
   }
+  writeFileSync(join(staging, '.complete'), embeddedTypesStamp);
+  rmSync(dest, { recursive: true, force: true });
+  renameSync(staging, dest);
   return dest;
 }
 
