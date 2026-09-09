@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { exists, rm } from 'node:fs/promises';
+import { exists, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DottsError } from './core/errors';
 import { dottsInit } from './commands/init';
 
 function exportedNames(src: string): Set<string> {
@@ -43,6 +44,22 @@ describe('dotts init', () => {
     expect(content).not.toContain('src/public');
     expect(content).toContain("onPlatform('darwin'");
     expect(content).toContain("onDistro('ubuntu'");
+    expect(content).toContain("pkg('build-essential')");
+  });
+
+  it('refuses to re-init when dotts.ts exists unless force is set', async () => {
+    await mkdir(testProjectDir, { recursive: true });
+    const existing = '// keep me\nexport default () => {};\n';
+    await writeFile(join(testProjectDir, 'dotts.ts'), existing);
+
+    await expect(dottsInit(testProjectDir)).rejects.toThrow(DottsError);
+    await expect(dottsInit(testProjectDir)).rejects.toThrow(/Refusing to overwrite/);
+    expect(await Bun.file(join(testProjectDir, 'dotts.ts')).text()).toBe(existing);
+
+    await dottsInit(testProjectDir, { force: true });
+    const content = await Bun.file(join(testProjectDir, 'dotts.ts')).text();
+    expect(content).toContain("from 'dotts'");
+    expect(content).not.toContain('keep me');
   });
 
   it('writes tsconfig.json with paths.dotts', async () => {
