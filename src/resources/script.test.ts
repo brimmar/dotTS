@@ -40,10 +40,12 @@ describe('ScriptResource', () => {
 
   it('should skip execution if unless command succeeds', async () => {
     let executed = false;
+    const intents: { command: string; intent?: 'read' | 'write' }[] = [];
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) => {
+        run: (command, options) => {
+          intents.push({ command, intent: options?.intent });
           if (command === 'check-exists') return Effect.succeed('0'); // Sockets/shell success
           executed = true;
           return Effect.succeed('');
@@ -59,14 +61,17 @@ describe('ScriptResource', () => {
 
     await Effect.runPromise(Effect.provide(scriptRes.apply(), SystemCommandMock));
     expect(executed).toBe(false);
+    expect(intents).toEqual([{ command: 'check-exists', intent: 'read' }]);
   });
 
   it('should execute if unless command fails', async () => {
     let executed = false;
+    const intents: { command: string; intent?: 'read' | 'write' }[] = [];
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) => {
+        run: (command, options) => {
+          intents.push({ command, intent: options?.intent });
           if (command === 'check-exists') return Effect.fail(new Error('1')); // shell fail
           executed = true;
           return Effect.succeed('');
@@ -82,14 +87,20 @@ describe('ScriptResource', () => {
 
     await Effect.runPromise(Effect.provide(scriptRes.apply(), SystemCommandMock));
     expect(executed).toBe(true);
+    expect(intents).toEqual([
+      { command: 'check-exists', intent: 'read' },
+      { command: 'main-command', intent: undefined },
+    ]);
   });
 
   it('should execute only if onlyIf command succeeds', async () => {
     let executed = false;
+    const intents: { command: string; intent?: 'read' | 'write' }[] = [];
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) => {
+        run: (command, options) => {
+          intents.push({ command, intent: options?.intent });
           if (command === 'should-run') return Effect.succeed('0');
           executed = true;
           return Effect.succeed('');
@@ -105,6 +116,10 @@ describe('ScriptResource', () => {
 
     await Effect.runPromise(Effect.provide(scriptRes.apply(), SystemCommandMock));
     expect(executed).toBe(true);
+    expect(intents).toEqual([
+      { command: 'should-run', intent: 'read' },
+      { command: 'main-command', intent: undefined },
+    ]);
   });
 
   it('should skip if onlyIf command fails', async () => {

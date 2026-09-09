@@ -37,7 +37,10 @@ export class GroupResource extends Resource {
           args.push(name);
           yield* exec.execFile('groupadd', args, { become: this.props.become });
         } else if (gid !== undefined) {
-          const groupLine = yield* exec.execFile('getent', ['group', name], { become: this.props.become });
+          const groupLine = yield* exec.execFile('getent', ['group', name], {
+            become: this.props.become,
+            intent: 'read',
+          });
           const currentGid = groupLine.split(':')[2] ?? '';
           if (parseInt(currentGid) !== gid) {
             yield* exec.execFile('groupmod', ['--gid', String(gid), name], { become: this.props.become });
