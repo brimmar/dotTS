@@ -32,20 +32,20 @@ export class GroupResource extends Resource {
 
       if (state === 'present') {
         if (!exists) {
-          let cmd = `groupadd`;
-          if (gid !== undefined) cmd += ` --gid ${gid}`;
-          cmd += ` ${name}`;
-          yield* exec.run(cmd, { become: this.props.become });
+          const args: string[] = [];
+          if (gid !== undefined) args.push('--gid', String(gid));
+          args.push(name);
+          yield* exec.execFile('groupadd', args, { become: this.props.become });
         } else if (gid !== undefined) {
-          // Check current GID
-          const currentGid = yield* exec.run(`getent group ${name} | cut -d: -f3`, { become: this.props.become });
+          const groupLine = yield* exec.execFile('getent', ['group', name], { become: this.props.become });
+          const currentGid = groupLine.split(':')[2] ?? '';
           if (parseInt(currentGid) !== gid) {
-            yield* exec.run(`groupmod --gid ${gid} ${name}`, { become: this.props.become });
+            yield* exec.execFile('groupmod', ['--gid', String(gid), name], { become: this.props.become });
           }
         }
       } else {
         if (exists) {
-          yield* exec.run(`groupdel ${name}`, { become: this.props.become });
+          yield* exec.execFile('groupdel', [name], { become: this.props.become });
         }
       }
     });
@@ -55,12 +55,12 @@ export class GroupResource extends Resource {
     const { name } = this.props;
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`groupdel ${name}`, { become: this.props.become });
+      yield* exec.execFile('groupdel', [name], { become: this.props.become });
     });
   }
 
   private checkExists(name: string, exec: SystemCommand): Effect.Effect<boolean, Error> {
-    return exec.run(`getent group ${name}`, { become: this.props.become }).pipe(
+    return exec.execFile('getent', ['group', name], { become: this.props.become }).pipe(
       Effect.map(() => true),
       Effect.catchAll(() => Effect.succeed(false))
     );
