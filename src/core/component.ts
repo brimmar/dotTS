@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import { DottsError } from './errors';
 
 export interface ResourceHandle {
   readonly id: string;
@@ -36,7 +37,16 @@ export abstract class Resource<Props extends ResourceBaseProps = ResourceBasePro
       for (const dep of props.dependsOn) {
         if (dep instanceof Component) {
           this.addDependency(dep);
+          continue;
         }
+        const found = flatten(scope).find((child) => child.id === dep.id && child !== this);
+        if (!found) {
+          throw new DottsError(
+            `dependsOn target '${dep.id}' is not a live resource in this stack`,
+            'Pass the handle returned by pkg(), file(), or another helper. Plain `{ id }` objects only work if that id is already in the stack.',
+          );
+        }
+        this.addDependency(found);
       }
     }
   }

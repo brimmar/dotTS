@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { ActiveContext } from './core/context';
 import { App, Stack } from './core/app';
-import { pkg, file, link, dir, script, remoteFile, secret, onPlatform, onDistro } from './public';
+import { pkg, file, link, dir, script, remoteFile, secret, onPlatform, onDistro, lineInFile } from './public';
 import { PackageResource } from './resources/package';
 import { FileResource } from './resources/file';
 import { SymlinkResource } from './resources/symlink';
@@ -115,15 +115,29 @@ describe('Functional Helpers', () => {
     expect(res.id).toBe('pkg:git');
   });
 
-  it('script() ids are a stable hash of the command', () => {
+  it('script() ids hash run plus stable props', () => {
     const a = script('echo hello');
     const b = script('echo hello');
     const c = script('echo hello;');
-    const digest = createHash('sha256').update('echo hello').digest('hex').slice(0, 16);
+    const d = script('echo hello', { workingDir: '/tmp' });
+    const payload = JSON.stringify(['echo hello', null, null, null, null]);
+    const digest = createHash('sha256').update(payload).digest('hex').slice(0, 16);
 
     expect(a.id).toBe(b.id);
     expect(a.id).not.toBe(c.id);
+    expect(a.id).not.toBe(d.id);
     expect(a.id).toBe(`script:${digest}`);
+  });
+
+  it('lineInFile() ids hash line, regexp, and flags as JSON', () => {
+    const a = lineInFile('/tmp/f', 'ab', { regexp: 'c' });
+    const b = lineInFile('/tmp/f', 'a', { regexp: 'bc' });
+    const c = lineInFile('/tmp/f', 'ab', { regexp: /c/gi });
+    const digest = createHash('sha256').update(JSON.stringify(['ab', 'c', null])).digest('hex').slice(0, 16);
+
+    expect(a.id).not.toBe(b.id);
+    expect(a.id).not.toBe(c.id);
+    expect(a.id).toBe(`line:/tmp/f:${digest}`);
   });
 
   it('file(), link(), and dir() use path-based ids', () => {
