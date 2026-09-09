@@ -16,6 +16,7 @@ describe('DirectoryResource', () => {
     rm: (path: string) => Effect.sync(() => { state.exists = false; }),
     chmod: (path: string, mode: number) => Effect.sync(() => { state.chmod = { path, mode }; }),
     chown: (path: string, uid: number, gid: number) => Effect.sync(() => { state.chown = { path, uid, gid }; }),
+    writeFileBytes: () => Effect.void,
   } as any));
 
   it('should create a directory', async () => {

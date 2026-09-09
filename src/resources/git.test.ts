@@ -9,6 +9,7 @@ describe('GitResource', () => {
   const MockFS = (exists: boolean = false) => Layer.succeed(FileSystem, FileSystem.of({
     exists: (path: string) => Effect.succeed(path.endsWith('.git') ? false : exists),
     rm: (path: string) => Effect.succeed(undefined),
+    writeFileBytes: () => Effect.void,
   } as any));
 
   const MockExec = (commands: string[] = []) => Layer.succeed(SystemCommand, SystemCommand.of({
@@ -94,6 +95,7 @@ describe('GitResource', () => {
     // Mock FS to say .git exists
     const fsWithGit = Layer.succeed(FileSystem, FileSystem.of({
       exists: (path: string) => Effect.succeed(true),
+      writeFileBytes: () => Effect.void,
     } as any));
 
     await Effect.runPromise(

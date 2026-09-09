@@ -9,6 +9,7 @@ describe('LineInFileResource', () => {
     exists: (path: string) => Effect.succeed(files[path] !== undefined),
     readFile: (path: string) => Effect.succeed(files[path] || ''),
     writeFile: (path: string, content: string) => Effect.sync(() => { files[path] = content; }),
+    writeFileBytes: () => Effect.void,
   } as any));
 
   it('should append a line if it does not exist', async () => {
