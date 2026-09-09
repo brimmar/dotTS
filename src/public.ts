@@ -130,8 +130,9 @@ export function dir(path: string, props: DirectoryProps = {}): ResourceHandle {
 }
 
 /**
- * Runs a shell command. The resource id is a hash of `run`, so the same command
- * always maps to the same id.
+ * Runs a shell command. The resource id is a hash of `run` plus stable props
+ * (`workingDir`, `unless`, `onlyIf`, `become`), so the same command in a
+ * different directory does not collide.
  * @param run Command to execute.
  * @param props Optional `unless`, `onlyIf`, working directory, and env vars.
  * @example
@@ -143,7 +144,10 @@ export function dir(path: string, props: DirectoryProps = {}): ResourceHandle {
  */
 export function script(run: string, props: ScriptProps = {}): ResourceHandle {
   const stack = ActiveContext.requireStack();
-  return new ScriptResource(stack, `script:${stableHash(run)}`, { ...props, run } as never);
+  const id = `script:${stableHash(
+    JSON.stringify([run, props.workingDir ?? null, props.unless ?? null, props.onlyIf ?? null, props.become ?? null]),
+  )}`;
+  return new ScriptResource(stack, id, { ...props, run } as never);
 }
 
 /**
@@ -192,7 +196,10 @@ export function git(url: string, props: GitProps): ResourceHandle {
  */
 export function lineInFile(path: string, line: string, props: LineInFileProps = {}): ResourceHandle {
   const stack = ActiveContext.requireStack();
-  const id = `line:${path}:${stableHash(line + String(props.regexp))}`;
+  const regexp = props.regexp;
+  const pattern = regexp instanceof RegExp ? regexp.source : (regexp ?? null);
+  const flags = regexp instanceof RegExp ? regexp.flags : null;
+  const id = `line:${path}:${stableHash(JSON.stringify([line, pattern, flags]))}`;
   return new LineInFileResource(stack, id, { ...props, path, line } as never);
 }
 
