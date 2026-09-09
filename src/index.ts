@@ -25,7 +25,7 @@ async function main() {
 
       if (request.kind === 'init') {
         p.log.step(`Initializing project at ${request.projectDir}...`);
-        await dottsInit(request.projectDir);
+        await dottsInit(request.projectDir, { force: request.force });
         p.log.success('Project initialized successfully!');
         p.note(`Project created at ${request.projectDir}\nEdit ${join(request.projectDir, 'dotts.ts')} to get started.`, 'next steps');
       } else if (request.kind === 'prepare') {

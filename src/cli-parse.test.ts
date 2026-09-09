@@ -29,8 +29,46 @@ describe('parseArgv', () => {
     expect(req.kind).not.toBe('interactive');
   });
 
+  it("parses ['-h'] and ['apply', '--help'] as help", () => {
+    expect(parseArgv(['-h']).kind).toBe('help');
+    expect(parseArgv(['apply', '--help']).kind).toBe('help');
+    expect(parseArgv(['apply', '-h']).kind).toBe('help');
+  });
+
   it("parses ['apply', 'f.ts', '--dry-run'] with dryRun true", () => {
     const req = parseArgv(['apply', 'f.ts', '--dry-run']);
     expect(req).toEqual({ kind: 'apply', configPath: 'f.ts', dryRun: true });
+  });
+
+  it("rejects unknown apply flags such as --dryrun", () => {
+    expect(() => parseArgv(['apply', '--dryrun'])).toThrow('Unknown flag: --dryrun');
+    expect(() => parseArgv(['apply', '--dry-ru'])).toThrow('Unknown flag: --dry-ru');
+  });
+
+  it('rejects unknown flags on init, prepare, and check', () => {
+    expect(() => parseArgv(['init', '--dry-run'])).toThrow('Unknown flag: --dry-run');
+    expect(() => parseArgv(['prepare', '--force'])).toThrow('Unknown flag: --force');
+    expect(() => parseArgv(['check', '--dry-run'])).toThrow('Unknown flag: --dry-run');
+  });
+
+  it("parses ['init', '--force', './x'] with force true", () => {
+    expect(parseArgv(['init', '--force', './x'])).toEqual({
+      kind: 'init',
+      projectDir: './x',
+      force: true,
+    });
+    expect(parseArgv(['init', './x', '--force'])).toEqual({
+      kind: 'init',
+      projectDir: './x',
+      force: true,
+    });
+  });
+
+  it("treats ['secrets', 'set', 'API_KEY', '-h'] as a set value, not help", () => {
+    expect(parseArgv(['secrets', 'set', 'API_KEY', '-h'])).toEqual({
+      kind: 'secrets-set',
+      name: 'API_KEY',
+      value: '-h',
+    });
   });
 });
