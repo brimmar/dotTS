@@ -1,4 +1,4 @@
-export const HELP_TEXT = `dotts init [dir]
+export const HELP_TEXT = `dotts init [--force] [dir]
 dotts prepare [dir]
 dotts check [path]
 dotts apply [path] [--dry-run]
@@ -10,7 +10,7 @@ dotts secrets remove <name>`;
 export type CliRequest =
   | { kind: 'interactive' }
   | { kind: 'help' }
-  | { kind: 'init'; projectDir: string }
+  | { kind: 'init'; projectDir: string; force: boolean }
   | { kind: 'prepare'; dir: string }
   | { kind: 'check'; configPath: string }
   | { kind: 'doctor' }
@@ -19,11 +19,25 @@ export type CliRequest =
   | { kind: 'secrets-list' }
   | { kind: 'secrets-remove'; name: string };
 
-function firstNonFlag(args: string[]): string | undefined {
-  for (const arg of args) {
-    if (!arg.startsWith('-')) return arg;
+function isHelpFlag(arg: string): boolean {
+  return arg === '--help' || arg === '-h';
+}
+
+function takeArgs(rest: string[], knownFlags: string[]): { positional?: string; flags: Set<string> } {
+  const known = new Set(knownFlags);
+  const flags = new Set<string>();
+  let positional: string | undefined;
+  for (const arg of rest) {
+    if (arg.startsWith('-')) {
+      if (!known.has(arg)) {
+        throw new Error(`Unknown flag: ${arg}`);
+      }
+      flags.add(arg);
+      continue;
+    }
+    if (positional === undefined) positional = arg;
   }
-  return undefined;
+  return { positional, flags };
 }
 
 export function parseArgv(argv: string[]): CliRequest {
@@ -31,38 +45,43 @@ export function parseArgv(argv: string[]): CliRequest {
     return { kind: 'interactive' };
   }
 
-  if (argv.includes('--help') || argv.includes('-h')) {
-    return { kind: 'help' };
-  }
-
   const command = argv[0];
   if (!command) {
     return { kind: 'interactive' };
   }
 
+  if (argv.length === 1 && isHelpFlag(command)) {
+    return { kind: 'help' };
+  }
+
+  const afterCommand = argv[1];
+  if (afterCommand !== undefined && isHelpFlag(afterCommand)) {
+    return { kind: 'help' };
+  }
+
   if (command === 'init') {
-    const projectDir = firstNonFlag(argv.slice(1)) || './my-dotfiles';
-    return { kind: 'init', projectDir };
+    const { positional, flags } = takeArgs(argv.slice(1), ['--force']);
+    return { kind: 'init', projectDir: positional || './my-dotfiles', force: flags.has('--force') };
   }
 
   if (command === 'prepare') {
-    const dir = firstNonFlag(argv.slice(1)) || process.cwd();
-    return { kind: 'prepare', dir };
+    const { positional } = takeArgs(argv.slice(1), []);
+    return { kind: 'prepare', dir: positional || process.cwd() };
   }
 
   if (command === 'check') {
-    const configPath = firstNonFlag(argv.slice(1)) || './dotts.ts';
-    return { kind: 'check', configPath };
+    const { positional } = takeArgs(argv.slice(1), []);
+    return { kind: 'check', configPath: positional || './dotts.ts' };
   }
 
   if (command === 'doctor') {
+    takeArgs(argv.slice(1), []);
     return { kind: 'doctor' };
   }
 
   if (command === 'apply') {
-    const dryRun = argv.includes('--dry-run');
-    const configPath = firstNonFlag(argv.slice(1)) || './dotts.ts';
-    return { kind: 'apply', configPath, dryRun };
+    const { positional, flags } = takeArgs(argv.slice(1), ['--dry-run']);
+    return { kind: 'apply', configPath: positional || './dotts.ts', dryRun: flags.has('--dry-run') };
   }
 
   if (command === 'secrets') {
