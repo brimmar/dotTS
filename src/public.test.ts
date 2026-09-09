@@ -120,12 +120,16 @@ describe('Functional Helpers', () => {
     const b = script('echo hello');
     const c = script('echo hello;');
     const d = script('echo hello', { workingDir: '/tmp' });
-    const payload = JSON.stringify(['echo hello', null, null, null, null]);
+    const e = script('echo hello', { environment: { B: '2', A: '1' } });
+    const f = script('echo hello', { environment: { A: '1', B: '2' } });
+    const payload = JSON.stringify(['echo hello', null, null, null, null, null]);
     const digest = createHash('sha256').update(payload).digest('hex').slice(0, 16);
 
     expect(a.id).toBe(b.id);
     expect(a.id).not.toBe(c.id);
     expect(a.id).not.toBe(d.id);
+    expect(a.id).not.toBe(e.id);
+    expect(e.id).toBe(f.id);
     expect(a.id).toBe(`script:${digest}`);
   });
 

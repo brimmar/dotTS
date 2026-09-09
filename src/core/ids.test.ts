@@ -1,23 +1,51 @@
 import { describe, expect, it } from 'bun:test';
-import { migrateStateId } from './ids';
+import { migrateStateId, migrateStateKeys } from './ids';
 
 describe('migrateStateId', () => {
-  it('converts hyphen prefixes to colon form', () => {
+  it('converts 1:1 hyphen prefixes to colon form', () => {
     expect(migrateStateId('file-/tmp/a')).toBe('file:/tmp/a');
     expect(migrateStateId('pkg-git')).toBe('pkg:git');
     expect(migrateStateId('link-~/.config/nvim')).toBe('link:~/.config/nvim');
     expect(migrateStateId('dir-~/.config')).toBe('dir:~/.config');
-    expect(migrateStateId('script-echo hello')).toBe('script:echo hello');
+    expect(migrateStateId('remote-/tmp/bin')).toBe('remote:/tmp/bin');
+    expect(migrateStateId('git-/tmp/dotts')).toBe('git:/tmp/dotts');
+    expect(migrateStateId('service-sshd')).toBe('service:sshd');
+    expect(migrateStateId('user-brimmar')).toBe('user:brimmar');
+    expect(migrateStateId('group-sudo')).toBe('group:sudo');
+    expect(migrateStateId('unarchive-tools')).toBe('unarchive:tools');
+    expect(migrateStateId('apt-repo-nodejs')).toBe('apt-repo:nodejs');
+  });
+
+  it('does not rewrite script or line prefixes', () => {
+    expect(migrateStateId('script-echo hello')).toBe('script-echo hello');
+    expect(migrateStateId('line-/tmp/a-export')).toBe('line-/tmp/a-export');
   });
 
   it('leaves colon-form ids unchanged', () => {
     expect(migrateStateId('file:/tmp/a')).toBe('file:/tmp/a');
     expect(migrateStateId('pkg:git')).toBe('pkg:git');
     expect(migrateStateId('service:sshd')).toBe('service:sshd');
+    expect(migrateStateId('apt-repo:nodejs')).toBe('apt-repo:nodejs');
+    expect(migrateStateId('script:deadbeefdeadbeef')).toBe('script:deadbeefdeadbeef');
   });
 
   it('leaves unrelated ids unchanged', () => {
-    expect(migrateStateId('apt-repo:nodejs')).toBe('apt-repo:nodejs');
-    expect(migrateStateId('git:/tmp/dotts')).toBe('git:/tmp/dotts');
+    expect(migrateStateId('gone')).toBe('gone');
+    expect(migrateStateId('res-1')).toBe('res-1');
+  });
+});
+
+describe('migrateStateKeys', () => {
+  it('rewrites hyphen keys and prefers an existing colon key', () => {
+    const migrated = migrateStateKeys({
+      'file-/tmp/x': { hash: 'old' },
+      'file:/tmp/x': { hash: 'new' },
+      gone: { hash: 'keep' },
+      'script-echo hello': { hash: 'script' },
+    });
+    expect(migrated['file:/tmp/x']).toEqual({ hash: 'new' });
+    expect(migrated['file-/tmp/x']).toBeUndefined();
+    expect(migrated.gone).toEqual({ hash: 'keep' });
+    expect(migrated['script-echo hello']).toEqual({ hash: 'script' });
   });
 });

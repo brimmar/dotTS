@@ -3,6 +3,7 @@ import { Component, Resource, flatten } from './component';
 import { StateService, type AppState } from '../services/state';
 import pc from 'picocolors';
 import { sortResourcesByTier } from './graph';
+import { migrateStateKeys } from './ids';
 import { performance } from 'node:perf_hooks';
 
 export interface Runner {
@@ -19,7 +20,7 @@ export const RunnerLive = Layer.effect(
     return Runner.of({
       run: (component: Component): Effect.Effect<void, Error, never> => Effect.gen(function* () {
         const startTime = performance.now();
-        const currentState = yield* stateService.load();
+        const currentState = migrateStateKeys(yield* stateService.load());
         const newState: AppState = {};
         
         const rawResources = flatten(component);

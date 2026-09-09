@@ -69,6 +69,17 @@ function stableHash(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 16);
 }
 
+function sortedEnv(env: Record<string, string> | undefined): Record<string, string> | null {
+  if (!env) return null;
+  const sorted: Record<string, string> = {};
+  for (const key of Object.keys(env).sort()) {
+    const value = env[key];
+    if (value === undefined) continue;
+    sorted[key] = value;
+  }
+  return sorted;
+}
+
 /**
  * Declares a software package to install with the platform package manager.
  * @param name Package name as the manager knows it.
@@ -131,8 +142,8 @@ export function dir(path: string, props: DirectoryProps = {}): ResourceHandle {
 
 /**
  * Runs a shell command. The resource id is a hash of `run` plus stable props
- * (`workingDir`, `unless`, `onlyIf`, `become`), so the same command in a
- * different directory does not collide.
+ * (`workingDir`, `unless`, `onlyIf`, `become`, `environment`), so the same
+ * command with different env does not collide.
  * @param run Command to execute.
  * @param props Optional `unless`, `onlyIf`, working directory, and env vars.
  * @example
@@ -145,7 +156,14 @@ export function dir(path: string, props: DirectoryProps = {}): ResourceHandle {
 export function script(run: string, props: ScriptProps = {}): ResourceHandle {
   const stack = ActiveContext.requireStack();
   const id = `script:${stableHash(
-    JSON.stringify([run, props.workingDir ?? null, props.unless ?? null, props.onlyIf ?? null, props.become ?? null]),
+    JSON.stringify([
+      run,
+      props.workingDir ?? null,
+      props.unless ?? null,
+      props.onlyIf ?? null,
+      props.become ?? null,
+      sortedEnv(props.environment),
+    ]),
   )}`;
   return new ScriptResource(stack, id, { ...props, run } as never);
 }
