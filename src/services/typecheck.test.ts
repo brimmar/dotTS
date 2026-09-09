@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { typecheckFile } from './typecheck';
 
 describe('typecheckFile', () => {
@@ -65,6 +65,25 @@ export default () => {
     );
 
     expect(typecheckFile({ configPath, typesDir })).toEqual([]);
+  });
+
+  it('accepts node:fs and fetch using only embedded typeRoots', async () => {
+    const typesDir = await writeFixtureTypes();
+    const embedded = resolve(join(import.meta.dir, '../embedded/types'));
+    const configPath = join(dir, 'dotts.ts');
+    await writeFile(
+      configPath,
+      `import { readFileSync } from 'node:fs';
+import { pkg } from 'dotts';
+export default () => {
+  pkg('git');
+  readFileSync('/etc/os-release', 'utf8');
+  void fetch('https://example.com');
+};
+`,
+    );
+
+    expect(typecheckFile({ configPath, typesDir, typeRoots: [embedded] })).toEqual([]);
   });
 
   it('fails on a type error in a helper imported from a parent directory', async () => {

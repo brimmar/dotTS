@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import * as ts from 'typescript';
-import { nodeTypeAssets } from '../embedded/node-types-assets';
+import { embeddedTypesStamp, nodeTypeAssets } from '../embedded/node-types-assets';
 
 export interface TypecheckDiagnostic {
   file: string;
@@ -34,10 +34,11 @@ function ensureEmbeddedTypes(): string {
   const fromSource = resolve(join(import.meta.dir, '../embedded/types'));
   if (existsSync(join(fromSource, 'node', 'index.d.ts'))) return fromSource;
 
-  const dest = join(tmpdir(), 'dotts-embedded-types');
+  const dest = join(tmpdir(), `dotts-embedded-types-${embeddedTypesStamp}`);
+  if (existsSync(join(dest, 'node', 'index.d.ts'))) return dest;
+
   for (const [rel, assetPath] of Object.entries(nodeTypeAssets)) {
-    const file = join(dest, 'node', rel);
-    if (existsSync(file)) continue;
+    const file = join(dest, rel);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, readFileSync(assetPath));
   }
@@ -48,13 +49,6 @@ function cliTypeRoots(): string[] {
   const roots: string[] = [];
   const embedded = ensureEmbeddedTypes();
   if (existsSync(join(embedded, 'node'))) roots.push(embedded);
-
-  for (const candidate of [
-    join(import.meta.dir, '../../node_modules/@types'),
-    join(import.meta.dir, '../node_modules/@types'),
-  ]) {
-    if (existsSync(candidate)) roots.push(resolve(candidate));
-  }
   return [...new Set(roots)];
 }
 
@@ -70,6 +64,7 @@ function isIgnoredFile(program: ts.Program, fileName: string): boolean {
 export function typecheckFile(opts: {
   configPath: string;
   typesDir: string;
+  typeRoots?: string[];
 }): TypecheckDiagnostic[] {
   if (!existsSync(opts.typesDir)) {
     return [
@@ -83,8 +78,16 @@ export function typecheckFile(opts: {
     ];
   }
 
-  const typeRoots = cliTypeRoots();
+  const typeRoots = opts.typeRoots ?? cliTypeRoots();
   const nodeTypes = typeRoots.some((root) => existsSync(join(root, 'node')));
+  const undiciRoot = typeRoots
+    .map((root) => join(root, 'undici-types'))
+    .find((dir) => existsSync(join(dir, 'index.d.ts')));
+
+  const paths: ts.MapLike<string[]> = { dotts: [opts.typesDir] };
+  if (undiciRoot) {
+    paths['undici-types'] = [undiciRoot];
+  }
 
   const options: ts.CompilerOptions = {
     strict: true,
@@ -94,7 +97,7 @@ export function typecheckFile(opts: {
     lib: ['lib.esnext.d.ts'],
     noEmit: true,
     skipLibCheck: true,
-    paths: { dotts: [opts.typesDir] },
+    paths,
     baseUrl: dirname(opts.configPath),
     // TS 6 errors on deprecated baseUrl unless this is set.
     ignoreDeprecations: '6.0',
