@@ -12,7 +12,15 @@ describe('UserResource', () => {
         return exists ? Effect.succeed('uid=1000(testuser)...') : Effect.fail(new Error('not found'));
       }
       return Effect.succeed('');
-    }
+    },
+    execFile: (file, args) => {
+      const cmd = [file, ...args].join(' ');
+      commands.push(cmd);
+      if (cmd.startsWith('id ')) {
+        return exists ? Effect.succeed('uid=1000(testuser)...') : Effect.fail(new Error('not found'));
+      }
+      return Effect.succeed('');
+    },
   }));
 
   it('should create a user if it does not exist', async () => {

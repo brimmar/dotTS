@@ -2,7 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import { existsSync, readFileSync, statSync } from 'fs';
 import { rm, stat } from 'fs/promises';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { Effect, Layer } from 'effect';
 import { FileSystem, FileSystemLive } from './fs';
 import { SystemCommand, SystemCommandLive } from './exec';
@@ -96,39 +96,88 @@ describe('FileSystem Service', () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  it('should write bytes with become via 0o600 temp, quoted cp, then unlink', async () => {
-    const calls: string[] = [];
+  it('should create a symlink with become via ln argv', async () => {
+    const calls: { file: string; args: string[] }[] = [];
+    const MockExec = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: () => Effect.succeed(''),
+        execFile: (file, args) => {
+          calls.push({ file, args });
+          return Effect.succeed('');
+        },
+      }),
+    );
+
+    const linkPath = join(testDir, 'the-link');
+    const program = Effect.gen(function* () {
+      const fs = yield* FileSystem;
+      yield* fs.symlink('/the-target', linkPath, { become: true });
+    });
+
+    await Effect.runPromise(program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)));
+
+    expect(calls).toEqual([
+      { file: 'mkdir', args: ['-p', dirname(linkPath)] },
+      { file: 'ln', args: ['-sf', '/the-target', linkPath] },
+    ]);
+  });
+
+  it('should write a file with become via tee argv and stdin', async () => {
+    const calls: { file: string; args: string[]; stdin?: string }[] = [];
+    const MockExec = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: () => Effect.succeed(''),
+        execFile: (file, args, opts) => {
+          calls.push({ file, args, stdin: opts?.stdin });
+          return Effect.succeed('');
+        },
+      }),
+    );
+
+    const filePath = join(testDir, 'become.txt');
+    const program = Effect.gen(function* () {
+      const fs = yield* FileSystem;
+      yield* fs.writeFile(filePath, 'secret', { become: true });
+    });
+
+    await Effect.runPromise(program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)));
+
+    expect(calls).toEqual([{ file: 'tee', args: [filePath], stdin: 'secret' }]);
+  });
+
+  it('should write bytes with become via 0o600 temp, cp argv, then unlink', async () => {
+    const calls: { file: string; args: string[] }[] = [];
     let seenMode: number | undefined;
     let seenTemp: string | undefined;
 
     const MockExec = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
-        run: (command) =>
-          Effect.sync(() => {
-            calls.push(command);
-            const match = /^cp '([^']+)' '(.+)'$/.exec(command);
-            if (match?.[1]) {
-              seenTemp = match[1];
-              seenMode = statSync(seenTemp).mode & 0o777;
-            }
-            return '';
-          }),
+        run: () => Effect.succeed(''),
+        execFile: (file, args) => {
+          calls.push({ file, args });
+          if (file === 'cp' && args[0]) {
+            seenTemp = args[0];
+            seenMode = statSync(seenTemp).mode & 0o777;
+          }
+          return Effect.succeed('');
+        },
       }),
     );
 
     const filePath = join(testDir, 'become.bin');
     const program = Effect.gen(function* () {
       const fs = yield* FileSystem;
-      yield* fs.mkdir(testDir);
       yield* fs.writeFileBytes(filePath, new Uint8Array([0, 255]), { become: true });
     });
 
     await Effect.runPromise(program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)));
 
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.startsWith('cp ')).toBe(true);
-    expect(calls[0]?.includes(filePath)).toBe(true);
+    expect(calls[0]?.file).toBe('cp');
+    expect(calls[0]?.args[1]).toBe(filePath);
     expect(seenMode).toBe(0o600);
     if (!seenTemp) {
       throw new Error('expected cp of a temp path');
@@ -136,3 +185,4 @@ describe('FileSystem Service', () => {
     expect(existsSync(seenTemp)).toBe(false);
   });
 });
+

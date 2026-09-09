@@ -16,7 +16,14 @@ describe('ServiceResource', () => {
       if (cmd.includes('is-active')) return Effect.succeed('inactive');
       if (cmd.includes('is-enabled')) return Effect.succeed('disabled');
       return Effect.succeed('');
-    }
+    },
+    execFile: (file, args) => {
+      const cmd = [file, ...args].join(' ');
+      commands.push(cmd);
+      if (cmd.includes('is-active')) return Effect.succeed('inactive');
+      if (cmd.includes('is-enabled')) return Effect.succeed('disabled');
+      return Effect.succeed('');
+    },
   }));
 
   it('should start and enable a service', async () => {

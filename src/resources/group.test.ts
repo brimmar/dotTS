@@ -12,7 +12,15 @@ describe('GroupResource', () => {
         return exists ? Effect.succeed('group:x:1000:') : Effect.fail(new Error('not found'));
       }
       return Effect.succeed('');
-    }
+    },
+    execFile: (file, args) => {
+      const cmd = [file, ...args].join(' ');
+      commands.push(cmd);
+      if (cmd.startsWith('getent group')) {
+        return exists ? Effect.succeed('group:x:1000:') : Effect.fail(new Error('not found'));
+      }
+      return Effect.succeed('');
+    },
   }));
 
   it('should create a group if it does not exist', async () => {

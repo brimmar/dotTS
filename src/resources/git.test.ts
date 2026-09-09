@@ -17,7 +17,13 @@ describe('GitResource', () => {
       commands.push(cmd);
       if (cmd === 'git remote get-url origin') return Effect.succeed('https://github.com/test/repo.git');
       return Effect.succeed('');
-    }
+    },
+    execFile: (file, args) => {
+      const cmd = [file, ...args].join(' ');
+      commands.push(cmd);
+      if (cmd === 'git remote get-url origin') return Effect.succeed('https://github.com/test/repo.git');
+      return Effect.succeed('');
+    },
   }));
 
   it('should clone a repository if it does not exist', async () => {
