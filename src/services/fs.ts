@@ -203,7 +203,7 @@ export const FileSystemLive = Layer.effect(
             }
           },
           (exec) =>
-            exec.execFile('test', ['-e', '--', resolved], options).pipe(
+            exec.execFile('test', ['-e', resolved], options).pipe(
               Effect.map(() => true),
               Effect.catchAll(() => Effect.succeed(false))
             ),
