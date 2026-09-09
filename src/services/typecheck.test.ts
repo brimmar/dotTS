@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { typecheckFile } from './typecheck';
+import { ensureEmbeddedTypes, typecheckFile } from './typecheck';
 
 describe('typecheckFile', () => {
   const dir = join(tmpdir(), `dotts-typecheck-${Math.random().toString(36).slice(2)}`);
@@ -84,6 +85,38 @@ export default () => {
     );
 
     expect(typecheckFile({ configPath, typesDir, typeRoots: [embedded] })).toEqual([]);
+  });
+
+  it('re-extracts a partial dest without .complete including undici-types', async () => {
+    const typesDir = await writeFixtureTypes();
+    const missingSource = join(dir, 'no-embedded-types');
+    const dest = ensureEmbeddedTypes(missingSource);
+    expect(existsSync(join(dest, '.complete'))).toBe(true);
+    expect(existsSync(join(dest, 'undici-types', 'index.d.ts'))).toBe(true);
+
+    rmSync(join(dest, '.complete'), { force: true });
+    rmSync(join(dest, 'undici-types'), { recursive: true, force: true });
+    mkdirSync(join(dest, 'node'), { recursive: true });
+    writeFileSync(join(dest, 'node', 'index.d.ts'), 'partial');
+
+    const extracted = ensureEmbeddedTypes(missingSource);
+    expect(existsSync(join(extracted, '.complete'))).toBe(true);
+    expect(existsSync(join(extracted, 'undici-types', 'index.d.ts'))).toBe(true);
+    expect(readFileSync(join(extracted, 'node', 'index.d.ts'), 'utf8')).not.toBe('partial');
+
+    const configPath = join(dir, 'dotts-extract.ts');
+    await writeFile(
+      configPath,
+      `import { readFileSync } from 'node:fs';
+import { pkg } from 'dotts';
+export default () => {
+  pkg('git');
+  readFileSync('/etc/os-release', 'utf8');
+  void fetch('https://example.com');
+};
+`,
+    );
+    expect(typecheckFile({ configPath, typesDir, typeRoots: [extracted] })).toEqual([]);
   });
 
   it('fails on a type error in a helper imported from a parent directory', async () => {
