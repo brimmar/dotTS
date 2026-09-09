@@ -37,62 +37,63 @@ export class UserResource extends Resource {
 
       if (state === 'present') {
         if (!exists) {
-          let cmd = `useradd`;
-          if (uid !== undefined) cmd += ` --uid ${uid}`;
-          if (gid !== undefined) cmd += ` --gid ${gid}`;
-          if (groups && groups.length > 0) cmd += ` --groups ${groups.join(',')}`;
-          if (shell) cmd += ` --shell ${shell}`;
-          if (home) cmd += ` --home-dir ${home}`;
-          if (createHome) cmd += ` --create-home`;
-          cmd += ` ${name}`;
-          yield* exec.run(cmd, { become: this.props.become });
+          const args: string[] = [];
+          if (uid !== undefined) args.push('--uid', String(uid));
+          if (gid !== undefined) args.push('--gid', String(gid));
+          if (groups && groups.length > 0) args.push('--groups', groups.join(','));
+          if (shell) args.push('--shell', shell);
+          if (home) args.push('--home-dir', home);
+          if (createHome) args.push('--create-home');
+          args.push(name);
+          yield* exec.execFile('useradd', args, { become: this.props.become });
         } else {
           // Update existing user
-          let cmd = `usermod`;
+          const args: string[] = [];
           let needsUpdate = false;
 
           if (uid !== undefined) {
-            const currentUid = yield* exec.run(`id -u ${name}`, { become: this.props.become });
+            const currentUid = yield* exec.execFile('id', ['-u', name], { become: this.props.become });
             if (parseInt(currentUid) !== uid) {
-              cmd += ` --uid ${uid}`;
+              args.push('--uid', String(uid));
               needsUpdate = true;
             }
           }
 
           if (gid !== undefined) {
-            const currentGid = yield* exec.run(`id -g ${name}`, { become: this.props.become });
+            const currentGid = yield* exec.execFile('id', ['-g', name], { become: this.props.become });
             // This is simplified, gid could be name or id
             if (currentGid !== String(gid)) {
-              cmd += ` --gid ${gid}`;
+              args.push('--gid', String(gid));
               needsUpdate = true;
             }
           }
 
           if (groups) {
-            const currentGroups = (yield* exec.run(`id -Gn ${name}`, { become: this.props.become })).split(' ');
+            const currentGroups = (yield* exec.execFile('id', ['-Gn', name], { become: this.props.become })).split(' ');
             const hasAllGroups = groups.every(g => currentGroups.includes(g));
             if (!hasAllGroups) {
-              cmd += ` --groups ${groups.join(',')}`;
+              args.push('--groups', groups.join(','));
               needsUpdate = true;
             }
           }
 
           if (shell) {
-            const currentShell = yield* exec.run(`getent passwd ${name} | cut -d: -f7`, { become: this.props.become });
+            const passwd = yield* exec.execFile('getent', ['passwd', name], { become: this.props.become });
+            const currentShell = passwd.split(':')[6];
             if (currentShell !== shell) {
-              cmd += ` --shell ${shell}`;
+              args.push('--shell', shell);
               needsUpdate = true;
             }
           }
 
           if (needsUpdate) {
-            cmd += ` ${name}`;
-            yield* exec.run(cmd, { become: this.props.become });
+            args.push(name);
+            yield* exec.execFile('usermod', args, { become: this.props.become });
           }
         }
       } else {
         if (exists) {
-          yield* exec.run(`userdel --remove ${name}`, { become: this.props.become });
+          yield* exec.execFile('userdel', ['--remove', name], { become: this.props.become });
         }
       }
     });
@@ -102,12 +103,12 @@ export class UserResource extends Resource {
     const { name } = this.props;
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`userdel --remove ${name}`, { become: this.props.become });
+      yield* exec.execFile('userdel', ['--remove', name], { become: this.props.become });
     });
   }
 
   private checkExists(name: string, exec: SystemCommand): Effect.Effect<boolean, Error> {
-    return exec.run(`id ${name}`, { become: this.props.become }).pipe(
+    return exec.execFile('id', [name], { become: this.props.become }).pipe(
       Effect.map(() => true),
       Effect.catchAll(() => Effect.succeed(false))
     );

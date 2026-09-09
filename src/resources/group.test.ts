@@ -6,17 +6,11 @@ import { SystemCommand } from '../services/exec';
 
 describe('GroupResource', () => {
   const MockExec = (commands: string[] = [], exists: boolean = false) => Layer.succeed(SystemCommand, SystemCommand.of({
-    run: (cmd: string) => {
-      commands.push(cmd);
-      if (cmd.startsWith('getent group')) {
-        return exists ? Effect.succeed('group:x:1000:') : Effect.fail(new Error('not found'));
-      }
-      return Effect.succeed('');
-    },
+    run: (cmd: string) => Effect.fail(new Error(`unexpected run: ${cmd}`)),
     execFile: (file, args) => {
       const cmd = [file, ...args].join(' ');
       commands.push(cmd);
-      if (cmd.startsWith('getent group')) {
+      if (file === 'getent' && args[0] === 'group') {
         return exists ? Effect.succeed('group:x:1000:') : Effect.fail(new Error('not found'));
       }
       return Effect.succeed('');
