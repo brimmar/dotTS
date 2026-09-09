@@ -10,7 +10,14 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@/resources/*": ["src/public-props.ts"],
+      "@/core/context": ["src/public-props.ts"],
+      "@/core/app": ["src/public-props.ts"]
+    }
   },
   "include": ["src/public.ts"]
 }

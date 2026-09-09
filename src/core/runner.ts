@@ -3,6 +3,7 @@ import { Component, Resource, flatten } from './component';
 import { StateService, type AppState } from '../services/state';
 import pc from 'picocolors';
 import { sortResourcesByTier } from './graph';
+import { migrateStateKeys } from './ids';
 import { performance } from 'node:perf_hooks';
 
 export interface Runner {
@@ -19,10 +20,11 @@ export const RunnerLive = Layer.effect(
     return Runner.of({
       run: (component: Component): Effect.Effect<void, Error, never> => Effect.gen(function* () {
         const startTime = performance.now();
-        const currentState = yield* stateService.load();
+        const currentState = migrateStateKeys(yield* stateService.load());
         const newState: AppState = {};
         
         const rawResources = flatten(component);
+        warnLeftoverScriptLineState(currentState, rawResources);
         const tiers = sortResourcesByTier(rawResources);
 
         let created = 0;
@@ -92,6 +94,19 @@ export const RunnerLive = Layer.effect(
 );
 
 type ResourceResult = 'created' | 'updated' | 'converged';
+
+function warnLeftoverScriptLineState(currentState: AppState, resources: Resource[]) {
+  const currentIds = new Set(resources.map((res) => res.id));
+  const leftover = Object.keys(currentState).some(
+    (id) => (id.startsWith('script-') || id.startsWith('line-')) && !currentIds.has(id),
+  );
+  if (!leftover) return;
+  console.warn(
+    pc.yellow(
+      'Leftover script-/line- state hashes will be treated as deleted and the new hashed ids as creates. Non-idempotent scripts will re-run on this upgrade.',
+    ),
+  );
+}
 
 function runResource(res: Resource, currentState: AppState, newState: AppState): Effect.Effect<ResourceResult, Error, any> {
   return Effect.gen(function* () {

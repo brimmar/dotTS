@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, spyOn } from 'bun:test';
 import { Effect, Layer } from 'effect';
 import { Runner, RunnerLive } from './runner';
 import { App, Stack } from './app';
@@ -181,5 +181,69 @@ describe('Runner', () => {
     await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
 
     expect(res.applied).toBe(true);
+  });
+
+  it('matches resources against migrated hyphenated state ids', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new TestResource(stack, 'pkg:git', 'hash');
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(MockState({ 'pkg-git': { hash: 'hash', metadata: {} } })),
+    );
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    expect(res.applied).toBe(true);
+  });
+
+  it('does not treat script- hyphen ids as the hashed script id', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new TestResource(stack, 'script:deadbeefdeadbeef', 'hash');
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(MockState({ 'script-echo hello': { hash: 'hash', metadata: {} } })),
+    );
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    expect(res.applied).toBe(true);
+  });
+
+  it('warns once when leftover script- or line- hashes cannot match current ids', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    new TestResource(stack, 'script:deadbeefdeadbeef', 'hash');
+
+    const warn = spyOn(console, 'warn');
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(
+        MockState({
+          'script-echo hello': { hash: 'hash', metadata: {} },
+          'line-/tmp/a-export': { hash: 'hash', metadata: {} },
+        }),
+      ),
+    );
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    const leftoverWarnings = warn.mock.calls.filter((call) =>
+      String(call[0]).includes('Leftover script-/line- state hashes'),
+    );
+    expect(leftoverWarnings).toHaveLength(1);
+    warn.mockRestore();
   });
 });

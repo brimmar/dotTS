@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { SecretToken } from './secret';
 
+const RUNTIME_KEYS = new Set(['retries', 'retryDelay']);
+
 export function hashConfig(config: unknown): string {
   const normalized = normalize(config, new WeakSet<object>());
   return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
@@ -47,8 +49,20 @@ function normalize(value: unknown, seen: WeakSet<object>): unknown {
     const result: Record<string, unknown> = {};
     const keys = Object.keys(record).sort();
     for (const key of keys) {
+      if (RUNTIME_KEYS.has(key)) continue;
       const nested = record[key];
       if (nested === undefined || typeof nested === 'function') {
+        continue;
+      }
+      if (key === 'dependsOn' && Array.isArray(nested)) {
+        result[key] = nested
+          .map((dep) => {
+            if (dep !== null && typeof dep === 'object' && typeof (dep as { id?: unknown }).id === 'string') {
+              return (dep as { id: string }).id;
+            }
+            return normalize(dep, seen);
+          })
+          .sort();
         continue;
       }
       result[key] = normalize(nested, seen);
