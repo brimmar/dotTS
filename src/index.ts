@@ -1,50 +1,49 @@
 import * as p from '@clack/prompts';
+import { join } from 'node:path';
 import pc from 'picocolors';
-import { dottsInit } from './commands/init';
+import { HELP_TEXT, parseArgv } from './cli-parse';
 import { dottsApply } from './commands/apply';
 import { dottsCheck } from './commands/check';
 import { dottsDoctor } from './commands/doctor';
-import { dottsSecretSet, dottsSecretList, dottsSecretRemove } from './commands/secrets';
-import { join } from 'node:path';
+import { dottsInit } from './commands/init';
+import { dottsPrepare } from './commands/prepare';
+import { dottsSecretList, dottsSecretRemove, dottsSecretSet } from './commands/secrets';
 import { formatError } from './core/errors';
 
 async function main() {
   const args = process.argv.slice(2);
 
   if (args.length > 0) {
-    const command = args[0];
     try {
-      if (command === 'init') {
-        const projectDir = args[1] || './my-dotfiles';
-        p.log.step(`Initializing project at ${projectDir}...`);
-        await dottsInit(projectDir);
+      const request = parseArgv(args);
+
+      if (request.kind === 'help') {
+        // --help / -h prints usage and does not open the interactive menu
+        process.stdout.write(`${HELP_TEXT}\n`);
+        return;
+      }
+
+      if (request.kind === 'init') {
+        p.log.step(`Initializing project at ${request.projectDir}...`);
+        await dottsInit(request.projectDir);
         p.log.success('Project initialized successfully!');
-        p.note(`Project created at ${projectDir}\nEdit ${join(projectDir, 'dotts.ts')} to get started.`, 'next steps');
-      } else if (command === 'check') {
-        const configPath = args[1] || './dotts.ts';
-        await dottsCheck(configPath);
-      } else if (command === 'doctor') {
+        p.note(`Project created at ${request.projectDir}\nEdit ${join(request.projectDir, 'dotts.ts')} to get started.`, 'next steps');
+      } else if (request.kind === 'prepare') {
+        p.log.step(`Preparing editor types at ${request.dir}...`);
+        await dottsPrepare(request.dir);
+        p.log.success('Editor types prepared.');
+      } else if (request.kind === 'check') {
+        await dottsCheck(request.configPath);
+      } else if (request.kind === 'doctor') {
         await dottsDoctor();
-      } else if (command === 'apply') {
-        const configPath = args[1] || './dotts.ts';
-        const dryRun = args.includes('--dry-run');
-        await dottsApply(configPath, { dryRun });
-      } else if (command === 'secrets') {
-        const action = args[1];
-        if (action === 'set') {
-          const name = args[2];
-          const value = args[3];
-          if (!name || !value) {
-            throw new Error('Usage: dotts secrets set <name> <value>');
-          }
-          await dottsSecretSet(name, value);
-        } else if (action === 'list') {
-          await dottsSecretList();
-        } else {
-          throw new Error('Usage: dotts secrets <set|list>');
-        }
-      } else {
-        throw new Error(`Unknown command: ${command}`);
+      } else if (request.kind === 'apply') {
+        await dottsApply(request.configPath, { dryRun: request.dryRun });
+      } else if (request.kind === 'secrets-set') {
+        await dottsSecretSet(request.name, request.value);
+      } else if (request.kind === 'secrets-list') {
+        await dottsSecretList();
+      } else if (request.kind === 'secrets-remove') {
+        await dottsSecretRemove(request.name);
       }
     } catch (error) {
       const formatted = formatError(error);
@@ -63,6 +62,7 @@ async function main() {
     message: 'What would you like to do?',
     options: [
       { value: 'init', label: 'Initialize a new project', hint: 'dotts init' },
+      { value: 'prepare', label: 'Prepare editor types', hint: 'dotts prepare' },
       { value: 'check', label: 'Check configuration', hint: 'dotts check' },
       { value: 'doctor', label: 'System Diagnostics', hint: 'dotts doctor' },
       { value: 'apply', label: 'Apply configuration', hint: 'dotts apply' },
@@ -94,6 +94,8 @@ async function main() {
       await dottsInit(projectDir);
       s.stop('Project initialized successfully!');
       p.note(`Project created at ${projectDir}\nEdit ${join(projectDir, 'dotts.ts')} to get started.`, 'next steps');
+    } else if (command === 'prepare') {
+      await dottsPrepare();
     } else if (command === 'check') {
       const configPath = await p.text({
         message: 'Path to dotts.ts?',
