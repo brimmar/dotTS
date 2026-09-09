@@ -50,6 +50,40 @@ describe('typecheckFile', () => {
     ).toBe(true);
   });
 
+  it('accepts node:fs when @types/node is available', async () => {
+    const typesDir = await writeFixtureTypes();
+    const configPath = join(dir, 'dotts.ts');
+    await writeFile(
+      configPath,
+      `import { readFileSync } from 'node:fs';
+import { pkg } from 'dotts';
+export default () => {
+  pkg('git');
+  readFileSync('/etc/os-release', 'utf8');
+};
+`,
+    );
+
+    expect(typecheckFile({ configPath, typesDir })).toEqual([]);
+  });
+
+  it('ignores suggestion diagnostics from dependencies', async () => {
+    const typesDir = await writeFixtureTypes();
+    const configPath = join(dir, 'dotts.ts');
+    await writeFile(
+      configPath,
+      `import { pkg } from 'dotts';
+export default () => {
+  pkg('git');
+};
+`,
+    );
+
+    const diagnostics = typecheckFile({ configPath, typesDir });
+    expect(diagnostics.every((d) => d.file === configPath || d.file.startsWith(dir))).toBe(true);
+    expect(diagnostics).toEqual([]);
+  });
+
   it('tells the user to run prepare when types are missing', async () => {
     await mkdir(dir, { recursive: true });
     const configPath = join(dir, 'dotts.ts');
