@@ -103,17 +103,18 @@ export const FileSystemLive = Layer.effect(
                   catch: (error) => new Error(`Failed to write temp file ${temp}: ${String(error)}`),
                 }).pipe(
                   Effect.flatMap(() =>
-                    exec.run(`cp ${shellQuote(temp)} ${shellQuote(resolved)}`, asRoot),
+                    exec.run(`cp ${shellQuote(temp)} ${shellQuote(resolved)}`, asRoot).pipe(
+                      Effect.as(undefined),
+                    ),
                   ),
-                  Effect.flatMap(() => {
+                  Effect.flatMap((): Effect.Effect<void, Error> => {
                     const user = namedBecomeUser(options?.become);
                     if (!user) return Effect.void;
                     return exec.run(
                       `chown ${shellQuote(`${user}:`)} ${shellQuote(resolved)}`,
                       asRoot,
-                    );
+                    ).pipe(Effect.as(undefined));
                   }),
-                  Effect.map(() => undefined),
                   Effect.ensuring(rmTempDir(dir)),
                 );
               }),
