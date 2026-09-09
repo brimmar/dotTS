@@ -75,12 +75,16 @@ function copyViaTemp(
     }),
     ({ temp }) =>
       Effect.gen(function* () {
-        // Copy as root so a 0o600 temp is readable. sudo -u <user> cannot read it.
-        yield* exec.execFile('cp', [temp, dest], asRoot);
-        yield* exec.execFile('chmod', [destMode(options).toString(8), dest], asRoot);
+        // install -m sets dest mode in the same root step so a 0o600 file
+        // is never world-readable between cp and chmod.
+        yield* exec.execFile(
+          'install',
+          ['-m', destMode(options).toString(8), '--', temp, dest],
+          asRoot,
+        );
         const user = namedBecomeUser(options?.become);
         if (user) {
-          yield* exec.execFile('chown', [`${user}:`, dest], asRoot);
+          yield* exec.execFile('chown', [`${user}:`, '--', dest], asRoot);
         }
       }),
     ({ dir }) => Effect.ignore(Effect.tryPromise(() => NodeFS.rm(dir, { recursive: true, force: true }))),
@@ -143,7 +147,7 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.readFile(resolved, 'utf-8'),
-          (exec) => exec.execFile('cat', [resolved], options),
+          (exec) => exec.execFile('cat', ['--', resolved], options),
           (error) => `Failed to read file ${resolved}: ${String(error)}`
         );
       },
@@ -160,7 +164,7 @@ export const FileSystemLive = Layer.effect(
             }
           },
           (exec) =>
-            exec.execFile('test', ['-e', resolved], options).pipe(
+            exec.execFile('test', ['-e', '--', resolved], options).pipe(
               Effect.map(() => true),
               Effect.catchAll(() => Effect.succeed(false))
             ),
@@ -172,7 +176,7 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.mkdir(resolved, { recursive: true }).then(() => undefined),
-          (exec) => exec.execFile('mkdir', ['-p', resolved], options).pipe(Effect.map(() => undefined)),
+          (exec) => exec.execFile('mkdir', ['-p', '--', resolved], options).pipe(Effect.map(() => undefined)),
           (error) => `Failed to create directory ${resolved}: ${String(error)}`
         );
       },
@@ -191,7 +195,7 @@ export const FileSystemLive = Layer.effect(
           },
           (exec) =>
             Effect.gen(function* () {
-              yield* exec.execFile('mkdir', ['-p', dirname(resolvedPath)], options);
+              yield* exec.execFile('mkdir', ['-p', '--', dirname(resolvedPath)], options);
               yield* exec.execFile('ln', ['-sf', '--', target, resolvedPath], options);
             }),
           (error) => `Failed to create symlink ${resolvedPath} -> ${target}: ${String(error)}`
@@ -202,7 +206,7 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.rm(resolved, { force: true, recursive: true }),
-          (exec) => exec.execFile('rm', ['-rf', resolved], options).pipe(Effect.map(() => undefined)),
+          (exec) => exec.execFile('rm', ['-rf', '--', resolved], options).pipe(Effect.map(() => undefined)),
           (error) => `Failed to remove ${resolved}: ${String(error)}`
         );
       },
@@ -211,7 +215,7 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.unlink(resolved),
-          (exec) => exec.execFile('rm', ['-f', resolved], options).pipe(Effect.map(() => undefined)),
+          (exec) => exec.execFile('rm', ['-f', '--', resolved], options).pipe(Effect.map(() => undefined)),
           (error) => `Failed to unlink ${resolved}: ${String(error)}`
         );
       },
@@ -221,7 +225,7 @@ export const FileSystemLive = Layer.effect(
           options,
           () => NodeFS.chmod(resolved, mode),
           (exec) =>
-            exec.execFile('chmod', [mode.toString(8), resolved], options).pipe(Effect.map(() => undefined)),
+            exec.execFile('chmod', [mode.toString(8), '--', resolved], options).pipe(Effect.map(() => undefined)),
           (error) => `Failed to chmod ${resolved} to ${mode}: ${String(error)}`
         );
       },
@@ -231,7 +235,7 @@ export const FileSystemLive = Layer.effect(
           options,
           () => NodeFS.chown(resolved, uid, gid),
           (exec) =>
-            exec.execFile('chown', [`${uid}:${gid}`, resolved], options).pipe(Effect.map(() => undefined)),
+            exec.execFile('chown', [`${uid}:${gid}`, '--', resolved], options).pipe(Effect.map(() => undefined)),
           (error) => `Failed to chown ${resolved} to ${uid}:${gid}: ${String(error)}`
         );
       },

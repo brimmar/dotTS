@@ -2,7 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import { existsSync, readFileSync, statSync } from 'fs';
 import { rm, stat } from 'fs/promises';
 import { tmpdir } from 'os';
-import { dirname, join } from 'path';
+import { basename, dirname, join } from 'path';
 import { Effect, Layer } from 'effect';
 import { FileSystem, FileSystemLive } from './fs';
 import { SystemCommand, SystemCommandLive, buildSudoArgs } from './exec';
@@ -138,12 +138,12 @@ describe('FileSystem Service', () => {
     await Effect.runPromise(program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)));
 
     expect(calls).toEqual([
-      { file: 'mkdir', args: ['-p', dirname(linkPath)] },
+      { file: 'mkdir', args: ['-p', '--', dirname(linkPath)] },
       { file: 'ln', args: ['-sf', '--', '/the-target', linkPath] },
     ]);
   });
 
-  it('should write a file with become via 0o600 temp, root cp, chmod, then unlink', async () => {
+  it('should write a file with become via 0o600 temp, root install -m, then unlink', async () => {
     const calls: { file: string; args: string[]; become?: boolean | string }[] = [];
     let seenMode: number | undefined;
     let seenTemp: string | undefined;
@@ -154,9 +154,13 @@ describe('FileSystem Service', () => {
         run: () => Effect.succeed(''),
         execFile: (file, args, opts) => {
           calls.push({ file, args, become: opts?.become });
-          if (file === 'cp' && args[0]) {
-            seenTemp = args[0];
-            seenMode = statSync(seenTemp).mode & 0o777;
+          if (file === 'install') {
+            const dash = args.indexOf('--');
+            const temp = dash >= 0 ? args[dash + 1] : undefined;
+            if (temp) {
+              seenTemp = temp;
+              seenMode = statSync(seenTemp).mode & 0o777;
+            }
           }
           return Effect.succeed('');
         },
@@ -171,19 +175,21 @@ describe('FileSystem Service', () => {
 
     await Effect.runPromise(program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)));
 
-    expect(calls).toHaveLength(2);
-    expect(calls[0]?.file).toBe('cp');
-    expect(calls[0]?.args[1]).toBe(filePath);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.file).toBe('install');
     expect(calls[0]?.become).toBe(true);
-    expect(calls[1]).toEqual({ file: 'chmod', args: ['644', filePath], become: true });
     expect(seenMode).toBe(0o600);
     if (!seenTemp) {
-      throw new Error('expected cp of a temp path');
+      throw new Error('expected install of a temp path');
     }
+    expect(calls[0]?.args).toEqual(['-m', '644', '--', seenTemp, filePath]);
+    expect(seenTemp.startsWith(join(tmpdir(), 'dotts-'))).toBe(true);
+    expect(basename(seenTemp)).toBe('file');
     expect(existsSync(seenTemp)).toBe(false);
+    expect(existsSync(dirname(seenTemp))).toBe(false);
   });
 
-  it('should write bytes with become via 0o600 temp, root cp, chmod, then unlink', async () => {
+  it('should write bytes with become via 0o600 temp, root install -m, then unlink', async () => {
     const calls: { file: string; args: string[]; become?: boolean | string }[] = [];
     let seenMode: number | undefined;
     let seenTemp: string | undefined;
@@ -194,9 +200,13 @@ describe('FileSystem Service', () => {
         run: () => Effect.succeed(''),
         execFile: (file, args, opts) => {
           calls.push({ file, args, become: opts?.become });
-          if (file === 'cp' && args[0]) {
-            seenTemp = args[0];
-            seenMode = statSync(seenTemp).mode & 0o777;
+          if (file === 'install') {
+            const dash = args.indexOf('--');
+            const temp = dash >= 0 ? args[dash + 1] : undefined;
+            if (temp) {
+              seenTemp = temp;
+              seenMode = statSync(seenTemp).mode & 0o777;
+            }
           }
           return Effect.succeed('');
         },
@@ -211,16 +221,18 @@ describe('FileSystem Service', () => {
 
     await Effect.runPromise(program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)));
 
-    expect(calls).toHaveLength(2);
-    expect(calls[0]?.file).toBe('cp');
-    expect(calls[0]?.args[1]).toBe(filePath);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.file).toBe('install');
     expect(calls[0]?.become).toBe(true);
-    expect(calls[1]).toEqual({ file: 'chmod', args: ['644', filePath], become: true });
     expect(seenMode).toBe(0o600);
     if (!seenTemp) {
-      throw new Error('expected cp of a temp path');
+      throw new Error('expected install of a temp path');
     }
+    expect(calls[0]?.args).toEqual(['-m', '644', '--', seenTemp, filePath]);
+    expect(seenTemp.startsWith(join(tmpdir(), 'dotts-'))).toBe(true);
+    expect(basename(seenTemp)).toBe('file');
     expect(existsSync(seenTemp)).toBe(false);
+    expect(existsSync(dirname(seenTemp))).toBe(false);
   });
 
   it('should copy as root then chown when become is a username', async () => {
@@ -245,26 +257,33 @@ describe('FileSystem Service', () => {
 
     await Effect.runPromise(program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)));
 
-    const cp = calls[0];
-    if (!cp || cp.file !== 'cp' || !cp.args[0]) {
-      throw new Error('expected cp of a temp path');
+    const install = calls[0];
+    if (!install || install.file !== 'install') {
+      throw new Error('expected install of a temp path');
     }
-    expect(cp.args[1]).toBe(filePath);
-    expect(cp.become).toBe(true);
-    expect(buildSudoArgs(cp.file, cp.args, cp.become)).toEqual({
+    const temp = install.args[3];
+    if (!temp) {
+      throw new Error('expected install of a temp path');
+    }
+    expect(install.args).toEqual(['-m', '644', '--', temp, filePath]);
+    expect(install.become).toBe(true);
+    expect(buildSudoArgs(install.file, install.args, install.become)).toEqual({
       file: 'sudo',
-      args: ['--', 'cp', cp.args[0], filePath],
+      args: ['--', 'install', '-m', '644', '--', temp, filePath],
     });
-    expect(calls[1]).toEqual({ file: 'chmod', args: ['644', filePath], become: true });
-    expect(calls[2]).toEqual({ file: 'chown', args: ['alice:', filePath], become: true });
-    expect(buildSudoArgs('chown', ['alice:', filePath], calls[2]?.become)).toEqual({
+    expect(calls[1]).toEqual({ file: 'chown', args: ['alice:', '--', filePath], become: true });
+    expect(buildSudoArgs('chown', ['alice:', '--', filePath], calls[1]?.become)).toEqual({
       file: 'sudo',
-      args: ['--', 'chown', 'alice:', filePath],
+      args: ['--', 'chown', 'alice:', '--', filePath],
     });
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(2);
+    expect(temp.startsWith(join(tmpdir(), 'dotts-'))).toBe(true);
+    expect(basename(temp)).toBe('file');
+    expect(existsSync(temp)).toBe(false);
+    expect(existsSync(dirname(temp))).toBe(false);
   });
 
-  it('should chmod dest to the requested mode after privileged copy', async () => {
+  it('should install dest with the requested mode in one privileged step', async () => {
     const calls: { file: string; args: string[] }[] = [];
     const MockExec = Layer.succeed(
       SystemCommand,
@@ -285,7 +304,12 @@ describe('FileSystem Service', () => {
 
     await Effect.runPromise(program.pipe(Effect.provide(FileSystemLive), Effect.provide(MockExec)));
 
-    expect(calls[1]).toEqual({ file: 'chmod', args: ['600', filePath] });
+    expect(calls[0]?.file).toBe('install');
+    expect(calls[0]?.args[0]).toBe('-m');
+    expect(calls[0]?.args[1]).toBe('600');
+    expect(calls[0]?.args[2]).toBe('--');
+    expect(calls[0]?.args[4]).toBe(filePath);
+    expect(calls).toHaveLength(1);
   });
 
   it('should pass mode to NodeFS.writeFile when set without become', async () => {
