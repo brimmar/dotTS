@@ -34,6 +34,12 @@ export default () => {
 };
 `;
 
+export function parseInitArgs(args: string[]): { projectDir: string; force: boolean } {
+  const force = args.includes('--force');
+  const projectDir = args.find((arg) => !arg.startsWith('-')) || './my-dotfiles';
+  return { projectDir, force };
+}
+
 export async function dottsInit(projectDir: string, options: { force?: boolean } = {}) {
   await mkdir(projectDir, { recursive: true });
   const configPath = join(projectDir, 'dotts.ts');

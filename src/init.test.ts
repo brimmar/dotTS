@@ -3,7 +3,7 @@ import { exists, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DottsError } from './core/errors';
-import { dottsInit } from './commands/init';
+import { dottsInit, parseInitArgs } from './commands/init';
 
 function exportedNames(src: string): Set<string> {
   const names = new Set<string>();
@@ -45,6 +45,13 @@ describe('dotts init', () => {
     expect(content).toContain("onPlatform('darwin'");
     expect(content).toContain("onDistro('ubuntu'");
     expect(content).toContain("pkg('build-essential')");
+  });
+
+  it('does not treat --force as the project directory', () => {
+    expect(parseInitArgs(['--force'])).toEqual({ projectDir: './my-dotfiles', force: true });
+    expect(parseInitArgs(['--force', './x'])).toEqual({ projectDir: './x', force: true });
+    expect(parseInitArgs(['./x', '--force'])).toEqual({ projectDir: './x', force: true });
+    expect(parseInitArgs([])).toEqual({ projectDir: './my-dotfiles', force: false });
   });
 
   it('refuses to re-init when dotts.ts exists unless force is set', async () => {
