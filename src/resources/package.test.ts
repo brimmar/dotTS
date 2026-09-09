@@ -21,6 +21,7 @@ describe('PackageResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command) => {
           executedCommands.push(command);
           if (command.includes('list')) return Effect.fail(new Error('Not found'));
@@ -52,6 +53,7 @@ describe('PackageResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command) => {
           executedCommand = command;
           return Effect.succeed('');
@@ -82,6 +84,7 @@ describe('PackageResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command) => {
           executedCommands.push(command);
           if (command.includes('list')) return Effect.fail(new Error('Not found'));
@@ -112,6 +115,7 @@ describe('PackageResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command) => {
           executedCommands.push(command);
           if (command.includes('list')) return Effect.succeed('neovim 0.9.0');
@@ -143,6 +147,7 @@ describe('PackageResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command) => {
           executedCommands.push(command);
           if (command.includes('list')) return Effect.fail(new Error('Not found'));

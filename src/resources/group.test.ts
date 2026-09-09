@@ -5,14 +5,17 @@ import { GroupResource } from './group';
 import { SystemCommand } from '../services/exec';
 
 describe('GroupResource', () => {
-  const MockExec = (commands: string[] = [], exists: boolean = false) => Layer.succeed(SystemCommand, SystemCommand.of({
-    run: (cmd: string) => {
-      commands.push(cmd);
-      if (cmd.startsWith('getent group')) {
-        return exists ? Effect.succeed('group:x:1000:') : Effect.fail(new Error('not found'));
-      }
-      return Effect.succeed('');
+  const record = (commands: string[], cmd: string, exists: boolean) => {
+    commands.push(cmd);
+    if (cmd.startsWith('getent group')) {
+      return exists ? Effect.succeed('group:x:1000:') : Effect.fail(new Error('not found'));
     }
+    return Effect.succeed('');
+  };
+
+  const MockExec = (commands: string[] = [], exists: boolean = false) => Layer.succeed(SystemCommand, SystemCommand.of({
+    run: (cmd: string) => record(commands, cmd, exists),
+    execFile: (file, args) => record(commands, [file, ...args].join(' '), exists),
   }));
 
   it('should create a group if it does not exist', async () => {
@@ -48,6 +51,26 @@ describe('GroupResource', () => {
       )
     );
 
+    expect(commands).toContain('groupdel developers');
+  });
+
+  it('should treat a missing group as success on destroy', async () => {
+    const commands: string[] = [];
+    const MockMissing = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: (cmd: string) => {
+        commands.push(cmd);
+        return Effect.fail(new Error("groupdel: group 'developers' does not exist"));
+      },
+      execFile: (file, args) => {
+        commands.push([file, ...args].join(' '));
+        return Effect.fail(new Error("groupdel: group 'developers' does not exist"));
+      },
+    }));
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new GroupResource(stack, 'test-group', { name: 'developers' });
+
+    await Effect.runPromise(res.destroy().pipe(Effect.provide(MockMissing)));
     expect(commands).toContain('groupdel developers');
   });
 });

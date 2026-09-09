@@ -20,6 +20,7 @@ export interface UnarchiveResourceProps {
 }
 
 export class UnarchiveResource extends Resource {
+  override readonly kind = 'unarchive' as const;
   constructor(scope: Component, id: string, override readonly props: UnarchiveResourceProps) {
     super(scope, id, props);
   }
@@ -74,9 +75,6 @@ export class UnarchiveResource extends Resource {
   }
 
   destroy() {
-    return Effect.gen(this, function* () {
-      const fs = yield* FileSystem;
-      yield* fs.rm(this.props.dest, { become: this.props.become });
-    });
+    return Effect.void;
   }
 }

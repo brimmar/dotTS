@@ -4,6 +4,7 @@ import { Component, Resource } from './component';
 import { App, Stack } from './app';
 
 class TestResource extends Resource {
+  override readonly kind = 'test' as const;
   constructor(scope: Component, id: string, props?: { dependsOn?: Component[] }) {
     super(scope, id, props);
   }

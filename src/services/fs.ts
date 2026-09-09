@@ -10,6 +10,7 @@ export interface FileSystem {
   readonly mkdir: (path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly symlink: (target: string, path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly rm: (path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
+  readonly rmdir: (path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly unlink: (path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly chmod: (path: string, mode: number, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly chown: (path: string, uid: number, gid: number, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
@@ -29,6 +30,42 @@ function resolvePath(p: string): string {
   if (p === '~') return homedir();
   if (p.startsWith('~/') || p.startsWith('~\\')) return `${homedir()}${p.slice(1)}`;
   return resolve(p);
+}
+
+function isIgnorableRmdirError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = String(error.code);
+    if (code === 'ENOENT' || code === 'ENOTEMPTY') return true;
+  }
+  const msg = String(error).toLowerCase();
+  return (
+    msg.includes('no such file') ||
+    msg.includes('not empty') ||
+    msg.includes('directory not empty') ||
+    msg.includes('enoent') ||
+    msg.includes('enotempty')
+  );
+}
+
+function isDirectoryUnlinkError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    if (String(error.code) === 'EISDIR') return true;
+  }
+  const msg = String(error).toLowerCase();
+  return msg.includes('is a directory') || msg.includes('eisdir');
+}
+
+function isIgnorableUnlinkError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = String(error.code);
+    if (code === 'ENOENT' || code === 'EISDIR') return true;
+  }
+  const msg = String(error).toLowerCase();
+  return (
+    msg.includes('no such file') ||
+    msg.includes('enoent') ||
+    isDirectoryUnlinkError(error)
+  );
 }
 
 export const FileSystemLive = Layer.effect(
@@ -129,16 +166,58 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.rm(resolved, { force: true, recursive: true }),
-          (exec) => exec.run(`rm -rf ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          (exec) => exec.execFile('rm', ['-rf', '--', resolved], options).pipe(Effect.map(() => undefined)),
           (error) => `Failed to remove ${resolved}: ${String(error)}`
+        );
+      },
+      rmdir: (path, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
+          options,
+          async () => {
+            try {
+              await NodeFS.rmdir(resolved);
+            } catch (error) {
+              if (isIgnorableRmdirError(error)) return;
+              return Promise.reject(error);
+            }
+          },
+          (exec) =>
+            exec.execFile('rmdir', [resolved], options).pipe(
+              Effect.map(() => undefined),
+              Effect.catchAll((error) =>
+                isIgnorableRmdirError(error) ? Effect.void : Effect.fail(error)
+              ),
+            ),
+          (error) => `Failed to rmdir ${resolved}: ${String(error)}`
         );
       },
       unlink: (path, options) => {
         const resolved = resolvePath(path);
+        const ignoreUnlinkError = (error: unknown): boolean => {
+          if (!isIgnorableUnlinkError(error)) return false;
+          if (isDirectoryUnlinkError(error)) {
+            console.warn(`unlink ${resolved}: path is a directory; leaving it in place`);
+          }
+          return true;
+        };
         return wrap(
           options,
-          () => NodeFS.unlink(resolved),
-          (exec) => exec.run(`rm -f ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          async () => {
+            try {
+              await NodeFS.unlink(resolved);
+            } catch (error) {
+              if (ignoreUnlinkError(error)) return;
+              return Promise.reject(error);
+            }
+          },
+          (exec) =>
+            exec.execFile('rm', ['-f', '--', resolved], options).pipe(
+              Effect.map(() => undefined),
+              Effect.catchAll((error) =>
+                ignoreUnlinkError(error) ? Effect.void : Effect.fail(error)
+              ),
+            ),
           (error) => `Failed to unlink ${resolved}: ${String(error)}`
         );
       },
