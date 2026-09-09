@@ -115,6 +115,17 @@ describe('Functional Helpers', () => {
     expect(handle).toBeUndefined();
   });
 
+  it('onPlatform() awaits an async callback so later resources are declared', async () => {
+    ActiveContext.setPlatform({ os: 'darwin', arch: 'arm64' });
+
+    let handle: ReturnType<typeof pkg> | undefined;
+    await onPlatform('darwin', async (api) => {
+      await Promise.resolve();
+      handle = api.pkg('git');
+    });
+    expect(handle).toBeInstanceOf(PackageResource);
+  });
+
   it('onDistro() should support multiple distro matches', () => {
     ActiveContext.setPlatform({ os: 'linux', arch: 'x64', distro: 'ubuntu' });
     
