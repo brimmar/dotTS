@@ -39,17 +39,17 @@ export class RemoteFileResource extends Resource {
       // We will skip Etag for this task to avoid breaking the Runner's current interface.
       // We will focus on progress reporting if possible, but Bun's fetch doesn't easily support it without streaming.
 
-      const content = yield* http.downloadString(this.props.url);
+      const bytes = yield* http.downloadBytes(this.props.url);
       
       if (this.props.sha256) {
-        const actualHash = createHash('sha256').update(content).digest('hex');
+        const actualHash = createHash('sha256').update(bytes).digest('hex');
         if (actualHash !== this.props.sha256) {
           throw new Error(`Hash mismatch for ${this.props.url}. Expected ${this.props.sha256}, got ${actualHash}`);
         }
       }
 
       yield* fs.mkdir(dirname(this.props.path), { become: this.props.become });
-      yield* fs.writeFile(this.props.path, content, { become: this.props.become });
+      yield* fs.writeFileBytes(this.props.path, bytes, { become: this.props.become });
       
       if (this.props.mode !== undefined) {
         yield* fs.chmod(this.props.path, this.props.mode, { become: this.props.become });

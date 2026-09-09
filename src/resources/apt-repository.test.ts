@@ -18,6 +18,7 @@ describe('AptRepositoryResource', () => {
     writeFile: (path: string, content: string) => Effect.sync(() => { files[path] = content; }),
     mkdir: (path: string) => Effect.succeed(undefined),
     rm: (path: string) => Effect.sync(() => { delete files[path]; }),
+    writeFileBytes: () => Effect.void,
   } as any));
 
   const MockHttp = (keyContent: string) => Layer.succeed(HttpService, HttpService.of({

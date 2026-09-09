@@ -1,7 +1,7 @@
 import { Context, Effect, Layer } from 'effect';
 import * as NodeFS from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 
 export interface FileSystem {
   readonly writeFile: (path: string, content: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
@@ -13,6 +13,11 @@ export interface FileSystem {
   readonly unlink: (path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly chmod: (path: string, mode: number, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly chown: (path: string, uid: number, gid: number, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
+  readonly writeFileBytes: (
+    path: string,
+    content: Uint8Array,
+    options?: { become?: boolean | string },
+  ) => Effect.Effect<void, Error>;
 }
 
 export const FileSystem = Context.GenericTag<FileSystem>('FileSystem');
@@ -58,6 +63,24 @@ export const FileSystemLive = Layer.effect(
           options,
           () => NodeFS.writeFile(resolved, content, 'utf-8'),
           (exec) => exec.run(`tee ${resolved} << 'EOF'\n${content}\nEOF`, options).pipe(Effect.map(() => undefined)),
+          (error) => `Failed to write file ${resolved}: ${String(error)}`
+        );
+      },
+      writeFileBytes: (path, content, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
+          options,
+          () => NodeFS.writeFile(resolved, content),
+          (exec) => {
+            const temp = `${tmpdir()}/dotts-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            return Effect.tryPromise({
+              try: () => NodeFS.writeFile(temp, content),
+              catch: (error) => new Error(`Failed to write temp file ${temp}: ${String(error)}`),
+            }).pipe(
+              Effect.flatMap(() => exec.run(`cp ${temp} ${resolved}`, options)),
+              Effect.map(() => undefined)
+            );
+          },
           (error) => `Failed to write file ${resolved}: ${String(error)}`
         );
       },
