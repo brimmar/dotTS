@@ -24,6 +24,7 @@ jobs:
   build:
     needs: test
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -32,6 +33,12 @@ jobs:
           - os: ubuntu-24.04-arm
             target: linux-arm64
             artifact: dotts-linux-arm64
+          - os: macos-14
+            target: darwin-arm64
+            artifact: dotts-darwin-arm64
+          - os: macos-15-intel
+            target: darwin-x64
+            artifact: dotts-darwin-x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -39,7 +46,7 @@ jobs:
         with:
           bun-version: latest
       - run: bun install
-      - run: bun build ./src/index.ts --compile --outfile ${{ matrix.artifact }}
+      - run: bun build ./src/index.ts --compile --target=bun-${{ matrix.target }} --outfile ${{ matrix.artifact }}
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
