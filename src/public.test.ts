@@ -98,6 +98,23 @@ describe('Functional Helpers', () => {
     expect(called).toBe(false);
   });
 
+  it('onPlatform() api.pkg works when the OS matches', () => {
+    ActiveContext.setPlatform({ os: 'darwin', arch: 'arm64' });
+
+    let handle: ReturnType<typeof pkg> | undefined;
+    onPlatform('darwin', (api) => {
+      handle = api.pkg('git');
+    });
+    expect(handle).toBeInstanceOf(PackageResource);
+    expect(handle?.id).toBe('pkg:git');
+
+    handle = undefined;
+    onPlatform('linux', (api) => {
+      handle = api.pkg('git');
+    });
+    expect(handle).toBeUndefined();
+  });
+
   it('onDistro() should support multiple distro matches', () => {
     ActiveContext.setPlatform({ os: 'linux', arch: 'x64', distro: 'ubuntu' });
     

@@ -301,46 +301,108 @@ export type Distro =
   | 'rhel'
   | 'alpine';
 
+export type DarwinManagers = 'brew' | 'bun' | 'npm' | 'cargo' | 'pip';
+export type LinuxManagers = 'apt' | 'pacman' | 'bun' | 'npm' | 'cargo' | 'pip';
+export type DebianDistro = 'ubuntu' | 'debian';
+export type ArchDistro = 'arch';
+
+export interface CommonApi {
+  file: typeof file;
+  link: typeof link;
+  dir: typeof dir;
+  script: typeof script;
+  remoteFile: typeof remoteFile;
+  git: typeof git;
+  lineInFile: typeof lineInFile;
+  unarchive: typeof unarchive;
+  secret: typeof secret;
+}
+
+export interface DarwinApi extends CommonApi {
+  pkg: (name: string, props?: Omit<PackageProps, 'manager'> & { manager?: DarwinManagers }) => ResourceHandle;
+}
+
+export interface LinuxApi extends CommonApi {
+  pkg: (name: string, props?: Omit<PackageProps, 'manager'> & { manager?: LinuxManagers }) => ResourceHandle;
+  service: typeof service;
+  user: typeof user;
+  group: typeof group;
+  aptRepository: typeof aptRepository;
+}
+
+export type ArchApi = Omit<LinuxApi, 'aptRepository'>;
+
+export type ApiFor<O extends OS> = O extends 'darwin' ? DarwinApi : O extends 'linux' ? LinuxApi : CommonApi;
+
+export type DistroApiFor<D extends Distro> = D extends DebianDistro ? LinuxApi : ArchApi;
+
+const platformApi = {
+  file,
+  link,
+  dir,
+  script,
+  remoteFile,
+  git,
+  lineInFile,
+  unarchive,
+  secret,
+  pkg,
+  service,
+  user,
+  group,
+  aptRepository,
+};
+
 /**
- * Runs `callback` only when the current OS matches.
+ * Run `fn` only on the given OS. Use the `api` argument for platform-narrowed helpers.
+ * Global helpers such as `pkg` stay un-narrowed; narrowing is opt-in via `api`.
+ * Mixed OS lists receive `CommonApi` only.
  * @param os One OS name or a list of names.
- * @param callback Code that declares resources for that OS.
+ * @param fn Code that declares resources for that OS.
  * @example
  * ```ts
- * onPlatform('darwin', () => {
- *   pkg('iterm2');
+ * onPlatform('darwin', (d) => {
+ *   d.pkg('iterm2', { manager: 'brew' });
  * });
  * ```
  */
-export function onPlatform(os: OS | OS[], callback: () => void | Promise<void>) {
+export function onPlatform(os: OS[], fn: (api: CommonApi) => void | Promise<void>): void;
+export function onPlatform<O extends OS>(os: O, fn: (api: ApiFor<O>) => void | Promise<void>): void;
+export function onPlatform(os: OS | OS[], fn: (api: typeof platformApi) => void | Promise<void>): void {
   const platform = ActiveContext.getPlatform();
   if (!platform) return;
 
   const matches = Array.isArray(os) ? os.includes(platform.os as OS) : platform.os === os;
   if (matches) {
-    callback();
+    fn(platformApi);
   }
 }
 
 /**
- * Runs `callback` only when the current Linux distro matches.
- * Unknown distros never match.
+ * Run `fn` only on the given Linux distro. Use the `api` argument for distro-narrowed helpers.
+ * Unknown distros never match. Mixed distro lists receive `CommonApi` only.
  * @param distro One distro name or a list of names.
- * @param callback Code that declares resources for that distro.
+ * @param fn Code that declares resources for that distro.
  * @example
  * ```ts
- * onDistro(['ubuntu', 'debian'], () => {
- *   pkg('build-essential');
+ * onDistro('ubuntu', (d) => {
+ *   d.aptRepository('nodejs', {
+ *     uri: 'https://deb.nodesource.com/node_22.x',
+ *     distribution: 'nodistro',
+ *     components: ['main'],
+ *   });
  * });
  * ```
  */
-export function onDistro(distro: Distro | Distro[], callback: () => void | Promise<void>) {
+export function onDistro(distro: Distro[], fn: (api: CommonApi) => void | Promise<void>): void;
+export function onDistro<D extends Distro>(distro: D, fn: (api: DistroApiFor<D>) => void | Promise<void>): void;
+export function onDistro(distro: Distro | Distro[], fn: (api: typeof platformApi) => void | Promise<void>): void {
   const platform = ActiveContext.getPlatform();
   if (!platform || !platform.distro) return;
 
   const wanted = Array.isArray(distro) ? distro : [distro];
   const matches = (wanted as readonly string[]).includes(platform.distro);
   if (matches) {
-    callback();
+    fn(platformApi);
   }
 }
