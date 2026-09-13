@@ -20,7 +20,6 @@ describe('ScriptResource', () => {
           executedCwd = options?.cwd || '';
           return ''; 
         }),
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -50,7 +49,6 @@ describe('ScriptResource', () => {
           executed = true;
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -74,7 +72,6 @@ describe('ScriptResource', () => {
           executed = true;
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -98,7 +95,6 @@ describe('ScriptResource', () => {
           executed = true;
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -122,7 +118,6 @@ describe('ScriptResource', () => {
           executed = true;
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 

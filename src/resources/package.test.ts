@@ -27,7 +27,6 @@ describe('PackageResource', () => {
           if (command.includes('list')) return Effect.fail(new Error('Not found'));
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -59,7 +58,6 @@ describe('PackageResource', () => {
           executedCommand = command;
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -92,7 +90,6 @@ describe('PackageResource', () => {
           if (command.includes('list')) return Effect.fail(new Error('Not found'));
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -124,7 +121,6 @@ describe('PackageResource', () => {
           if (command.includes('list')) return Effect.succeed('neovim 0.9.0');
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
@@ -157,7 +153,6 @@ describe('PackageResource', () => {
           if (command.includes('list')) return Effect.fail(new Error('Not found'));
           return Effect.succeed('');
         },
-        execFile: () => Effect.succeed(''),
       })
     );
 
