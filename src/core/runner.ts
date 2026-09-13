@@ -175,7 +175,7 @@ function runResource(res: Resource, currentState: AppState, newState: AppState):
 
     yield* withRetry(res.apply(), res);
 
-    newState[id] = { hash, kind: res.kind, metadata: res.props || {} };
+    newState[id] = { hash, kind: res.kind, metadata: { ...res.props } as Record<string, unknown> };
     return result;
   });
 }
