@@ -1,6 +1,6 @@
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
-import { dottsInit } from './commands/init';
+import { dottsInit, parseInitArgs } from './commands/init';
 import { dottsApply } from './commands/apply';
 import { dottsCheck } from './commands/check';
 import { dottsDoctor } from './commands/doctor';
@@ -15,9 +15,9 @@ async function main() {
     const command = args[0];
     try {
       if (command === 'init') {
-        const projectDir = args[1] || './my-dotfiles';
+        const { projectDir, force } = parseInitArgs(args.slice(1));
         p.log.step(`Initializing project at ${projectDir}...`);
-        await dottsInit(projectDir);
+        await dottsInit(projectDir, { force });
         p.log.success('Project initialized successfully!');
         p.note(`Project created at ${projectDir}\nEdit ${join(projectDir, 'dotts.ts')} to get started.`, 'next steps');
       } else if (command === 'check') {
