@@ -19,7 +19,7 @@ describe('ScriptResource', () => {
           executedCommand = command; 
           executedCwd = options?.cwd || '';
           return ''; 
-        })
+        }),
       })
     );
 
@@ -48,7 +48,7 @@ describe('ScriptResource', () => {
           if (command === 'check-exists') return Effect.succeed('0'); // Sockets/shell success
           executed = true;
           return Effect.succeed('');
-        }
+        },
       })
     );
 
@@ -71,7 +71,7 @@ describe('ScriptResource', () => {
           if (command === 'check-exists') return Effect.fail(new Error('1')); // shell fail
           executed = true;
           return Effect.succeed('');
-        }
+        },
       })
     );
 
@@ -94,7 +94,7 @@ describe('ScriptResource', () => {
           if (command === 'should-run') return Effect.succeed('0');
           executed = true;
           return Effect.succeed('');
-        }
+        },
       })
     );
 
@@ -117,7 +117,7 @@ describe('ScriptResource', () => {
           if (command === 'should-not-run') return Effect.fail(new Error('1'));
           executed = true;
           return Effect.succeed('');
-        }
+        },
       })
     );
 

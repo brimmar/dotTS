@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
-import { SystemCommand, SystemCommandLive } from './exec';
+import { SystemCommand, SystemCommandLive, buildSudoArgs } from './exec';
 
 describe('SystemCommand Service', () => {
   it('should execute a shell command successfully', async () => {
@@ -69,5 +69,54 @@ describe('SystemCommand Service', () => {
     const result = await Effect.runPromise(Effect.provide(program, SystemCommandLive));
     expect(result).toBe(payload);
     expect(existsSync(pwned)).toBe(false);
+  });
+
+  it('should pass stdin as process input', async () => {
+    const program = Effect.gen(function* () {
+      const exec = yield* SystemCommand;
+      return yield* exec.execFile('cat', [], { stdin: 'from-stdin' });
+    });
+
+    const result = await Effect.runPromise(Effect.provide(program, SystemCommandLive));
+    expect(result).toBe('from-stdin');
+  });
+});
+
+describe('buildSudoArgs', () => {
+  it('uses sudo without -u for become true and root', () => {
+    expect([buildSudoArgs('echo', ['hi'], true).file, ...buildSudoArgs('echo', ['hi'], true).args]).toEqual([
+      'sudo',
+      '--',
+      'echo',
+      'hi',
+    ]);
+    expect([buildSudoArgs('echo', ['hi'], 'root').file, ...buildSudoArgs('echo', ['hi'], 'root').args]).toEqual([
+      'sudo',
+      '--',
+      'echo',
+      'hi',
+    ]);
+  });
+
+  it('uses sudo -u for become username', () => {
+    const result = buildSudoArgs('echo', ['hi'], 'www-data');
+    expect([result.file, ...result.args]).toEqual(['sudo', '-u', 'www-data', '--', 'echo', 'hi']);
+  });
+
+  it('inserts -- so a file starting with - is not a sudo flag', () => {
+    expect([buildSudoArgs('-n', ['foo'], true).file, ...buildSudoArgs('-n', ['foo'], true).args]).toEqual([
+      'sudo',
+      '--',
+      '-n',
+      'foo',
+    ]);
+    expect([
+      buildSudoArgs('-n', ['foo'], 'www-data').file,
+      ...buildSudoArgs('-n', ['foo'], 'www-data').args,
+    ]).toEqual(['sudo', '-u', 'www-data', '--', '-n', 'foo']);
+  });
+
+  it('leaves argv unchanged when become is falsy', () => {
+    expect(buildSudoArgs('echo', ['hi'])).toEqual({ file: 'echo', args: ['hi'] });
   });
 });
