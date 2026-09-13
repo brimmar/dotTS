@@ -152,6 +152,7 @@ describe('RemoteFileResource', () => {
       unlink: (path) => Effect.sync(() => { state.unlink = path; }),
       chmod: () => Effect.void,
       chown: () => Effect.void,
+      writeFileBytes: () => Effect.void,
     }));
 
     const res = new RemoteFileResource(stack, 'remote-destroy', {
