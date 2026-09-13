@@ -30,6 +30,7 @@
 ### Usage
 The CLI is interactive. Run `bun start` and follow the prompts to:
 - `init`: Create a new `dotts` project.
+- `prepare`: Refresh editor types after upgrading the CLI.
 - `check`: Validate a `dotts.ts` configuration file.
 - `apply`: Apply the configuration to the local system (includes a Dry Run mode).
 - `doctor`: Run system diagnostics.
