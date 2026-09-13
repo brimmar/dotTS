@@ -126,6 +126,43 @@ describe('dotts init', () => {
     expect(await Bun.file(join(testProjectDir, 'tsconfig.json')).text()).toBe(existing);
   });
 
+  it('merges paths.dotts into a JSONC tsconfig with comments', async () => {
+    await mkdir(testProjectDir, { recursive: true });
+    await writeFile(
+      join(testProjectDir, 'tsconfig.json'),
+      `{
+  // Visit https://aka.ms/tsconfig to read more about this file
+  "compilerOptions": {
+    /* Language and Environment */
+    "strict": true,
+    "target": "ESNext"
+  },
+  "include": ["src/**/*.ts"]
+}
+`,
+    );
+
+    await dottsInit(testProjectDir);
+
+    const tsconfig = JSON.parse(await Bun.file(join(testProjectDir, 'tsconfig.json')).text());
+    expect(tsconfig.compilerOptions.paths.dotts).toEqual(['./.dotts/types']);
+    expect(tsconfig.compilerOptions.strict).toBe(true);
+    expect(tsconfig.compilerOptions.target).toBe('ESNext');
+    expect(tsconfig.include).toEqual(['src/**/*.ts']);
+    expect(await exists(join(testProjectDir, '.dotts/types/index.d.ts'))).toBe(true);
+  });
+
+  it('throws DottsError when tsconfig.json is invalid JSONC', async () => {
+    await mkdir(testProjectDir, { recursive: true });
+    await writeFile(join(testProjectDir, 'tsconfig.json'), '{ this is not json');
+
+    const err = await dottsInit(testProjectDir).catch((error: unknown) => error);
+    expect(err).toBeInstanceOf(DottsError);
+    expect(err).not.toBeInstanceOf(SyntaxError);
+    expect((err as DottsError).message).toMatch(/Could not parse/);
+    expect((err as DottsError).hint).toMatch(/JSON\/JSONC/);
+  });
+
   it('does not overwrite an existing .gitignore', async () => {
     await mkdir(testProjectDir, { recursive: true });
     const existing = 'dist\n*.log\n';

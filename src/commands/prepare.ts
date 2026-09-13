@@ -1,5 +1,7 @@
 import { exists, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import ts from 'typescript';
+import { DottsError } from '../core/errors';
 
 // Bun embeds this asset in `bun build --compile`. dist/public.d.ts is not a
 // single file (it imports ./public-props and ./core/secret), so init/prepare
@@ -33,7 +35,20 @@ async function ensureDottsPath(tsconfigPath: string): Promise<void> {
     return;
   }
   const raw = await Bun.file(tsconfigPath).text();
-  const json = JSON.parse(raw) as {
+  const { config, error } = ts.parseConfigFileTextToJson(tsconfigPath, raw);
+  if (
+    error ||
+    config === undefined ||
+    config === null ||
+    typeof config !== 'object' ||
+    Array.isArray(config)
+  ) {
+    throw new DottsError(
+      `Could not parse ${tsconfigPath}`,
+      'Fix the JSON/JSONC, or add compilerOptions.paths.dotts manually.',
+    );
+  }
+  const json = config as {
     compilerOptions?: { paths?: Record<string, string[]> };
   };
   json.compilerOptions ??= {};
