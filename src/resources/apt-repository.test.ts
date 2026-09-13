@@ -18,6 +18,7 @@ describe('AptRepositoryResource', () => {
     writeFile: (path: string, content: string) => Effect.sync(() => { files[path] = content; }),
     mkdir: (path: string) => Effect.succeed(undefined),
     rm: (path: string) => Effect.sync(() => { delete files[path]; }),
+    writeFileBytes: () => Effect.void,
   } as any));
 
   const MockHttp = (keyContent: string) => Layer.succeed(HttpService, HttpService.of({
@@ -28,7 +29,11 @@ describe('AptRepositoryResource', () => {
     run: (cmd: string) => {
       commands.push(cmd);
       return Effect.succeed('');
-    }
+    },
+    execFile: (file, args) => {
+      commands.push([file, ...args].join(' '));
+      return Effect.succeed('');
+    },
   }));
 
   it('should add a repository and download key', async () => {
@@ -56,7 +61,7 @@ describe('AptRepositoryResource', () => {
     );
 
     expect(files['/etc/apt/sources.list.d/docker.list']).toContain('[signed-by=/etc/apt/keyrings/docker.gpg]');
-    expect(commands).toContain('gpg --dearmor < /tmp/dotts-docker.key > /etc/apt/keyrings/docker.gpg');
+    expect(commands).toContain('gpg --dearmor --output /etc/apt/keyrings/docker.gpg /tmp/dotts-docker.key');
     expect(commands).toContain('apt-get update');
   });
 

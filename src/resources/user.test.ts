@@ -5,14 +5,25 @@ import { UserResource } from './user';
 import { SystemCommand } from '../services/exec';
 
 describe('UserResource', () => {
-  const MockExec = (commands: string[] = [], exists: boolean = false) => Layer.succeed(SystemCommand, SystemCommand.of({
-    run: (cmd: string) => {
+  const MockExec = (
+    commands: string[] = [],
+    exists: boolean = false,
+    calls: { file: string; args: string[]; intent?: 'read' | 'write' }[] = [],
+  ) => Layer.succeed(SystemCommand, SystemCommand.of({
+    run: (cmd: string) => Effect.fail(new Error(`unexpected run: ${cmd}`)),
+    execFile: (file, args, opts) => {
+      calls.push({ file, args, intent: opts?.intent });
+      const cmd = [file, ...args].join(' ');
       commands.push(cmd);
-      if (cmd.startsWith('id ')) {
+      if (file === 'id' && args.length === 1) {
         return exists ? Effect.succeed('uid=1000(testuser)...') : Effect.fail(new Error('not found'));
       }
+      if (file === 'id' && args[0] === '-u') return Effect.succeed('1000');
+      if (file === 'id' && args[0] === '-g') return Effect.succeed('1000');
+      if (file === 'id' && args[0] === '-Gn') return Effect.succeed('testuser sudo');
+      if (file === 'getent' && args[0] === 'passwd') return Effect.succeed('testuser:x:1000:1000::/home/testuser:/bin/sh');
       return Effect.succeed('');
-    }
+    },
   }));
 
   it('should create a user if it does not exist', async () => {
@@ -49,6 +60,109 @@ describe('UserResource', () => {
       )
     );
 
+    expect(commands).toContain('userdel testuser');
+    expect(commands.some((c) => c.includes('--remove'))).toBe(false);
+  });
+
+  it('should not remove home on destroy unless removeHome is set', async () => {
+    const commands: string[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new UserResource(stack, 'test-user', { name: 'testuser' });
+
+    await Effect.runPromise(
+      res.destroy().pipe(
+        Effect.provide(MockExec(commands, true))
+      )
+    );
+
+    expect(commands).toContain('userdel testuser');
+    expect(commands.some((c) => c.includes('--remove'))).toBe(false);
+  });
+
+  it('should pass --remove on destroy when removeHome is set', async () => {
+    const commands: string[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new UserResource(stack, 'test-user', { name: 'testuser', removeHome: true });
+
+    await Effect.runPromise(
+      res.destroy().pipe(
+        Effect.provide(MockExec(commands, true))
+      )
+    );
+
     expect(commands).toContain('userdel --remove testuser');
+  });
+
+  it('should treat a missing user as success on destroy', async () => {
+    const commands: string[] = [];
+    const MockMissing = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: (cmd: string) => {
+        commands.push(cmd);
+        return Effect.fail(new Error("userdel: user 'testuser' does not exist"));
+      },
+      execFile: (file, args) => {
+        commands.push([file, ...args].join(' '));
+        return Effect.fail(new Error("userdel: user 'testuser' does not exist"));
+      },
+    }));
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new UserResource(stack, 'test-user', { name: 'testuser' });
+
+    await Effect.runPromise(res.destroy().pipe(Effect.provide(MockMissing)));
+    expect(commands).toContain('userdel testuser');
+  });
+
+  it('should pass a user name with semicolon as a single argv entry', async () => {
+    const commands: string[] = [];
+    const calls: { file: string; args: string[] }[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new UserResource(stack, 'test-user', {
+      name: 'alice; id'
+    });
+
+    await Effect.runPromise(
+      res.apply().pipe(
+        Effect.provide(MockExec(commands, false, calls))
+      )
+    );
+
+    const useradd = calls.find((c) => c.file === 'useradd');
+    expect(useradd).toBeDefined();
+    expect(useradd?.args.at(-1)).toBe('alice; id');
+    expect(useradd?.args).toContain('alice; id');
+  });
+
+  it('should probe existing users with intent read before usermod', async () => {
+    const commands: string[] = [];
+    const calls: { file: string; args: string[]; intent?: 'read' | 'write' }[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new UserResource(stack, 'test-user', {
+      name: 'testuser',
+      uid: 2000,
+      gid: 2000,
+      groups: ['docker'],
+      shell: '/bin/zsh',
+    });
+
+    await Effect.runPromise(
+      res.apply().pipe(
+        Effect.provide(MockExec(commands, true, calls)),
+      ),
+    );
+
+    const probes = calls.filter((c) =>
+      (c.file === 'id' && (c.args[0] === '-u' || c.args[0] === '-g' || c.args[0] === '-Gn')) ||
+      (c.file === 'getent' && c.args[0] === 'passwd'),
+    );
+    expect(probes.length).toBe(4);
+    expect(probes.every((c) => c.intent === 'read')).toBe(true);
+    const usermod = calls.find((c) => c.file === 'usermod');
+    expect(usermod).toBeDefined();
+    expect(usermod?.intent).toBeUndefined();
   });
 });

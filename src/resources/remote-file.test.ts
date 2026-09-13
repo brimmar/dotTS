@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
+import { existsSync } from 'fs';
+import { mkdir, rm, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join, resolve } from 'path';
 import { Effect, Layer } from 'effect';
 import { RemoteFileResource } from './remote-file';
 import { HttpService } from '../services/http';
-import { FileSystem } from '../services/fs';
+import { FileSystem, FileSystemLive } from '../services/fs';
+import { SystemCommand, SystemCommandLive } from '../services/exec';
 import { App, Stack } from '../core/app';
 
 describe('RemoteFileResource', () => {
@@ -17,24 +22,27 @@ describe('RemoteFileResource', () => {
   it('should download a remote file', async () => {
     let downloadedUrl = '';
     let writtenPath = '';
-    let writtenContent = '';
+    let writtenContent: Uint8Array | undefined;
+    const bytes = new Uint8Array([0, 1, 2, 255]);
 
     const MockHttp = Layer.succeed(HttpService, HttpService.of({
       downloadString: (url) => Effect.sync(() => { downloadedUrl = url; return 'remote content'; }),
-      downloadBytes: (url) => Effect.sync(() => { downloadedUrl = url; return new Uint8Array(); }),
+      downloadBytes: (url) => Effect.sync(() => { downloadedUrl = url; return bytes; }),
       downloadWithMetadata: (url) => Effect.sync(() => ({ content: 'remote content', unchanged: false }))
     }));
 
     const MockFS = Layer.succeed(FileSystem, FileSystem.of({
-      writeFile: (path, content) => Effect.sync(() => { writtenPath = path; writtenContent = content; }),
+      writeFile: () => Effect.void,
       readFile: () => Effect.succeed(''),
       exists: () => Effect.succeed(false),
       mkdir: () => Effect.void,
       symlink: () => Effect.void,
       rm: () => Effect.void,
+      rmdir: () => Effect.void,
       unlink: () => Effect.void,
       chmod: () => Effect.void,
       chown: () => Effect.void,
+      writeFileBytes: (path, content) => Effect.sync(() => { writtenPath = path; writtenContent = content; }),
     }));
 
     const res = new RemoteFileResource(stack, 'remote-1', {
@@ -48,13 +56,13 @@ describe('RemoteFileResource', () => {
 
     expect(downloadedUrl).toBe('https://example.com/file.txt');
     expect(writtenPath).toBe('/tmp/file.txt');
-    expect(writtenContent).toBe('remote content');
+    expect(writtenContent).toEqual(bytes);
   });
 
   it('should fail if sha256 hash mismatch', async () => {
     const MockHttp = Layer.succeed(HttpService, HttpService.of({
       downloadString: () => Effect.succeed('wrong content'),
-      downloadBytes: () => Effect.succeed(new Uint8Array()),
+      downloadBytes: () => Effect.succeed(new Uint8Array([1, 2, 3])),
       downloadWithMetadata: () => Effect.succeed({ content: 'content', unchanged: false })
     }));
 
@@ -65,9 +73,11 @@ describe('RemoteFileResource', () => {
       mkdir: () => Effect.void,
       symlink: () => Effect.void,
       rm: () => Effect.void,
+      rmdir: () => Effect.void,
       unlink: () => Effect.void,
       chmod: () => Effect.void,
       chown: () => Effect.void,
+      writeFileBytes: () => Effect.void,
     }));
 
     const res = new RemoteFileResource(stack, 'remote-fail', {
@@ -103,9 +113,11 @@ describe('RemoteFileResource', () => {
       mkdir: () => Effect.void,
       symlink: () => Effect.void,
       rm: () => Effect.void,
+      rmdir: () => Effect.void,
       unlink: () => Effect.void,
       chmod: (path, mode) => Effect.sync(() => { chmodPath = path; chmodMode = mode; }),
       chown: (path, uid, gid) => Effect.sync(() => { chownPath = path; chownUid = uid; chownGid = gid; }),
+      writeFileBytes: () => Effect.void,
     }));
 
     const res = new RemoteFileResource(stack, 'remote-attrs', {
@@ -125,5 +137,98 @@ describe('RemoteFileResource', () => {
     expect(chownPath).toBe('/tmp/file.txt');
     expect(chownUid).toBe(1000);
     expect(chownGid).toBe(1000);
+  });
+
+  it('should unlink the file on destroy, never rm', async () => {
+    const state: { unlink?: string; rm?: string } = {};
+    const MockFS = Layer.succeed(FileSystem, FileSystem.of({
+      writeFile: () => Effect.void,
+      readFile: () => Effect.succeed(''),
+      exists: () => Effect.succeed(true),
+      mkdir: () => Effect.void,
+      symlink: () => Effect.void,
+      rm: (path) => Effect.sync(() => { state.rm = path; }),
+      rmdir: () => Effect.void,
+      unlink: (path) => Effect.sync(() => { state.unlink = path; }),
+      chmod: () => Effect.void,
+      chown: () => Effect.void,
+      writeFileBytes: () => Effect.void,
+    }));
+
+    const res = new RemoteFileResource(stack, 'remote-destroy', {
+      url: 'https://example.com/file.txt',
+      path: '/tmp/file.txt',
+    });
+
+    await Effect.runPromise(res.destroy().pipe(Effect.provide(MockFS)));
+
+    expect(state.unlink).toBe('/tmp/file.txt');
+    expect(state.rm).toBeUndefined();
+  });
+
+  it('should destroy with become via rm -f argv, never rm -rf', async () => {
+    const calls: { file: string; args: string[] }[] = [];
+    const MockExec = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: () => Effect.fail(new Error('run should not be used')),
+      execFile: (file, args) => {
+        calls.push({ file, args });
+        return Effect.succeed('');
+      },
+    }));
+
+    const path = '/tmp/remote; rm -rf /';
+    const res = new RemoteFileResource(stack, 'remote-become', {
+      url: 'https://example.com/file.txt',
+      path,
+      become: true,
+    });
+
+    await Effect.runPromise(res.destroy().pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(MockExec),
+    ));
+
+    expect(calls).toEqual([{ file: 'rm', args: ['-f', '--', resolve(path)] }]);
+    expect(calls.some((c) => c.args.includes('-rf'))).toBe(false);
+  });
+
+  it('should not recursively delete a directory on destroy', async () => {
+    const testDir = join(tmpdir(), 'dotts-remote-dir-destroy-' + Math.random().toString(36).slice(2));
+    const dirPath = join(testDir, 'was-a-file');
+    await mkdir(dirPath, { recursive: true });
+    const keep = join(dirPath, 'keep.txt');
+    await writeFile(keep, 'stay');
+
+    const res = new RemoteFileResource(stack, 'remote-dir', {
+      url: 'https://example.com/file.txt',
+      path: dirPath,
+    });
+
+    await Effect.runPromise(res.destroy().pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive),
+    ));
+
+    expect(existsSync(keep)).toBe(true);
+    await rm(testDir, { recursive: true, force: true });
+  });
+
+  it('should succeed destroy when the file is already gone', async () => {
+    const testDir = join(tmpdir(), 'dotts-remote-missing-destroy-' + Math.random().toString(36).slice(2));
+    await mkdir(testDir, { recursive: true });
+    const path = join(testDir, 'gone.txt');
+
+    const res = new RemoteFileResource(stack, 'remote-gone', {
+      url: 'https://example.com/file.txt',
+      path,
+    });
+
+    await Effect.runPromise(res.destroy().pipe(
+      Effect.provide(FileSystemLive),
+      Effect.provide(SystemCommandLive),
+    ));
+
+    expect(existsSync(path)).toBe(false);
+    await rm(testDir, { recursive: true, force: true });
   });
 });

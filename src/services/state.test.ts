@@ -20,10 +20,10 @@ describe('StateService', () => {
       const initialState = yield* _(state.load());
       expect(initialState).toEqual({});
       
-      yield* _(state.save({ 'res-1': { hash: 'abc', metadata: {} } }));
+      yield* _(state.save({ 'res-1': { hash: 'abc', kind: 'file', metadata: {} } }));
       
       const loadedState = yield* _(state.load());
-      expect(loadedState).toEqual({ 'res-1': { hash: 'abc', metadata: {} } });
+      expect(loadedState).toEqual({ 'res-1': { hash: 'abc', kind: 'file', metadata: {} } });
     });
 
     const runnable = program.pipe(

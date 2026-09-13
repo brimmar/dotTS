@@ -10,6 +10,7 @@ describe('TempDirService', () => {
     const MockFS = Layer.succeed(FileSystem, FileSystem.of({
       mkdir: (path: string) => Effect.sync(() => { createdDir = path; }),
       rm: (path: string) => Effect.sync(() => { removedDir = path; }),
+      rmdir: () => Effect.void,
       exists: () => Effect.succeed(false),
       writeFile: () => Effect.void,
       readFile: () => Effect.succeed(''),
@@ -17,6 +18,7 @@ describe('TempDirService', () => {
       unlink: () => Effect.void,
       chmod: () => Effect.void,
       chown: () => Effect.void,
+      writeFileBytes: () => Effect.void,
     }));
 
     const program = Effect.gen(function* () {

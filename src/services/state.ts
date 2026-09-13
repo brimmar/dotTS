@@ -4,7 +4,8 @@ import { dirname, join } from 'node:path';
 
 export interface ResourceState {
   hash: string;
-  metadata: Record<string, any>;
+  kind: string;
+  metadata: Record<string, unknown>;
 }
 
 export type AppState = Record<string, ResourceState>;

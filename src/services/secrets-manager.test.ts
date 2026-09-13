@@ -206,9 +206,11 @@ describe('SecretManager Service', () => {
         }),
       symlink: () => Effect.void,
       rm: () => Effect.void,
+      rmdir: () => Effect.void,
       unlink: () => Effect.void,
       chmod: () => Effect.void,
       chown: () => Effect.void,
+      writeFileBytes: () => Effect.void,
     }));
 
     const program = Effect.gen(function* (_) {

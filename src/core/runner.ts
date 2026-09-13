@@ -2,8 +2,11 @@ import { Context, Effect, Layer, Schedule, Duration } from 'effect';
 import { Component, Resource, flatten } from './component';
 import { StateService, type AppState } from '../services/state';
 import pc from 'picocolors';
-import { sortResourcesByTier } from './graph';
+import { isPathWithin, resourceManagedPath, sortDestroyResources, sortResourcesByTier } from './graph';
 import { performance } from 'node:perf_hooks';
+import { App } from './app';
+import { rehydrate } from './registry';
+import { migrateStateId, migrateStateKeys } from './ids';
 
 export interface Runner {
   readonly run: (component: Component) => Effect.Effect<void, Error, never>;
@@ -19,15 +22,16 @@ export const RunnerLive = Layer.effect(
     return Runner.of({
       run: (component: Component): Effect.Effect<void, Error, never> => Effect.gen(function* () {
         const startTime = performance.now();
-        const currentState = yield* stateService.load();
+        const currentState = migrateStateKeys(yield* stateService.load());
         const newState: AppState = {};
         
         const rawResources = flatten(component);
+        warnLeftoverScriptLineState(currentState, rawResources);
         const tiers = sortResourcesByTier(rawResources);
 
         let created = 0;
         let updated = 0;
-        let skipped = 0;
+        let converged = 0;
 
         for (const tier of tiers) {
           const groups = new Map<string | undefined, Resource[]>();
@@ -47,7 +51,7 @@ export const RunnerLive = Layer.effect(
                         const result = yield* runResource(res, currentState, newState);
                         if (result === 'created') created++;
                         else if (result === 'updated') updated++;
-                        else skipped++;
+                        else converged++;
                       })
                     ),
                     { concurrency: 'unbounded' }
@@ -57,7 +61,7 @@ export const RunnerLive = Layer.effect(
                     const result = yield* runResource(res, currentState, newState);
                     if (result === 'created') created++;
                     else if (result === 'updated') updated++;
-                    else skipped++;
+                    else converged++;
                   }
                 }
               })
@@ -67,15 +71,39 @@ export const RunnerLive = Layer.effect(
         }
 
         let deleted = 0;
+        const destroyScope = new App();
+        const toDestroy: Resource[] = [];
         for (const id of Object.keys(currentState)) {
-          if (!newState[id]) {
-            console.log(pc.red(`- Delete: ${id}`));
-            deleted++;
-            // TODO: Re-hydrate and destroy resource
+          if (hasStateId(newState, id, currentState[id]?.kind)) continue;
+          const oldState = currentState[id];
+          if (!oldState || !oldState.kind) {
+            console.warn(`cannot destroy ${id}: missing kind; keeping it in state until purged`);
+            if (oldState) newState[id] = oldState;
+            continue;
           }
+          toDestroy.push(rehydrate(oldState.kind, id, { ...oldState.metadata, dependsOn: undefined }, destroyScope));
         }
 
-        yield* stateService.save(newState);
+        const persisted: AppState = { ...newState };
+        for (const res of toDestroy) {
+          const previous = currentState[res.id];
+          if (previous) persisted[res.id] = previous;
+        }
+
+        for (const res of sortDestroyResources(toDestroy)) {
+          const dest = resourceManagedPath(res.props);
+          if (dest && remainingUsesPath(dest, newState)) {
+            console.warn(`skip destroy ${res.id}: remaining resources still under ${dest}`);
+            continue;
+          }
+          yield* withRetry(res.destroy(), res);
+          delete persisted[res.id];
+          yield* stateService.save(persisted);
+          deleted++;
+          console.log(pc.red(`- Delete: ${res.id}`));
+        }
+
+        yield* stateService.save(persisted);
 
         const endTime = performance.now();
         const duration = ((endTime - startTime) / 1000).toFixed(2);
@@ -84,37 +112,80 @@ export const RunnerLive = Layer.effect(
         console.log(`${pc.green(`+ ${created} created`)}`);
         console.log(`${pc.yellow(`~ ${updated} updated`)}`);
         console.log(`${pc.red(`- ${deleted} deleted`)}`);
-        console.log(`${pc.gray(`  ${skipped} skipped`)}`);
+        console.log(`${pc.gray(`  ${converged} converged`)}`);
         console.log(pc.cyan(`Total duration: ${duration}s`));
       }) as Effect.Effect<void, Error, never>,
     });
   })
 );
 
-type ResourceResult = 'created' | 'updated' | 'skipped';
+type ResourceResult = 'created' | 'updated' | 'converged';
+
+function hasStateId(state: AppState, id: string, kind?: string): boolean {
+  if (id in state) return true;
+  const canonical = migrateStateId(id, kind);
+  if (canonical in state) return true;
+  for (const [key, value] of Object.entries(state)) {
+    const other = migrateStateId(key, value.kind);
+    if (other === canonical || other === id) return true;
+  }
+  return false;
+}
+
+function remainingUsesPath(dest: string, remaining: AppState): boolean {
+  for (const state of Object.values(remaining)) {
+    const path = resourceManagedPath(state.metadata);
+    if (path && isPathWithin(dest, path)) return true;
+  }
+  return false;
+}
+
+function warnLeftoverScriptLineState(currentState: AppState, resources: Resource[]) {
+  const currentIds = new Set(resources.map((res) => res.id));
+  const leftover = Object.keys(currentState).some(
+    (id) => (id.startsWith('script-') || id.startsWith('line-')) && !currentIds.has(id),
+  );
+  if (!leftover) return;
+  console.warn(
+    pc.yellow(
+      'Leftover script-/line- state hashes will be treated as deleted and the new hashed ids as creates. Non-idempotent scripts will re-run on this upgrade.',
+    ),
+  );
+}
+
+function metadataForState(props: Record<string, unknown> = {}): Record<string, unknown> {
+  const { dependsOn, ...rest } = props;
+  return {
+    ...rest,
+    ...(Array.isArray(dependsOn)
+      ? { dependsOn: dependsOn.map((d) => ({ id: (d as { id: string }).id })) }
+      : {}),
+  };
+}
 
 function runResource(res: Resource, currentState: AppState, newState: AppState): Effect.Effect<ResourceResult, Error, any> {
   return Effect.gen(function* () {
     const id = res.id;
     const hash = res.hash();
-    const oldState = currentState[id];
+    const stateId = migrateStateId(id, res.kind);
+    const oldState = stateId in currentState ? currentState[stateId] : currentState[id];
 
     let result: ResourceResult;
 
     if (!oldState) {
       console.log(pc.green(`+ Create: ${id}`));
-      yield* withRetry(res.apply(), res);
       result = 'created';
     } else if (oldState.hash !== hash) {
       console.log(pc.yellow(`~ Update: ${id}`));
-      yield* withRetry(res.apply(), res);
       result = 'updated';
     } else {
-      console.log(pc.gray(`  No-op:  ${id}`));
-      result = 'skipped';
+      console.log(pc.gray(`~ Converge: ${id}`));
+      result = 'converged';
     }
 
-    newState[id] = { hash, metadata: res.props || {} };
+    yield* withRetry(res.apply(), res);
+
+    newState[id] = { hash, kind: res.kind, metadata: metadataForState({ ...(res.props as object) }) };
     return result;
   });
 }

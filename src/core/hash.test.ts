@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { hashConfig } from './hash';
 import { SecretToken } from './secret';
 
@@ -98,5 +98,29 @@ describe('Hashing Utility', () => {
     const loop: Record<string, unknown> = { path: '/loop' };
     loop.dependsOn = [loop];
     expect(() => hashConfig(loop)).not.toThrow();
+  });
+
+  it('hashes live dependsOn handles the same as { id }', () => {
+    const live = {
+      id: 'pkg:git',
+      isResource: true,
+      children: [],
+      dependencies: [],
+      props: { name: 'git' },
+    };
+    const byId = { id: 'pkg:git' };
+    const payload = { path: '/tmp/a', content: 'hello' };
+
+    expect(hashConfig({ ...payload, dependsOn: [live] })).toBe(
+      hashConfig({ ...payload, dependsOn: [byId] }),
+    );
+  });
+
+  it('omits retries and retryDelay from the content hash', () => {
+    const payload = { path: '/tmp/a', content: 'hello' };
+    expect(hashConfig({ ...payload, retries: 3, retryDelay: 2 })).toBe(hashConfig(payload));
+    expect(hashConfig({ ...payload, retries: 3 })).toBe(
+      hashConfig({ ...payload, retries: 9, retryDelay: 1 }),
+    );
   });
 });
