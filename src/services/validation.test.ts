@@ -8,7 +8,7 @@ import { FileResource } from '../resources/file';
 import { secret } from '../core/secret';
 
 describe('ValidationService', () => {
-  const MockFS = Layer.succeed(FileSystem, FileSystem.of({} as any));
+  const MockFS = Layer.succeed(FileSystem, FileSystem.of({ writeFileBytes: () => Effect.void } as any));
   
   const getMockSM = (secrets: string[]) => Layer.succeed(SecretManager, SecretManager.of({
     list: () => Effect.succeed(secrets),
