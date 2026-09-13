@@ -163,6 +163,26 @@ describe('dotts init', () => {
     expect((err as DottsError).hint).toMatch(/JSON\/JSONC/);
   });
 
+  it('leaves JSONC tsconfig bytes unchanged when paths.dotts already exists', async () => {
+    await mkdir(testProjectDir, { recursive: true });
+    const existing = `{
+  // keep this comment
+  "compilerOptions": {
+    /* and this block */
+    "paths": {
+      "dotts": ["./custom"]
+    }
+  }
+}
+`;
+    await writeFile(join(testProjectDir, 'tsconfig.json'), existing);
+    expect(() => JSON.parse(existing)).toThrow(SyntaxError);
+
+    await dottsInit(testProjectDir);
+
+    expect(await Bun.file(join(testProjectDir, 'tsconfig.json')).text()).toBe(existing);
+  });
+
   it('does not overwrite an existing .gitignore', async () => {
     await mkdir(testProjectDir, { recursive: true });
     const existing = 'dist\n*.log\n';

@@ -113,4 +113,24 @@ describe('dotts prepare', () => {
     expect((err as DottsError).message).toMatch(/Could not parse/);
     expect((err as DottsError).hint).toMatch(/JSON\/JSONC/);
   });
+
+  it('leaves JSONC tsconfig bytes unchanged when paths.dotts already exists', async () => {
+    await mkdir(testProjectDir, { recursive: true });
+    const existing = `{
+  // keep this comment
+  "compilerOptions": {
+    /* and this block */
+    "paths": {
+      "dotts": ["./custom"]
+    }
+  }
+}
+`;
+    await writeFile(join(testProjectDir, 'tsconfig.json'), existing);
+    expect(() => JSON.parse(existing)).toThrow(SyntaxError);
+
+    await dottsPrepare(testProjectDir);
+
+    expect(await Bun.file(join(testProjectDir, 'tsconfig.json')).text()).toBe(existing);
+  });
 });
