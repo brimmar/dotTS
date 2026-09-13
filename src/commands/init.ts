@@ -50,7 +50,13 @@ export async function dottsInit(projectDir: string, options: { force?: boolean }
     );
   }
   await writeFile(configPath, DOTTS_TEMPLATE);
-  await writeFile(join(projectDir, '.gitignore'), GITIGNORE);
-  await writeFile(join(projectDir, 'tsconfig.json'), tsconfigJson());
+  const gitignorePath = join(projectDir, '.gitignore');
+  if (!(await exists(gitignorePath))) {
+    await writeFile(gitignorePath, GITIGNORE);
+  }
+  const tsconfigPath = join(projectDir, 'tsconfig.json');
+  if (!(await exists(tsconfigPath))) {
+    await writeFile(tsconfigPath, tsconfigJson());
+  }
   await dottsPrepare(projectDir);
 }

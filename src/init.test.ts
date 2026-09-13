@@ -69,13 +69,41 @@ describe('dotts init', () => {
     expect(content).not.toContain('keep me');
   });
 
-  it('writes tsconfig.json with paths.dotts', async () => {
+  it('writes tsconfig.json and .gitignore when missing', async () => {
     await dottsInit(testProjectDir);
 
     const tsconfig = JSON.parse(await Bun.file(join(testProjectDir, 'tsconfig.json')).text()) as {
       compilerOptions: { paths: { dotts: string[] } };
     };
     expect(tsconfig.compilerOptions.paths.dotts).toEqual(['./.dotts/types']);
+    expect(await Bun.file(join(testProjectDir, '.gitignore')).text()).toBe(
+      `node_modules
+.dotts/state.json
+.dotts/secrets.json
+`,
+    );
+  });
+
+  it('does not overwrite an existing tsconfig.json', async () => {
+    await mkdir(testProjectDir, { recursive: true });
+    const existing = '{\n  "keep": true,\n  "compilerOptions": { "strict": false }\n}\n';
+    await writeFile(join(testProjectDir, 'tsconfig.json'), existing);
+
+    await dottsInit(testProjectDir);
+
+    const text = await Bun.file(join(testProjectDir, 'tsconfig.json')).text();
+    expect(text).toBe(existing);
+    expect(JSON.parse(text)).toEqual({ keep: true, compilerOptions: { strict: false } });
+  });
+
+  it('does not overwrite an existing .gitignore', async () => {
+    await mkdir(testProjectDir, { recursive: true });
+    const existing = 'dist\n*.log\n';
+    await writeFile(join(testProjectDir, '.gitignore'), existing);
+
+    await dottsInit(testProjectDir);
+
+    expect(await Bun.file(join(testProjectDir, '.gitignore')).text()).toBe(existing);
   });
 
   it('writes .dotts/types/index.d.ts describing pkg', async () => {
