@@ -117,4 +117,75 @@ describe('UnarchiveResource', () => {
     const fs = require('fs');
     expect(fs.existsSync(join(extractPath, 'zip-hello.txt'))).toBe(true);
   });
+
+  it('should execFile unzip and tar with paths as argv', async () => {
+    const calls: { file: string; args: string[] }[] = [];
+    const MockFS = Layer.succeed(FileSystem, FileSystem.of({
+      mkdir: () => Effect.void,
+      writeFileBytes: () => Effect.void,
+    } as any));
+    const MockExec = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: () => Effect.succeed(''),
+      execFile: (file, args) => {
+        calls.push({ file, args });
+        return Effect.succeed('');
+      },
+    }));
+
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const zipRes = new UnarchiveResource(stack, 'zip', {
+      src: '/tmp/evil; id.zip',
+      dest: '/tmp/out',
+    });
+    await Effect.runPromise(
+      zipRes.apply().pipe(Effect.provide(MockFS), Effect.provide(MockExec))
+    );
+    expect(calls[0]).toEqual({
+      file: 'unzip',
+      args: ['-o', '/tmp/evil; id.zip', '-d', '/tmp/out'],
+    });
+
+    calls.length = 0;
+    const tarRes = new UnarchiveResource(stack, 'tar', {
+      src: '/tmp/a.tar.gz',
+      dest: '/tmp/out',
+      stripComponents: 1,
+    });
+    await Effect.runPromise(
+      tarRes.apply().pipe(Effect.provide(MockFS), Effect.provide(MockExec))
+    );
+    expect(calls[0]).toEqual({
+      file: 'tar',
+      args: ['-xzf', '/tmp/a.tar.gz', '-C', '/tmp/out', '--strip-components=1'],
+    });
+  });
+
+  it('should not rm dest on destroy', async () => {
+    const rmCalls: string[] = [];
+    const MockFS = Layer.succeed(FileSystem, FileSystem.of({
+      rm: (path: string) => Effect.sync(() => { rmCalls.push(path); }),
+      writeFileBytes: () => Effect.void,
+    } as any));
+    const MockExec = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: () => Effect.succeed(''),
+      execFile: () => Effect.succeed(''),
+    }));
+
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const unarchiveRes = new UnarchiveResource(stack, 'my-tar', {
+      src: '/tmp/a.tar.gz',
+      dest: '/tmp/extract',
+    });
+
+    await Effect.runPromise(
+      unarchiveRes.destroy().pipe(
+        Effect.provide(MockFS),
+        Effect.provide(MockExec)
+      )
+    );
+
+    expect(rmCalls).toEqual([]);
+  });
 });
