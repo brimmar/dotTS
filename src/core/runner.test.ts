@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, spyOn } from 'bun:test';
 import { Effect, Layer } from 'effect';
 import { Runner, RunnerLive } from './runner';
 import { App, Stack } from './app';
@@ -198,6 +198,47 @@ describe('Runner', () => {
     await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
 
     expect(res.applied).toBe(true);
+  });
+
+  it('should persist dependsOn as ids and destroy without live resource lookup', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const a = new TestResource(stack, 'a');
+    new TestResource(stack, 'b', 'hash', { dependsOn: [a] });
+    let saved: AppState = {};
+
+    const applyProgram = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    await Effect.runPromise(Effect.provide(
+      applyProgram,
+      RunnerLive.pipe(Layer.provide(MockState({}, (state) => { saved = state; }))),
+    ));
+
+    const deps = saved.b?.metadata.dependsOn;
+    expect(deps).toEqual([{ id: 'a' }]);
+    expect(Array.isArray(deps) && !(deps[0] instanceof Resource)).toBe(true);
+
+    TestResource.destroyedIds = [];
+    const empty = new App();
+    new Stack(empty, 'test');
+
+    const destroyProgram = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(empty);
+    });
+
+    await Effect.runPromise(Effect.provide(
+      destroyProgram,
+      RunnerLive.pipe(Layer.provide(MockState(saved, (state) => { saved = state; }))),
+    ));
+
+    expect(TestResource.destroyedIds).toContain('b');
+    expect(TestResource.destroyedIds).toContain('a');
+    expect(saved.a).toBeUndefined();
+    expect(saved.b).toBeUndefined();
   });
 
   it('should destroy resources that left the graph', async () => {
@@ -475,5 +516,33 @@ describe('Runner', () => {
     expect(TestResource.destroyedIds).toEqual([]);
     expect(saved?.['file:/tmp/x']).toBeDefined();
     expect(saved?.['file-/tmp/x']).toBeUndefined();
+  });
+
+  it('warns once when leftover script- or line- hashes cannot match current ids', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    new TestResource(stack, 'script:deadbeefdeadbeef', 'hash');
+
+    const warn = spyOn(console, 'warn');
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app);
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(
+      Layer.provide(
+        MockState({
+          'script-echo hello': { hash: 'hash', metadata: {} },
+          'line-/tmp/a-export': { hash: 'hash', metadata: {} },
+        }),
+      ),
+    );
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    const leftoverWarnings = warn.mock.calls.filter((call) =>
+      String(call[0]).includes('Leftover script-/line- state hashes'),
+    );
+    expect(leftoverWarnings).toHaveLength(1);
+    warn.mockRestore();
   });
 });
