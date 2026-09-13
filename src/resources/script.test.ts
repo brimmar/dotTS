@@ -45,6 +45,7 @@ describe('ScriptResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command, options) => {
           intents.push({ command, intent: options?.intent });
           if (command === 'check-exists') return Effect.succeed('0'); // Sockets/shell success
@@ -70,6 +71,7 @@ describe('ScriptResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command, options) => {
           intents.push({ command, intent: options?.intent });
           if (command === 'check-exists') return Effect.fail(new Error('1')); // shell fail
@@ -98,6 +100,7 @@ describe('ScriptResource', () => {
     const SystemCommandMock = Layer.succeed(
       SystemCommand,
       SystemCommand.of({
+        execFile: () => Effect.succeed(''),
         run: (command, options) => {
           intents.push({ command, intent: options?.intent });
           if (command === 'should-run') return Effect.succeed('0');
