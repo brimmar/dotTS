@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'bun:test';
+import { resolve } from 'node:path';
 import { Resource, Component } from './component';
-import { sortResources, sortResourcesByTier } from './graph';
+import { isPathWithin, resourceManagedPath, sortDestroyResources, sortResources, sortResourcesByTier } from './graph';
 import { Effect } from 'effect';
 
 class MockResource extends Resource {
+  override readonly kind = 'test' as const;
   constructor(scope: any, id: string, props?: any) {
     super(scope, id, props);
   }
@@ -69,5 +71,35 @@ describe('Graph Engine', () => {
     expect(tiers[1]).toContain(r3);
     expect(tiers[1]).toContain(r4);
     expect(tiers[2]).toContain(r5);
+  });
+
+  it('should destroy dependents before dependencies', () => {
+    const parent = new class extends Component { constructor() { super('root'); } };
+    const r1 = new MockResource(parent, 'r1');
+    const r2 = new MockResource(parent, 'r2', { dependsOn: [r1] });
+    const r3 = new MockResource(parent, 'r3', { dependsOn: [r2] });
+
+    expect(sortDestroyResources([r1, r2, r3]).map((r) => r.id)).toEqual(['r3', 'r2', 'r1']);
+  });
+
+  it('should destroy nested paths before their parents', () => {
+    const parent = new class extends Component { constructor() { super('root'); } };
+    const dir = new MockResource(parent, 'dir', { path: '/tmp/parent' });
+    const file = new MockResource(parent, 'file', { path: '/tmp/parent/child' });
+
+    expect(sortDestroyResources([dir, file]).map((r) => r.id)).toEqual(['file', 'dir']);
+  });
+
+  it('should resolve path and dest from resource props', () => {
+    expect(resourceManagedPath({ path: '/tmp/a' })).toBe(resolve('/tmp/a'));
+    expect(resourceManagedPath({ dest: '/tmp/b' })).toBe(resolve('/tmp/b'));
+    expect(resourceManagedPath({})).toBeUndefined();
+  });
+
+  it('should treat a path as within its parent', () => {
+    expect(isPathWithin('/tmp/parent', '/tmp/parent/child')).toBe(true);
+    expect(isPathWithin('/tmp/parent', '/tmp/parent')).toBe(true);
+    expect(isPathWithin('/tmp/parent', '/tmp/parent', { strict: true })).toBe(false);
+    expect(isPathWithin('/tmp/parent', '/tmp/other')).toBe(false);
   });
 });

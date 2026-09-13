@@ -1,18 +1,29 @@
 import { Context, Effect, Layer } from 'effect';
 import * as NodeFS from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { homedir, tmpdir } from 'node:os';
+
+export interface WriteFileOptions {
+  become?: boolean | string;
+  mode?: number;
+}
 
 export interface FileSystem {
-  readonly writeFile: (path: string, content: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
+  readonly writeFile: (path: string, content: string, options?: WriteFileOptions) => Effect.Effect<void, Error>;
   readonly readFile: (path: string, options?: { become?: boolean | string }) => Effect.Effect<string, Error>;
   readonly exists: (path: string, options?: { become?: boolean | string }) => Effect.Effect<boolean, Error>;
   readonly mkdir: (path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly symlink: (target: string, path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly rm: (path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
+  readonly rmdir: (path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly unlink: (path: string, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly chmod: (path: string, mode: number, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
   readonly chown: (path: string, uid: number, gid: number, options?: { become?: boolean | string }) => Effect.Effect<void, Error>;
+  readonly writeFileBytes: (
+    path: string,
+    content: Uint8Array,
+    options?: WriteFileOptions,
+  ) => Effect.Effect<void, Error>;
 }
 
 export const FileSystem = Context.GenericTag<FileSystem>('FileSystem');
@@ -30,6 +41,94 @@ function resolvePath(p: string): string {
   if (p.startsWith('~/') || p.startsWith('~\\')) return `${homedir()}${p.slice(1)}`;
   return resolve(p);
 }
+
+function isIgnorableRmdirError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = String(error.code);
+    if (code === 'ENOENT' || code === 'ENOTEMPTY') return true;
+  }
+  const msg = String(error).toLowerCase();
+  return (
+    msg.includes('no such file') ||
+    msg.includes('not empty') ||
+    msg.includes('directory not empty') ||
+    msg.includes('enoent') ||
+    msg.includes('enotempty')
+  );
+}
+
+function isDirectoryUnlinkError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    if (String(error.code) === 'EISDIR') return true;
+  }
+  const msg = String(error).toLowerCase();
+  return msg.includes('is a directory') || msg.includes('eisdir');
+}
+
+function isIgnorableUnlinkError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = String(error.code);
+    if (code === 'ENOENT' || code === 'EISDIR') return true;
+  }
+  const msg = String(error).toLowerCase();
+  return (
+    msg.includes('no such file') ||
+    msg.includes('enoent') ||
+    isDirectoryUnlinkError(error)
+  );
+}
+
+function destMode(options?: WriteFileOptions): number {
+  if (options && options.mode !== undefined) {
+    return options.mode;
+  }
+  return 0o644;
+}
+
+
+function namedBecomeUser(become: boolean | string | undefined): string | undefined {
+  if (typeof become === 'string' && become !== 'root') {
+    return become;
+  }
+  return undefined;
+}
+
+function copyViaTemp(
+  exec: SystemCommand,
+  dest: string,
+  content: string | Uint8Array,
+  options?: WriteFileOptions,
+) {
+  const asRoot = { become: true as const };
+
+  return Effect.acquireUseRelease(
+    Effect.tryPromise({
+      try: async () => {
+        const dir = await NodeFS.mkdtemp(join(tmpdir(), 'dotts-'));
+        const temp = join(dir, 'file');
+        await NodeFS.writeFile(temp, content, { mode: 0o600 });
+        return { dir, temp };
+      },
+      catch: (error) => new Error(`Failed to write temp file: ${String(error)}`),
+    }),
+    ({ temp }) =>
+      Effect.gen(function* () {
+        // install -m sets dest mode in the same root step so a 0o600 file
+        // is never world-readable between cp and chmod.
+        yield* exec.execFile(
+          'install',
+          ['-m', destMode(options).toString(8), '--', temp, dest],
+          asRoot,
+        );
+        const user = namedBecomeUser(options?.become);
+        if (user) {
+          yield* exec.execFile('chown', [`${user}:`, '--', dest], asRoot);
+        }
+      }),
+    ({ dir }) => Effect.ignore(Effect.tryPromise(() => NodeFS.rm(dir, { recursive: true, force: true }))),
+  );
+}
+
 
 export const FileSystemLive = Layer.effect(
   FileSystem,
@@ -56,8 +155,29 @@ export const FileSystemLive = Layer.effect(
         const resolved = resolvePath(path);
         return wrap(
           options,
-          () => NodeFS.writeFile(resolved, content, 'utf-8'),
-          (exec) => exec.run(`tee ${resolved} << 'EOF'\n${content}\nEOF`, options).pipe(Effect.map(() => undefined)),
+          () =>
+            NodeFS.writeFile(
+              resolved,
+              content,
+              options?.mode !== undefined
+                ? { encoding: 'utf-8', mode: options.mode }
+                : 'utf-8',
+            ),
+          (exec) => copyViaTemp(exec, resolved, content, options),
+          (error) => `Failed to write file ${resolved}: ${String(error)}`
+        );
+      },
+      writeFileBytes: (path, content, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
+          options,
+          () =>
+            NodeFS.writeFile(
+              resolved,
+              content,
+              options?.mode !== undefined ? { mode: options.mode } : undefined,
+            ),
+          (exec) => copyViaTemp(exec, resolved, content, options),
           (error) => `Failed to write file ${resolved}: ${String(error)}`
         );
       },
@@ -66,7 +186,7 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.readFile(resolved, 'utf-8'),
-          (exec) => exec.run(`cat ${resolved}`, options),
+          (exec) => exec.execFile('cat', ['--', resolved], options),
           (error) => `Failed to read file ${resolved}: ${String(error)}`
         );
       },
@@ -83,7 +203,7 @@ export const FileSystemLive = Layer.effect(
             }
           },
           (exec) =>
-            exec.run(`test -e ${resolved}`, options).pipe(
+            exec.execFile('test', ['-e', resolved], options).pipe(
               Effect.map(() => true),
               Effect.catchAll(() => Effect.succeed(false))
             ),
@@ -95,7 +215,7 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.mkdir(resolved, { recursive: true }).then(() => undefined),
-          (exec) => exec.run(`mkdir -p ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          (exec) => exec.execFile('mkdir', ['-p', '--', resolved], options).pipe(Effect.map(() => undefined)),
           (error) => `Failed to create directory ${resolved}: ${String(error)}`
         );
       },
@@ -114,8 +234,8 @@ export const FileSystemLive = Layer.effect(
           },
           (exec) =>
             Effect.gen(function* () {
-              yield* exec.run(`mkdir -p ${dirname(resolvedPath)}`, options);
-              yield* exec.run(`ln -sf ${target} ${resolvedPath}`, options);
+              yield* exec.execFile('mkdir', ['-p', '--', dirname(resolvedPath)], options);
+              yield* exec.execFile('ln', ['-sf', '--', target, resolvedPath], options);
             }),
           (error) => `Failed to create symlink ${resolvedPath} -> ${target}: ${String(error)}`
         );
@@ -125,16 +245,58 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.rm(resolved, { force: true, recursive: true }),
-          (exec) => exec.run(`rm -rf ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          (exec) => exec.execFile('rm', ['-rf', '--', resolved], options).pipe(Effect.map(() => undefined)),
           (error) => `Failed to remove ${resolved}: ${String(error)}`
+        );
+      },
+      rmdir: (path, options) => {
+        const resolved = resolvePath(path);
+        return wrap(
+          options,
+          async () => {
+            try {
+              await NodeFS.rmdir(resolved);
+            } catch (error) {
+              if (isIgnorableRmdirError(error)) return;
+              return Promise.reject(error);
+            }
+          },
+          (exec) =>
+            exec.execFile('rmdir', [resolved], options).pipe(
+              Effect.map(() => undefined),
+              Effect.catchAll((error) =>
+                isIgnorableRmdirError(error) ? Effect.void : Effect.fail(error)
+              ),
+            ),
+          (error) => `Failed to rmdir ${resolved}: ${String(error)}`
         );
       },
       unlink: (path, options) => {
         const resolved = resolvePath(path);
+        const ignoreUnlinkError = (error: unknown): boolean => {
+          if (!isIgnorableUnlinkError(error)) return false;
+          if (isDirectoryUnlinkError(error)) {
+            console.warn(`unlink ${resolved}: path is a directory; leaving it in place`);
+          }
+          return true;
+        };
         return wrap(
           options,
-          () => NodeFS.unlink(resolved),
-          (exec) => exec.run(`rm -f ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          async () => {
+            try {
+              await NodeFS.unlink(resolved);
+            } catch (error) {
+              if (ignoreUnlinkError(error)) return;
+              return Promise.reject(error);
+            }
+          },
+          (exec) =>
+            exec.execFile('rm', ['-f', '--', resolved], options).pipe(
+              Effect.map(() => undefined),
+              Effect.catchAll((error) =>
+                ignoreUnlinkError(error) ? Effect.void : Effect.fail(error)
+              ),
+            ),
           (error) => `Failed to unlink ${resolved}: ${String(error)}`
         );
       },
@@ -143,7 +305,8 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.chmod(resolved, mode),
-          (exec) => exec.run(`chmod ${mode.toString(8)} ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          (exec) =>
+            exec.execFile('chmod', [mode.toString(8), '--', resolved], options).pipe(Effect.map(() => undefined)),
           (error) => `Failed to chmod ${resolved} to ${mode}: ${String(error)}`
         );
       },
@@ -152,7 +315,8 @@ export const FileSystemLive = Layer.effect(
         return wrap(
           options,
           () => NodeFS.chown(resolved, uid, gid),
-          (exec) => exec.run(`chown ${uid}:${gid} ${resolved}`, options).pipe(Effect.map(() => undefined)),
+          (exec) =>
+            exec.execFile('chown', [`${uid}:${gid}`, '--', resolved], options).pipe(Effect.map(() => undefined)),
           (error) => `Failed to chown ${resolved} to ${uid}:${gid}: ${String(error)}`
         );
       },

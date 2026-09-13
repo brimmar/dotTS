@@ -23,6 +23,7 @@ export interface LineInFileProps {
 }
 
 export class LineInFileResource extends Resource {
+  override readonly kind = 'line' as const;
   constructor(scope: Component, id: string, override readonly props: LineInFileProps) {
     super(scope, id, props);
   }

@@ -5,14 +5,22 @@ import { GroupResource } from './group';
 import { SystemCommand } from '../services/exec';
 
 describe('GroupResource', () => {
-  const MockExec = (commands: string[] = [], exists: boolean = false) => Layer.succeed(SystemCommand, SystemCommand.of({
-    run: (cmd: string) => {
+  const MockExec = (
+    commands: string[] = [],
+    exists: boolean = false,
+    calls: { file: string; args: string[]; intent?: 'read' | 'write' }[] = [],
+    currentGid = '1000',
+  ) => Layer.succeed(SystemCommand, SystemCommand.of({
+    run: (cmd: string) => Effect.fail(new Error(`unexpected run: ${cmd}`)),
+    execFile: (file, args, opts) => {
+      calls.push({ file, args, intent: opts?.intent });
+      const cmd = [file, ...args].join(' ');
       commands.push(cmd);
-      if (cmd.startsWith('getent group')) {
-        return exists ? Effect.succeed('group:x:1000:') : Effect.fail(new Error('not found'));
+      if (file === 'getent' && args[0] === 'group') {
+        return exists ? Effect.succeed(`developers:x:${currentGid}:`) : Effect.fail(new Error('not found'));
       }
       return Effect.succeed('');
-    }
+    },
   }));
 
   it('should create a group if it does not exist', async () => {
@@ -49,5 +57,49 @@ describe('GroupResource', () => {
     );
 
     expect(commands).toContain('groupdel developers');
+  });
+
+  it('should treat a missing group as success on destroy', async () => {
+    const commands: string[] = [];
+    const MockMissing = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: (cmd: string) => {
+        commands.push(cmd);
+        return Effect.fail(new Error("groupdel: group 'developers' does not exist"));
+      },
+      execFile: (file, args) => {
+        commands.push([file, ...args].join(' '));
+        return Effect.fail(new Error("groupdel: group 'developers' does not exist"));
+      },
+    }));
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new GroupResource(stack, 'test-group', { name: 'developers' });
+
+    await Effect.runPromise(res.destroy().pipe(Effect.provide(MockMissing)));
+    expect(commands).toContain('groupdel developers');
+  });
+
+  it('should probe existing groups with intent read before groupmod', async () => {
+    const commands: string[] = [];
+    const calls: { file: string; args: string[]; intent?: 'read' | 'write' }[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new GroupResource(stack, 'test-group', {
+      name: 'developers',
+      gid: 2000,
+    });
+
+    await Effect.runPromise(
+      res.apply().pipe(
+        Effect.provide(MockExec(commands, true, calls, '1000')),
+      ),
+    );
+
+    const getent = calls.filter((c) => c.file === 'getent');
+    expect(getent.length).toBeGreaterThan(0);
+    expect(getent.every((c) => c.intent === 'read')).toBe(true);
+    const groupmod = calls.find((c) => c.file === 'groupmod');
+    expect(groupmod).toBeDefined();
+    expect(groupmod?.intent).toBeUndefined();
   });
 });

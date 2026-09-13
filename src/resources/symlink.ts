@@ -13,6 +13,7 @@ export interface SymlinkResourceProps {
 }
 
 export class SymlinkResource extends Resource {
+  override readonly kind = 'link' as const;
   constructor(scope: Component, id: string, override readonly props: SymlinkResourceProps) {
     super(scope, id, props);
   }

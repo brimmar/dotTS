@@ -14,6 +14,7 @@ export interface GroupProps {
 }
 
 export class GroupResource extends Resource {
+  override readonly kind = 'group' as const;
   constructor(scope: Component, id: string, override readonly props: GroupProps) {
     super(scope, id, props);
   }
@@ -32,20 +33,23 @@ export class GroupResource extends Resource {
 
       if (state === 'present') {
         if (!exists) {
-          let cmd = `groupadd`;
-          if (gid !== undefined) cmd += ` --gid ${gid}`;
-          cmd += ` ${name}`;
-          yield* exec.run(cmd, { become: this.props.become });
+          const args: string[] = [];
+          if (gid !== undefined) args.push('--gid', String(gid));
+          args.push(name);
+          yield* exec.execFile('groupadd', args, { become: this.props.become });
         } else if (gid !== undefined) {
-          // Check current GID
-          const currentGid = yield* exec.run(`getent group ${name} | cut -d: -f3`, { become: this.props.become });
+          const groupLine = yield* exec.execFile('getent', ['group', name], {
+            become: this.props.become,
+            intent: 'read',
+          });
+          const currentGid = groupLine.split(':')[2] ?? '';
           if (parseInt(currentGid) !== gid) {
-            yield* exec.run(`groupmod --gid ${gid} ${name}`, { become: this.props.become });
+            yield* exec.execFile('groupmod', ['--gid', String(gid), name], { become: this.props.become });
           }
         }
       } else {
         if (exists) {
-          yield* exec.run(`groupdel ${name}`, { become: this.props.become });
+          yield* exec.execFile('groupdel', [name], { become: this.props.become });
         }
       }
     });
@@ -55,14 +59,35 @@ export class GroupResource extends Resource {
     const { name } = this.props;
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
-      yield* exec.run(`groupdel ${name}`, { become: this.props.become });
+      yield* ignoreIfAbsent(
+        exec.execFile('groupdel', [name], { become: this.props.become }),
+        ['does not exist', 'no such group', 'unknown group', 'not found'],
+      );
     });
   }
 
   private checkExists(name: string, exec: SystemCommand): Effect.Effect<boolean, Error> {
-    return exec.run(`getent group ${name}`, { become: this.props.become }).pipe(
+    return exec.execFile('getent', ['group', name], { become: this.props.become, intent: 'read' }).pipe(
       Effect.map(() => true),
       Effect.catchAll(() => Effect.succeed(false))
     );
   }
+}
+
+function ignoreIfAbsent(
+  effect: Effect.Effect<string, Error>,
+  tokens: string[],
+): Effect.Effect<void, Error> {
+  return Effect.flatMap(
+    Effect.match(effect, {
+      onFailure: (error) => error,
+      onSuccess: () => undefined as Error | undefined,
+    }),
+    (error) => {
+      if (!error) return Effect.void;
+      const msg = error.message.toLowerCase();
+      if (tokens.some((token) => msg.includes(token))) return Effect.void;
+      return Effect.fail(error);
+    },
+  );
 }

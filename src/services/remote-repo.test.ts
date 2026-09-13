@@ -13,8 +13,8 @@ describe('RemoteRepoService', () => {
 
     const result = await Effect.runPromise(program.pipe(
       Effect.provide(RemoteRepoServiceLive),
-      Effect.provide(Layer.succeed(SystemCommand, SystemCommand.of({ run: () => Effect.succeed('') }))),
-      Effect.provide(Layer.succeed(FileSystem, FileSystem.of({} as any)))
+      Effect.provide(Layer.succeed(SystemCommand, SystemCommand.of({ run: () => Effect.succeed(''), execFile: () => Effect.succeed('') }))),
+      Effect.provide(Layer.succeed(FileSystem, FileSystem.of({ writeFileBytes: () => Effect.void } as any)))
     ));
 
     expect(result).toBe('https://github.com/brimmar/dotts.git');
@@ -23,7 +23,8 @@ describe('RemoteRepoService', () => {
   it('should clone a repository', async () => {
     let executedCommand = '';
     const MockExec = Layer.succeed(SystemCommand, SystemCommand.of({
-      run: (cmd) => Effect.sync(() => { executedCommand = cmd; return ''; })
+      run: (cmd) => Effect.sync(() => { executedCommand = cmd; return ''; }),
+      execFile: (file, args) => Effect.sync(() => { executedCommand = [file, ...args].join(' '); return ''; }),
     }));
 
     const program = Effect.gen(function* () {
@@ -34,7 +35,7 @@ describe('RemoteRepoService', () => {
     await Effect.runPromise(program.pipe(
       Effect.provide(RemoteRepoServiceLive),
       Effect.provide(MockExec),
-      Effect.provide(Layer.succeed(FileSystem, FileSystem.of({} as any)))
+      Effect.provide(Layer.succeed(FileSystem, FileSystem.of({ writeFileBytes: () => Effect.void } as any)))
     ));
 
     expect(executedCommand).toContain('git clone https://github.com/brimmar/dotts.git /tmp/dotts');
