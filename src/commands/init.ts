@@ -1,7 +1,7 @@
 import { exists, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DottsError } from '../core/errors';
-import { dottsPrepare, tsconfigJson } from './prepare';
+import { dottsPrepare } from './prepare';
 
 const GITIGNORE = `node_modules
 .dotts/state.json
@@ -53,10 +53,6 @@ export async function dottsInit(projectDir: string, options: { force?: boolean }
   const gitignorePath = join(projectDir, '.gitignore');
   if (!(await exists(gitignorePath))) {
     await writeFile(gitignorePath, GITIGNORE);
-  }
-  const tsconfigPath = join(projectDir, 'tsconfig.json');
-  if (!(await exists(tsconfigPath))) {
-    await writeFile(tsconfigPath, tsconfigJson());
   }
   await dottsPrepare(projectDir);
 }

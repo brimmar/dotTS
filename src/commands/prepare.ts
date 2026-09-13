@@ -27,6 +27,23 @@ export function tsconfigJson(): string {
   return `${JSON.stringify(TSCONFIG, null, 2)}\n`;
 }
 
+async function ensureDottsPath(tsconfigPath: string): Promise<void> {
+  if (!(await exists(tsconfigPath))) {
+    await writeFile(tsconfigPath, tsconfigJson());
+    return;
+  }
+  const raw = await Bun.file(tsconfigPath).text();
+  const json = JSON.parse(raw) as {
+    compilerOptions?: { paths?: Record<string, string[]> };
+  };
+  json.compilerOptions ??= {};
+  json.compilerOptions.paths ??= {};
+  if (!json.compilerOptions.paths.dotts) {
+    json.compilerOptions.paths.dotts = ['./.dotts/types'];
+    await writeFile(tsconfigPath, `${JSON.stringify(json, null, 2)}\n`);
+  }
+}
+
 async function cliVersion(): Promise<string> {
   try {
     const parsed = JSON.parse(await Bun.file(join(import.meta.dir, '../../package.json')).text()) as {
@@ -56,11 +73,6 @@ async function writeEditorTypes(projectDir: string): Promise<void> {
 
 export async function dottsPrepare(projectDir: string = process.cwd()): Promise<void> {
   await mkdir(projectDir, { recursive: true });
-
-  const tsconfigPath = join(projectDir, 'tsconfig.json');
-  if (!(await exists(tsconfigPath))) {
-    await writeFile(tsconfigPath, tsconfigJson());
-  }
-
+  await ensureDottsPath(join(projectDir, 'tsconfig.json'));
   await writeEditorTypes(projectDir);
 }

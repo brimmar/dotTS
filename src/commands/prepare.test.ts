@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { exists, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { dottsPrepare } from './prepare';
+import { dottsPrepare, tsconfigJson } from './prepare';
 
 describe('dotts prepare', () => {
   const testProjectDir = join(tmpdir(), `dotts-test-prepare-${Math.random().toString(36).slice(2)}`);
@@ -26,9 +26,43 @@ describe('dotts prepare', () => {
     expect(dts.includes('declare') || dts.includes('export function pkg')).toBe(true);
   });
 
-  it('does not overwrite an existing tsconfig.json', async () => {
+  it('merges paths.dotts into an existing tsconfig without clobbering other fields', async () => {
     await mkdir(testProjectDir, { recursive: true });
-    const existing = '{\n  "keep": true\n}\n';
+    await writeFile(
+      join(testProjectDir, 'tsconfig.json'),
+      `${JSON.stringify(
+        {
+          compilerOptions: {
+            strict: false,
+            target: 'ES2020',
+            paths: { '@lib/*': ['./lib/*'] },
+          },
+          include: ['src/**/*.ts'],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    await dottsPrepare(testProjectDir);
+
+    const tsconfig = JSON.parse(await Bun.file(join(testProjectDir, 'tsconfig.json')).text());
+    expect(tsconfig).toEqual({
+      compilerOptions: {
+        strict: false,
+        target: 'ES2020',
+        paths: {
+          '@lib/*': ['./lib/*'],
+          dotts: ['./.dotts/types'],
+        },
+      },
+      include: ['src/**/*.ts'],
+    });
+  });
+
+  it('leaves tsconfig.json unchanged when paths.dotts already exists', async () => {
+    await mkdir(testProjectDir, { recursive: true });
+    const existing = '{\n  "compilerOptions": {\n    "paths": {\n      "dotts": ["./custom"]\n    }\n  }\n}\n';
     await writeFile(join(testProjectDir, 'tsconfig.json'), existing);
 
     await dottsPrepare(testProjectDir);
@@ -39,9 +73,6 @@ describe('dotts prepare', () => {
   it('writes tsconfig.json with paths.dotts when missing', async () => {
     await dottsPrepare(testProjectDir);
 
-    const tsconfig = JSON.parse(await Bun.file(join(testProjectDir, 'tsconfig.json')).text()) as {
-      compilerOptions: { paths: { dotts: string[] } };
-    };
-    expect(tsconfig.compilerOptions.paths.dotts).toEqual(['./.dotts/types']);
+    expect(await Bun.file(join(testProjectDir, 'tsconfig.json')).text()).toBe(tsconfigJson());
   });
 });

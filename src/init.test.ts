@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DottsError } from './core/errors';
 import { dottsInit, parseInitArgs } from './commands/init';
+import { tsconfigJson } from './commands/prepare';
 
 function exportedNames(src: string): Set<string> {
   const names = new Set<string>();
@@ -72,10 +73,7 @@ describe('dotts init', () => {
   it('writes tsconfig.json and .gitignore when missing', async () => {
     await dottsInit(testProjectDir);
 
-    const tsconfig = JSON.parse(await Bun.file(join(testProjectDir, 'tsconfig.json')).text()) as {
-      compilerOptions: { paths: { dotts: string[] } };
-    };
-    expect(tsconfig.compilerOptions.paths.dotts).toEqual(['./.dotts/types']);
+    expect(await Bun.file(join(testProjectDir, 'tsconfig.json')).text()).toBe(tsconfigJson());
     expect(await Bun.file(join(testProjectDir, '.gitignore')).text()).toBe(
       `node_modules
 .dotts/state.json
@@ -84,16 +82,48 @@ describe('dotts init', () => {
     );
   });
 
-  it('does not overwrite an existing tsconfig.json', async () => {
+  it('merges paths.dotts into an existing tsconfig without clobbering other fields', async () => {
     await mkdir(testProjectDir, { recursive: true });
-    const existing = '{\n  "keep": true,\n  "compilerOptions": { "strict": false }\n}\n';
+    await writeFile(
+      join(testProjectDir, 'tsconfig.json'),
+      `${JSON.stringify(
+        {
+          compilerOptions: {
+            strict: false,
+            target: 'ES2020',
+            paths: { '@lib/*': ['./lib/*'] },
+          },
+          include: ['src/**/*.ts'],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    await dottsInit(testProjectDir);
+
+    const tsconfig = JSON.parse(await Bun.file(join(testProjectDir, 'tsconfig.json')).text());
+    expect(tsconfig).toEqual({
+      compilerOptions: {
+        strict: false,
+        target: 'ES2020',
+        paths: {
+          '@lib/*': ['./lib/*'],
+          dotts: ['./.dotts/types'],
+        },
+      },
+      include: ['src/**/*.ts'],
+    });
+  });
+
+  it('leaves tsconfig.json unchanged when paths.dotts already exists', async () => {
+    await mkdir(testProjectDir, { recursive: true });
+    const existing = '{\n  "compilerOptions": {\n    "paths": {\n      "dotts": ["./custom"]\n    }\n  }\n}\n';
     await writeFile(join(testProjectDir, 'tsconfig.json'), existing);
 
     await dottsInit(testProjectDir);
 
-    const text = await Bun.file(join(testProjectDir, 'tsconfig.json')).text();
-    expect(text).toBe(existing);
-    expect(JSON.parse(text)).toEqual({ keep: true, compilerOptions: { strict: false } });
+    expect(await Bun.file(join(testProjectDir, 'tsconfig.json')).text()).toBe(existing);
   });
 
   it('does not overwrite an existing .gitignore', async () => {
