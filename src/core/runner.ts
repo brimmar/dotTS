@@ -81,7 +81,7 @@ export const RunnerLive = Layer.effect(
             if (oldState) newState[id] = oldState;
             continue;
           }
-          toDestroy.push(rehydrate(oldState.kind, id, oldState.metadata || {}, destroyScope));
+          toDestroy.push(rehydrate(oldState.kind, id, { ...oldState.metadata, dependsOn: undefined }, destroyScope));
         }
 
         const persisted: AppState = { ...newState };
@@ -153,6 +153,16 @@ function warnLeftoverScriptLineState(currentState: AppState, resources: Resource
   );
 }
 
+function metadataForState(props: Record<string, unknown> = {}): Record<string, unknown> {
+  const { dependsOn, ...rest } = props;
+  return {
+    ...rest,
+    ...(Array.isArray(dependsOn)
+      ? { dependsOn: dependsOn.map((d) => ({ id: (d as { id: string }).id })) }
+      : {}),
+  };
+}
+
 function runResource(res: Resource, currentState: AppState, newState: AppState): Effect.Effect<ResourceResult, Error, any> {
   return Effect.gen(function* () {
     const id = res.id;
@@ -175,7 +185,7 @@ function runResource(res: Resource, currentState: AppState, newState: AppState):
 
     yield* withRetry(res.apply(), res);
 
-    newState[id] = { hash, kind: res.kind, metadata: { ...res.props } as Record<string, unknown> };
+    newState[id] = { hash, kind: res.kind, metadata: metadataForState({ ...(res.props as object) }) };
     return result;
   });
 }
