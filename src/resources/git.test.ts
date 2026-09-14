@@ -116,6 +116,38 @@ describe('GitResource', () => {
     expect(commands).toContain('git pull');
   });
 
+  it('should initialize in-place if destination exists but is not a git repository', async () => {
+    const commands: string[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const gitRes = new GitResource(stack, 'git-test', {
+      url: 'https://github.com/test/repo.git',
+      dest: '/tmp/existing-folder',
+      branch: 'main',
+      sparse: ['dir1'],
+    });
+
+    const fsExistingDir = Layer.succeed(FileSystem, FileSystem.of({
+      exists: (path: string) => Effect.succeed(!path.endsWith('.git')),
+      writeFileBytes: () => Effect.void,
+    } as any));
+
+    await Effect.runPromise(
+      gitRes.apply().pipe(
+        Effect.provide(fsExistingDir),
+        Effect.provide(MockExec(commands)),
+      ),
+    );
+
+    expect(commands).toContain('git init');
+    expect(commands).toContain('git remote add origin https://github.com/test/repo.git');
+    expect(commands).toContain('git fetch origin main');
+    expect(commands).toContain('git sparse-checkout init --cone');
+    expect(commands).toContain('git sparse-checkout set dir1');
+    expect(commands).toContain('git checkout -f origin/main');
+    expect(commands).toContain('git checkout -B main');
+  });
+
   it('should not delete dest on destroy', async () => {
     let removed = false;
     const MockFS = Layer.succeed(FileSystem, FileSystem.of({
