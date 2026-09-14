@@ -116,9 +116,18 @@ export function typecheckFile(opts: {
     options.types = ['node'];
   }
 
+  const embedded = ensureEmbeddedTypes();
+  const host = ts.createCompilerHost(options);
+  if (existsSync(join(embedded, 'lib'))) {
+    const libDir = join(embedded, 'lib');
+    host.getDefaultLibLocation = () => libDir;
+    host.getDefaultLibFileName = (o) => join(libDir, ts.getDefaultLibFileName(o));
+  }
+
   const program = ts.createProgram({
     rootNames: [opts.configPath],
     options,
+    host,
   });
 
   return ts
