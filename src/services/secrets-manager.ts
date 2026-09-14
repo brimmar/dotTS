@@ -1,21 +1,24 @@
-import { Context, Effect, Layer } from 'effect';
-import { FileSystem } from './fs';
-import { decryptNew, SecretStore } from './secrets';
-import { join, dirname } from 'node:path';
-import { homedir } from 'node:os';
-import { randomBytes } from 'node:crypto';
+import { Context, Effect, Layer } from "effect";
+import { FileSystem } from "./fs";
+import { decryptNew, SecretStore } from "./secrets";
+import { join, dirname } from "node:path";
+import { homedir } from "node:os";
+import { randomBytes } from "node:crypto";
 
 const SECRET_FILE_MODE = 0o600;
 
 export interface SecretManager {
-  readonly setPaths: (paths: { secretsFile: string; masterKeyFile: string }) => Effect.Effect<void>;
+  readonly setPaths: (paths: {
+    secretsFile: string;
+    masterKeyFile: string;
+  }) => Effect.Effect<void>;
   readonly get: (name: string) => Effect.Effect<string, Error>;
   readonly set: (name: string, value: string) => Effect.Effect<void, Error>;
   readonly list: () => Effect.Effect<string[], Error>;
   readonly remove: (name: string) => Effect.Effect<void, Error>;
 }
 
-export const SecretManager = Context.GenericTag<SecretManager>('SecretManager');
+export const SecretManager = Context.GenericTag<SecretManager>("SecretManager");
 
 export const SecretManagerLive = Layer.effect(
   SecretManager,
@@ -23,15 +26,28 @@ export const SecretManagerLive = Layer.effect(
     const fs = yield* FileSystem;
     const store = yield* SecretStore;
 
-    let secretsFile = join(process.cwd(), '.dotts/secrets.json');
-    let masterKeyFile = join(homedir(), '.dotts_key');
+    let customMasterKeyFile = false;
+    let secretsFile = join(process.cwd(), ".dotts/secrets.json");
+    let masterKeyFile = join(homedir(), ".dotts_key");
 
     const getMasterKey = () =>
       Effect.gen(function* () {
         if (process.env.DOTTS_KEY) {
           return process.env.DOTTS_KEY.trim();
         }
-        const exists = yield* fs.exists(masterKeyFile);
+        let keyFile = masterKeyFile;
+        let exists = yield* fs.exists(keyFile);
+        if (!exists && !customMasterKeyFile) {
+          const vaultPass1 = join(homedir(), ".vault-pass");
+          const vaultPass2 = join(homedir(), ".vault_pass");
+          if (yield* fs.exists(vaultPass1)) {
+            keyFile = vaultPass1;
+            exists = true;
+          } else if (yield* fs.exists(vaultPass2)) {
+            keyFile = vaultPass2;
+            exists = true;
+          }
+        }
         if (!exists) {
           const secretsExist = yield* fs.exists(secretsFile);
           if (secretsExist) {
@@ -39,19 +55,21 @@ export const SecretManagerLive = Layer.effect(
             if (Object.keys(secrets).length > 0) {
               return yield* Effect.fail(
                 new Error(
-                  `Master key file not found at ${masterKeyFile}. Set DOTTS_KEY environment variable or create ${masterKeyFile} to decrypt secrets.`
-                )
+                  `Master key file not found at ${masterKeyFile} (or ~/.vault-pass). Set DOTTS_KEY environment variable or create ${masterKeyFile} to decrypt secrets.`,
+                ),
               );
             }
           }
-          const newKey = randomBytes(32).toString('hex');
+          const newKey = randomBytes(32).toString("hex");
           yield* fs.mkdir(dirname(masterKeyFile));
-          yield* fs.writeFile(masterKeyFile, newKey, { mode: SECRET_FILE_MODE });
+          yield* fs.writeFile(masterKeyFile, newKey, {
+            mode: SECRET_FILE_MODE,
+          });
           yield* fs.chmod(masterKeyFile, SECRET_FILE_MODE);
           return newKey;
         }
-        const key = yield* fs.readFile(masterKeyFile);
-        yield* fs.chmod(masterKeyFile, SECRET_FILE_MODE);
+        const key = yield* fs.readFile(keyFile);
+        yield* fs.chmod(keyFile, SECRET_FILE_MODE);
         return key.trim();
       });
 
@@ -90,9 +108,13 @@ export const SecretManagerLive = Layer.effect(
           if (usesNewKey) continue;
 
           // decryptNew failed: legacy candidate or corrupt blob. Leave corrupt entries as-is.
-          const plaintext = yield* store.decrypt(encrypted, key).pipe(
-            Effect.catchAll(() => Effect.succeed<string | undefined>(undefined))
-          );
+          const plaintext = yield* store
+            .decrypt(encrypted, key)
+            .pipe(
+              Effect.catchAll(() =>
+                Effect.succeed<string | undefined>(undefined),
+              ),
+            );
           if (plaintext === undefined) continue;
 
           next[name] = yield* store.encrypt(plaintext, key);
@@ -110,6 +132,7 @@ export const SecretManagerLive = Layer.effect(
         Effect.sync(() => {
           secretsFile = paths.secretsFile;
           masterKeyFile = paths.masterKeyFile;
+          customMasterKeyFile = true;
         }),
       get: (name) =>
         Effect.gen(function* () {
@@ -145,5 +168,5 @@ export const SecretManagerLive = Layer.effect(
           }
         }),
     });
-  })
+  }),
 );
