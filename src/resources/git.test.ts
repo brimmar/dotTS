@@ -335,4 +335,34 @@ describe("GitResource", () => {
     const cloneCall = calls.find((c) => c.args[0] === "clone");
     expect(cloneCall?.args).toContain(`${homedir()}/my-repo`);
   });
+
+  it("should fetch and force checkout if force is true on existing repository", async () => {
+    const commands: string[] = [];
+    const app = new App();
+    const stack = new Stack(app, "test");
+    const gitRes = new GitResource(stack, "git-test", {
+      url: "https://github.com/test/repo.git",
+      dest: "/tmp/repo",
+      branch: "main",
+      force: true,
+    });
+
+    const fsWithGit = Layer.succeed(
+      FileSystem,
+      FileSystem.of({
+        exists: (_path: string) => Effect.succeed(true),
+        writeFileBytes: () => Effect.void,
+      } as any),
+    );
+
+    await Effect.runPromise(
+      gitRes
+        .apply()
+        .pipe(Effect.provide(fsWithGit), Effect.provide(MockExec(commands))),
+    );
+
+    expect(commands).toContain("git fetch origin main");
+    expect(commands).toContain("git checkout -f -B main origin/main");
+    expect(commands).not.toContain("git pull");
+  });
 });

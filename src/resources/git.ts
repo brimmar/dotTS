@@ -11,6 +11,7 @@ export interface GitResourceProps {
   sparse?: string[];
   depth?: number;
   recursive?: boolean;
+  force?: boolean;
   dependsOn?: Component[];
   become?: boolean | string;
   retries?: number;
@@ -128,20 +129,50 @@ export class GitResource extends Resource {
           );
         }
 
-        if (branch) {
-          yield* exec.execFile("git", ["checkout", branch], inRepo);
+        if (this.props.force) {
+          const fetchArgs = ["fetch", "origin"];
+          if (depth) fetchArgs.push("--depth", String(depth));
+          if (branch) fetchArgs.push(branch);
+          yield* exec.execFile("git", fetchArgs, inRepo);
+
+          if (cleanSparse && cleanSparse.length > 0) {
+            yield* exec.execFile(
+              "git",
+              ["sparse-checkout", "set", ...cleanSparse],
+              inRepo,
+            );
+          }
+
+          if (branch) {
+            yield* exec.execFile(
+              "git",
+              ["checkout", "-f", "-B", branch, `origin/${branch}`],
+              inRepo,
+            );
+          } else {
+            yield* exec.execFile(
+              "git",
+              ["reset", "--hard", "FETCH_HEAD"],
+              inRepo,
+            );
+          }
+        } else {
+          if (branch) {
+            yield* exec.execFile("git", ["checkout", branch], inRepo);
+          }
+
+          if (cleanSparse && cleanSparse.length > 0) {
+            yield* exec.execFile(
+              "git",
+              ["sparse-checkout", "set", ...cleanSparse],
+              inRepo,
+            );
+            yield* exec.execFile("git", ["checkout", branch || "HEAD"], inRepo);
+          }
+
+          yield* exec.execFile("git", ["pull"], inRepo);
         }
 
-        if (cleanSparse && cleanSparse.length > 0) {
-          yield* exec.execFile(
-            "git",
-            ["sparse-checkout", "set", ...cleanSparse],
-            inRepo,
-          );
-          yield* exec.execFile("git", ["checkout", branch || "HEAD"], inRepo);
-        }
-
-        yield* exec.execFile("git", ["pull"], inRepo);
         if (recursive) {
           yield* exec.execFile(
             "git",
