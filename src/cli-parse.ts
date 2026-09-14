@@ -1,7 +1,7 @@
 export const HELP_TEXT = `dotts init [--force] [dir]
 dotts prepare [dir]
 dotts check [path]
-dotts apply [path] [--dry-run]
+dotts apply [path] [--dry-run] [--yes|-y]
 dotts doctor
 dotts secrets set <name> <value>
 dotts secrets list
@@ -14,7 +14,7 @@ export type CliRequest =
   | { kind: 'prepare'; dir: string }
   | { kind: 'check'; configPath: string }
   | { kind: 'doctor' }
-  | { kind: 'apply'; configPath: string; dryRun: boolean }
+  | { kind: 'apply'; configPath: string; dryRun: boolean; yes?: boolean }
   | { kind: 'secrets-set'; name: string; value: string }
   | { kind: 'secrets-list' }
   | { kind: 'secrets-remove'; name: string };
@@ -80,8 +80,14 @@ export function parseArgv(argv: string[]): CliRequest {
   }
 
   if (command === 'apply') {
-    const { positional, flags } = takeArgs(argv.slice(1), ['--dry-run']);
-    return { kind: 'apply', configPath: positional || './dotts.ts', dryRun: flags.has('--dry-run') };
+    const { positional, flags } = takeArgs(argv.slice(1), ['--dry-run', '--yes', '-y']);
+    const yes = flags.has('--yes') || flags.has('-y');
+    return {
+      kind: 'apply',
+      configPath: positional || './dotts.ts',
+      dryRun: flags.has('--dry-run'),
+      ...(yes ? { yes: true } : {}),
+    };
   }
 
   if (command === 'secrets') {

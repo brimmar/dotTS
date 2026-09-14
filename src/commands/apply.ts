@@ -14,13 +14,16 @@ import { RemoteRepoService, RemoteRepoServiceLive } from '../services/remote-rep
 import { TempDirService, TempDirServiceLive } from '../services/temp-dir';
 import { HttpServiceLive } from '../services/http';
 import { loadConfig } from '../core/loader';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 
 import { flatten } from '../core/component';
 import { checkPathPermission, setupSudoSession } from '../core/sudo';
 
 export interface ApplyOptions {
   dryRun?: boolean;
+  yes?: boolean;
 }
 
 /** Live reads; mutating methods log and do not touch disk. */
@@ -148,19 +151,21 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
     const remoteRepo = yield* _(RemoteRepoService);
     const tempDir = yield* _(TempDirService);
     const runner = yield* _(Runner);
-
-    let targetConfig = configPath;
+    const secretManager = yield* _(SecretManager);
 
     if (remoteRepo.isRemote(configPath)) {
       const url = yield* _(remoteRepo.resolve(configPath));
       
-      const confirmed = yield* _(Effect.promise(() => p.confirm({
-        message: `Applying remote configuration from ${pc.yellow(url)}. Do you trust this repository?`,
-        initialValue: false,
-      })));
+      const shouldConfirm = !options.yes && process.env.DOTTS_YES !== '1';
+      if (shouldConfirm) {
+        const confirmed = yield* _(Effect.promise(() => p.confirm({
+          message: `Applying remote configuration from ${pc.yellow(url)}. Do you trust this repository?`,
+          initialValue: false,
+        })));
 
-      if (!confirmed || p.isCancel(confirmed)) {
-        return yield* _(Effect.fail(new Error('Remote configuration apply cancelled by user.')));
+        if (!confirmed || p.isCancel(confirmed)) {
+          return yield* _(Effect.fail(new Error('Remote configuration apply cancelled by user.')));
+        }
       }
 
       return yield* _(tempDir.use((dir) => Effect.gen(function* (_) {
@@ -169,7 +174,21 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
         yield* _(remoteRepo.clone(url, dir));
         s.stop(`Cloned to temporary directory.`);
 
-        const finalPath = join(dir, 'dotts.ts');
+        let finalPath = join(dir, 'dotts.ts');
+        if (!existsSync(finalPath)) {
+          if (existsSync(join(dir, 'dotts', 'dotts.ts'))) {
+            finalPath = join(dir, 'dotts', 'dotts.ts');
+          } else if (existsSync(join(dir, '.dotts', 'dotts.ts'))) {
+            finalPath = join(dir, '.dotts', 'dotts.ts');
+          }
+        }
+
+        const configDir = dirname(finalPath);
+        yield* _(secretManager.setPaths({
+          secretsFile: join(configDir, '.dotts', 'secrets.json'),
+          masterKeyFile: join(homedir(), '.dotts_key'),
+        }));
+
         const { app, config } = yield* _(Effect.promise(() => loadConfig(finalPath)));
         
         p.log.step(pc.cyan(`Applying configuration: ${config.name}${options.dryRun ? ' (DRY RUN)' : ''}`));
@@ -185,6 +204,13 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
         return config;
       })));
     } else {
+      const resolved = resolve(configPath);
+      const configDir = dirname(resolved);
+      yield* _(secretManager.setPaths({
+        secretsFile: join(configDir, '.dotts', 'secrets.json'),
+        masterKeyFile: join(homedir(), '.dotts_key'),
+      }));
+
       const { app, config } = yield* _(Effect.promise(() => loadConfig(configPath)));
       p.log.step(pc.cyan(`Applying configuration: ${config.name}${options.dryRun ? ' (DRY RUN)' : ''}`));
       const rawResources = flatten(app);
@@ -200,9 +226,14 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
     }
   });
 
+  const RemoteRepoLayer = RemoteRepoServiceLive.pipe(Layer.provide(SystemCommandLive));
+  const TempDirLayer = TempDirServiceLive.pipe(
+    Layer.provide(FileSystemLive.pipe(Layer.provide(SystemCommandLive))),
+  );
+
   const MainLayer = RunnerLive.pipe(
-    Layer.provideMerge(RemoteRepoServiceLive),
-    Layer.provideMerge(TempDirServiceLive),
+    Layer.provideMerge(RemoteRepoLayer),
+    Layer.provideMerge(TempDirLayer),
     Layer.provideMerge(SecretManagerLive),
     Layer.provideMerge(PlatformServiceLive),
     Layer.provideMerge(StateLayer),

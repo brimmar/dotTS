@@ -28,8 +28,22 @@ export const SecretManagerLive = Layer.effect(
 
     const getMasterKey = () =>
       Effect.gen(function* () {
+        if (process.env.DOTTS_KEY) {
+          return process.env.DOTTS_KEY.trim();
+        }
         const exists = yield* fs.exists(masterKeyFile);
         if (!exists) {
+          const secretsExist = yield* fs.exists(secretsFile);
+          if (secretsExist) {
+            const secrets = yield* loadSecrets();
+            if (Object.keys(secrets).length > 0) {
+              return yield* Effect.fail(
+                new Error(
+                  `Master key file not found at ${masterKeyFile}. Set DOTTS_KEY environment variable or create ${masterKeyFile} to decrypt secrets.`
+                )
+              );
+            }
+          }
           const newKey = randomBytes(32).toString('hex');
           yield* fs.mkdir(dirname(masterKeyFile));
           yield* fs.writeFile(masterKeyFile, newKey, { mode: SECRET_FILE_MODE });
@@ -38,7 +52,7 @@ export const SecretManagerLive = Layer.effect(
         }
         const key = yield* fs.readFile(masterKeyFile);
         yield* fs.chmod(masterKeyFile, SECRET_FILE_MODE);
-        return key;
+        return key.trim();
       });
 
     const loadSecrets = () =>

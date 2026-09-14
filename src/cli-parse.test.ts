@@ -40,6 +40,21 @@ describe('parseArgv', () => {
     expect(req).toEqual({ kind: 'apply', configPath: 'f.ts', dryRun: true });
   });
 
+  it("parses ['apply', 'f.ts', '--yes'] and -y with yes true", () => {
+    expect(parseArgv(['apply', 'f.ts', '--yes'])).toEqual({
+      kind: 'apply',
+      configPath: 'f.ts',
+      dryRun: false,
+      yes: true,
+    });
+    expect(parseArgv(['apply', '-y'])).toEqual({
+      kind: 'apply',
+      configPath: './dotts.ts',
+      dryRun: false,
+      yes: true,
+    });
+  });
+
   it("rejects unknown apply flags such as --dryrun", () => {
     expect(() => parseArgv(['apply', '--dryrun'])).toThrow('Unknown flag: --dryrun');
     expect(() => parseArgv(['apply', '--dry-ru'])).toThrow('Unknown flag: --dry-ru');

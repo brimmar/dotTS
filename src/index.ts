@@ -37,7 +37,7 @@ async function main() {
       } else if (request.kind === 'doctor') {
         await dottsDoctor();
       } else if (request.kind === 'apply') {
-        await dottsApply(request.configPath, { dryRun: request.dryRun });
+        await dottsApply(request.configPath, { dryRun: request.dryRun, yes: request.yes });
       } else if (request.kind === 'secrets-set') {
         await dottsSecretSet(request.name, request.value);
       } else if (request.kind === 'secrets-list') {

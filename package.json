@@ -1,6 +1,6 @@
 {
   "name": "dotts",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Declarative dotfiles management with TypeScript — like AWS CDK for your system",
   "type": "module",
   "main": "./dist/public.js",
