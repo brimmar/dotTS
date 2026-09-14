@@ -5,7 +5,7 @@ import { arch, platform } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as publicApi from '../public';
-import type { PlatformInfo } from '../services/platform';
+import { parseOsRelease, type PlatformInfo } from '../services/platform';
 import { App, Stack } from './app';
 import { ActiveContext } from './context';
 
@@ -149,16 +149,18 @@ export async function loadConfig(configPath: string): Promise<{ app: App; config
 
     const currentOS = platform();
     let distro: string | undefined;
+    let distroLike: string[] | undefined;
     if (currentOS === 'linux') {
       try {
         const osRelease = await readFile('/etc/os-release', 'utf-8');
-        const match = osRelease.match(/^ID=(.*)$/m);
-        if (match) distro = match[1]?.replace(/"/g, '').trim();
+        const parsed = parseOsRelease(osRelease);
+        distro = parsed.distro;
+        distroLike = parsed.distroLike.length > 0 ? parsed.distroLike : undefined;
       } catch {
         // /etc/os-release not available. distro stays undefined.
       }
     }
-    const platformInfo: PlatformInfo = { os: currentOS, arch: arch(), distro };
+    const platformInfo: PlatformInfo = { os: currentOS, arch: arch(), distro, distroLike };
 
     if (typeof module.default !== 'function') {
       throw new Error(DEFAULT_EXPORT_ERROR);

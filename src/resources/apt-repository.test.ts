@@ -94,4 +94,39 @@ describe('AptRepositoryResource', () => {
     expect(files['/etc/apt/keyrings/docker.gpg']).toBeUndefined();
     expect(commands).toContain('apt-get update');
   });
+
+  it('allows aptRepository on Pop!_OS', async () => {
+    const PopPlatform = Layer.succeed(
+      PlatformService,
+      PlatformService.of({
+        get: () =>
+          Effect.succeed({
+            os: 'linux',
+            distro: 'pop',
+            distroLike: ['ubuntu', 'debian'],
+          } as any),
+      }),
+    );
+    const commands: string[] = [];
+    const files: Record<string, string> = {};
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new AptRepositoryResource(stack, 'test-repo', {
+      name: 'docker',
+      uri: 'https://download.docker.com/linux/ubuntu',
+      distribution: 'jammy',
+      components: ['stable'],
+    });
+
+    await Effect.runPromise(
+      res.apply().pipe(
+        Effect.provide(PopPlatform),
+        Effect.provide(MockFS(files)),
+        Effect.provide(MockHttp('')),
+        Effect.provide(MockExec(commands)),
+      ),
+    );
+
+    expect(files['/etc/apt/sources.list.d/docker.list']).toContain('jammy');
+  });
 });

@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { Resource, Component } from '../core/component';
 import { SystemCommand } from '../services/exec';
-import { PlatformService } from '../services/platform';
+import { isDebianFamily, PlatformService } from '../services/platform';
 import { hashConfig } from '../core/hash';
 import type { PackageProvider } from './package/provider';
 import { BrewProvider, AptProvider, PacmanProvider, BunProvider, NpmProvider, CargoProvider, PipProvider } from './package/providers/common';
@@ -68,7 +68,7 @@ export class PackageResource extends Resource {
       const info = yield* platform.get();
       if (info.os === 'darwin') return 'brew';
       if (info.os === 'linux') {
-        if (info.distro === 'ubuntu' || info.distro === 'debian') return 'apt';
+        if (isDebianFamily(info)) return 'apt';
         if (info.distro === 'arch') return 'pacman';
       }
       throw new Error(`Could not infer package manager for platform: ${info.os} ${info.distro || ''}`);

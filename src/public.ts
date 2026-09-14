@@ -313,6 +313,7 @@ export type OS = 'linux' | 'darwin' | 'win32' | 'freebsd' | 'openbsd' | 'aix' | 
 export type Distro =
   | 'ubuntu'
   | 'debian'
+  | 'pop'
   | 'arch'
   | 'fedora'
   | 'centos'
@@ -323,7 +324,7 @@ export type DarwinManagers = 'brew' | 'bun' | 'npm' | 'cargo' | 'pip';
 export type DebianManagers = 'apt' | 'bun' | 'npm' | 'cargo' | 'pip';
 export type ArchManagers = 'pacman' | 'bun' | 'npm' | 'cargo' | 'pip';
 export type LinuxManagers = DebianManagers | ArchManagers;
-export type DebianDistro = 'ubuntu' | 'debian';
+export type DebianDistro = 'ubuntu' | 'debian' | 'pop';
 export type ArchDistro = 'arch';
 
 export interface CommonApi {
@@ -415,6 +416,7 @@ export function onPlatform(
 
 /**
  * Run `fn` only on the given Linux distro. Use the `api` argument for distro-narrowed helpers.
+ * Matches `ID` and `ID_LIKE` from os-release, so Pop!_OS matches `pop` and `ubuntu`.
  * Unknown distros never match. Homogeneous Debian or Arch lists keep their
  * narrowed API; mixed lists receive `CommonApi` only.
  * @param distro One distro name or a list of names.
@@ -442,7 +444,8 @@ export function onDistro(
   if (!platform || !platform.distro) return;
 
   const wanted = Array.isArray(distro) ? distro : [distro];
-  const matches = (wanted as readonly string[]).includes(platform.distro);
+  const ids = [platform.distro, ...(platform.distroLike ?? [])];
+  const matches = (wanted as readonly string[]).some((name) => ids.includes(name));
   if (matches) {
     return fn(platformApi);
   }

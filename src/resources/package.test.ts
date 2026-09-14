@@ -209,4 +209,40 @@ describe('PackageResource', () => {
     expect(install?.[1]).toEqual(['install', 'neovim; touch /tmp/pwned']);
     expect(runUsed).toBe(false);
   });
+
+  it('infers apt on Pop!_OS', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const executedCommands: [string, string[]][] = [];
+    const PopPlatform = Layer.succeed(
+      PlatformService,
+      PlatformService.of({
+        get: () =>
+          Effect.succeed({
+            os: 'linux',
+            arch: 'x64',
+            distro: 'pop',
+            distroLike: ['ubuntu', 'debian'],
+          }),
+      }),
+    );
+    const SystemCommandMock = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: () => Effect.succeed(''),
+        execFile: (file, args) => {
+          executedCommands.push([file, args]);
+          if (file === 'dpkg') return Effect.fail(new Error('not installed'));
+          return Effect.succeed('');
+        },
+      }),
+    );
+
+    const pkgRes = new PackageResource(stack, 'my-pkg', { name: 'git' });
+    await Effect.runPromise(
+      pkgRes.apply().pipe(Effect.provide(SystemCommandMock), Effect.provide(PopPlatform)),
+    );
+
+    expect(executedCommands).toContainEqual(['apt-get', ['install', '-y', 'git']]);
+  });
 });
