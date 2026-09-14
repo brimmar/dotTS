@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import { Duration, Effect, Schedule } from 'effect';
 import { Resource, Component } from '../core/component';
 import { SystemCommand } from '../services/exec';
 import { FileSystem } from '../services/fs';
@@ -24,6 +24,10 @@ export class AptRepositoryResource extends Resource {
   override readonly kind = 'apt-repo' as const;
   constructor(scope: Component, id: string, override readonly props: AptRepositoryProps) {
     super(scope, id, props);
+  }
+
+  override get concurrencyKey(): string {
+    return 'pkg-manager-system';
   }
 
   hash() {
@@ -85,7 +89,10 @@ export class AptRepositoryResource extends Resource {
 
         // 3. Update apt
         if (changed) {
-          yield* exec.execFile('apt-get', ['update'], { become });
+          yield* Effect.retry(
+            exec.execFile('apt-get', ['update'], { become }),
+            Schedule.recurs(5).pipe(Schedule.addDelay(() => Duration.seconds(3))),
+          );
         }
       } else {
         // state === 'absent'
@@ -99,7 +106,10 @@ export class AptRepositoryResource extends Resource {
           removed = true;
         }
         if (removed) {
-          yield* exec.execFile('apt-get', ['update'], { become });
+          yield* Effect.retry(
+            exec.execFile('apt-get', ['update'], { become }),
+            Schedule.recurs(5).pipe(Schedule.addDelay(() => Duration.seconds(3))),
+          );
         }
       }
     });
@@ -116,7 +126,10 @@ export class AptRepositoryResource extends Resource {
       const exec = yield* SystemCommand;
       yield* fs.rm(listPath, { become });
       yield* fs.rm(keyringPath, { become });
-      yield* exec.execFile('apt-get', ['update'], { become });
+      yield* Effect.retry(
+        exec.execFile('apt-get', ['update'], { become }),
+        Schedule.recurs(5).pipe(Schedule.addDelay(() => Duration.seconds(3))),
+      );
     });
   }
 }

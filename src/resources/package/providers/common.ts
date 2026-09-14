@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import { Duration, Effect, Schedule } from 'effect';
 import type { PackageProvider } from '../provider';
 import { SystemCommand } from '../../../services/exec';
 import * as p from '@clack/prompts';
@@ -53,14 +53,20 @@ export class AptProvider implements PackageProvider {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}=${version}` : name;
       const become = options?.become === false ? undefined : (options?.become ?? true);
-      yield* exec.execFile('apt-get', ['install', '-y', pkg], { become });
+      yield* Effect.retry(
+        exec.execFile('apt-get', ['install', '-y', pkg], { become }),
+        Schedule.recurs(5).pipe(Schedule.addDelay(() => Duration.seconds(3))),
+      );
     });
   }
   uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const become = options?.become === false ? undefined : (options?.become ?? true);
-      yield* exec.execFile('apt-get', ['remove', '-y', name], { become });
+      yield* Effect.retry(
+        exec.execFile('apt-get', ['remove', '-y', name], { become }),
+        Schedule.recurs(5).pipe(Schedule.addDelay(() => Duration.seconds(3))),
+      );
     });
   }
   isInstalled(name: string, version?: string) {

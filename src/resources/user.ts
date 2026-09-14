@@ -25,6 +25,10 @@ export class UserResource extends Resource {
     super(scope, id, props);
   }
 
+  override get concurrencyKey(): string {
+    return 'system-user-group';
+  }
+
   hash() {
     return hashConfig(this.props);
   }

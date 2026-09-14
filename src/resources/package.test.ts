@@ -245,4 +245,20 @@ describe('PackageResource', () => {
 
     expect(executedCommands).toContainEqual(['apt-get', ['install', '-y', 'git']]);
   });
+
+  it('maps system package managers to pkg-manager-system concurrencyKey', () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const pDefault = new PackageResource(stack, 'p1', { name: 'git' });
+    const pApt = new PackageResource(stack, 'p2', { name: 'git', manager: 'apt' });
+    const pBrew = new PackageResource(stack, 'p3', { name: 'git', manager: 'brew' });
+    const pPacman = new PackageResource(stack, 'p4', { name: 'git', manager: 'pacman' });
+    const pCargo = new PackageResource(stack, 'p5', { name: 'ripgrep', manager: 'cargo' });
+
+    expect(pDefault.concurrencyKey).toBe('pkg-manager-system');
+    expect(pApt.concurrencyKey).toBe('pkg-manager-system');
+    expect(pBrew.concurrencyKey).toBe('pkg-manager-system');
+    expect(pPacman.concurrencyKey).toBe('pkg-manager-system');
+    expect(pCargo.concurrencyKey).toBe('pkg-manager-cargo');
+  });
 });

@@ -129,4 +129,17 @@ describe('AptRepositoryResource', () => {
 
     expect(files['/etc/apt/sources.list.d/docker.list']).toContain('jammy');
   });
+
+  it('should have concurrencyKey as pkg-manager-system', () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new AptRepositoryResource(stack, 'test-repo', {
+      name: 'docker',
+      uri: 'https://download.docker.com/linux/ubuntu',
+      distribution: 'jammy',
+      components: ['stable'],
+    });
+
+    expect(res.concurrencyKey).toBe('pkg-manager-system');
+  });
 });

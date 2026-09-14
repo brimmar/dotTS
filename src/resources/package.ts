@@ -25,7 +25,11 @@ export class PackageResource extends Resource {
   }
 
   override get concurrencyKey() {
-    return `pkg-manager-${this.props.manager || 'system'}`;
+    const mgr = this.props.manager;
+    if (!mgr || mgr === 'apt' || mgr === 'pacman' || mgr === 'brew') {
+      return 'pkg-manager-system';
+    }
+    return `pkg-manager-${mgr}`;
   }
 
   hash() {
