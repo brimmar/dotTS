@@ -68,6 +68,7 @@ export interface LineInFileProps extends ResourceBaseProps {
 export interface ServiceProps extends ResourceBaseProps {
   state?: 'started' | 'stopped' | 'restarted' | 'reloaded';
   enabled?: boolean;
+  user?: boolean;
 }
 
 export interface UserProps extends ResourceBaseProps {

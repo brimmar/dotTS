@@ -8,6 +8,7 @@ export interface ServiceProps {
   name: string;
   state?: 'started' | 'stopped' | 'restarted' | 'reloaded';
   enabled?: boolean;
+  user?: boolean;
   dependsOn?: Component[];
   become?: boolean | string;
   retries?: number;
@@ -25,7 +26,9 @@ export class ServiceResource extends Resource {
   }
 
   apply() {
-    const { name, state, enabled } = this.props;
+    const { name, state, enabled, user } = this.props;
+    const userFlag = user ? ['--user'] : [];
+    const become = user ? this.props.become : (this.props.become === false ? undefined : (this.props.become ?? true));
 
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
@@ -38,23 +41,21 @@ export class ServiceResource extends Resource {
 
       if (enabled !== undefined) {
         const unitFileState = (
-          yield* exec.execFile('systemctl', ['show', '-p', 'UnitFileState', '--value', name], {
-            become: this.props.become,
+          yield* exec.execFile('systemctl', [...userFlag, 'show', '-p', 'UnitFileState', '--value', name], {
             intent: 'read',
           })
         ).trim();
         const isEnabled = unitFileState === 'enabled';
         if (enabled && !isEnabled) {
-          yield* exec.execFile('systemctl', ['enable', name], { become: this.props.become });
+          yield* exec.execFile('systemctl', [...userFlag, 'enable', name], { become });
         } else if (!enabled && isEnabled) {
-          yield* exec.execFile('systemctl', ['disable', name], { become: this.props.become });
+          yield* exec.execFile('systemctl', [...userFlag, 'disable', name], { become });
         }
       }
 
       if (state) {
         const activeState = (
-          yield* exec.execFile('systemctl', ['show', '-p', 'ActiveState', '--value', name], {
-            become: this.props.become,
+          yield* exec.execFile('systemctl', [...userFlag, 'show', '-p', 'ActiveState', '--value', name], {
             intent: 'read',
           })
         ).trim();
@@ -62,16 +63,16 @@ export class ServiceResource extends Resource {
 
         switch (state) {
           case 'started':
-            if (!isActive) yield* exec.execFile('systemctl', ['start', name], { become: this.props.become });
+            if (!isActive) yield* exec.execFile('systemctl', [...userFlag, 'start', name], { become });
             break;
           case 'stopped':
-            if (isActive) yield* exec.execFile('systemctl', ['stop', name], { become: this.props.become });
+            if (isActive) yield* exec.execFile('systemctl', [...userFlag, 'stop', name], { become });
             break;
           case 'restarted':
-            yield* exec.execFile('systemctl', ['restart', name], { become: this.props.become });
+            yield* exec.execFile('systemctl', [...userFlag, 'restart', name], { become });
             break;
           case 'reloaded':
-            yield* exec.execFile('systemctl', ['reload', name], { become: this.props.become });
+            yield* exec.execFile('systemctl', [...userFlag, 'reload', name], { become });
             break;
         }
       }
@@ -79,12 +80,14 @@ export class ServiceResource extends Resource {
   }
 
   destroy() {
-    const { name } = this.props;
+    const { name, user } = this.props;
+    const userFlag = user ? ['--user'] : [];
+    const become = user ? this.props.become : (this.props.become === false ? undefined : (this.props.become ?? true));
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
       const absent = ['does not exist', 'not found', 'not-found', 'not loaded'];
-      yield* ignoreIfAbsent(exec.execFile('systemctl', ['stop', name], { become: this.props.become }), absent);
-      yield* ignoreIfAbsent(exec.execFile('systemctl', ['disable', name], { become: this.props.become }), absent);
+      yield* ignoreIfAbsent(exec.execFile('systemctl', [...userFlag, 'stop', name], { become }), absent);
+      yield* ignoreIfAbsent(exec.execFile('systemctl', [...userFlag, 'disable', name], { become }), absent);
     });
   }
 }

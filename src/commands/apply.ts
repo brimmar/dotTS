@@ -16,6 +16,9 @@ import { HttpServiceLive } from '../services/http';
 import { loadConfig } from '../core/loader';
 import { join } from 'node:path';
 
+import { flatten } from '../core/component';
+import { checkPathPermission, setupSudoSession } from '../core/sudo';
+
 export interface ApplyOptions {
   dryRun?: boolean;
 }
@@ -25,40 +28,49 @@ export function dryRunFileSystem(live: FileSystem): FileSystem {
   return FileSystem.of({
     readFile: (path, options) => live.readFile(path, options),
     exists: (path, options) => live.exists(path, options),
-    writeFile: (path) =>
+    writeFile: (path, _content, options) =>
       Effect.sync(() => {
+        checkPathPermission(path, options);
         p.log.info(pc.gray(`[DRY RUN] Would write file: ${path}`));
       }),
-    writeFileBytes: (path) =>
+    writeFileBytes: (path, _content, options) =>
       Effect.sync(() => {
+        checkPathPermission(path, options);
         p.log.info(pc.gray(`[DRY RUN] Would write bytes: ${path}`));
       }),
-    mkdir: (path) =>
+    mkdir: (path, options) =>
       Effect.sync(() => {
+        checkPathPermission(path, options);
         p.log.info(pc.gray(`[DRY RUN] Would create directory: ${path}`));
       }),
-    symlink: (target, path) =>
+    symlink: (target, path, options) =>
       Effect.sync(() => {
+        checkPathPermission(path, options);
         p.log.info(pc.gray(`[DRY RUN] Would create symlink: ${path} -> ${target}`));
       }),
-    rm: (path) =>
+    rm: (path, options) =>
       Effect.sync(() => {
+        checkPathPermission(path, options);
         p.log.info(pc.gray(`[DRY RUN] Would remove: ${path}`));
       }),
-    rmdir: (path) =>
+    rmdir: (path, options) =>
       Effect.sync(() => {
+        checkPathPermission(path, options);
         p.log.info(pc.gray(`[DRY RUN] Would rmdir: ${path}`));
       }),
-    unlink: (path) =>
+    unlink: (path, options) =>
       Effect.sync(() => {
+        checkPathPermission(path, options);
         p.log.info(pc.gray(`[DRY RUN] Would unlink: ${path}`));
       }),
-    chmod: (path, mode) =>
+    chmod: (path, mode, options) =>
       Effect.sync(() => {
+        checkPathPermission(path, options);
         p.log.info(pc.gray(`[DRY RUN] Would chmod: ${path} to ${mode}`));
       }),
-    chown: (path, uid, gid) =>
+    chown: (path, uid, gid, options) =>
       Effect.sync(() => {
+        checkPathPermission(path, options);
         p.log.info(pc.gray(`[DRY RUN] Would chown: ${path} to ${uid}:${gid}`));
       }),
   });
@@ -68,7 +80,7 @@ function dryRunSystemCommand(live: SystemCommand): SystemCommand {
   return SystemCommand.of({
     execFile: (file, args, options) => {
       if (options?.intent === 'read') {
-        return live.execFile(file, args, options);
+        return live.execFile(file, args, { ...options, become: undefined });
       }
       return Effect.sync(() => {
         p.log.info(pc.gray(`[DRY RUN] Would execute: ${file} ${args.join(' ')}`));
@@ -77,7 +89,7 @@ function dryRunSystemCommand(live: SystemCommand): SystemCommand {
     },
     run: (command, options) => {
       if (options?.intent === 'read') {
-        return live.run(command, options);
+        return live.run(command, { ...options, become: undefined });
       }
       return Effect.sync(() => {
         p.log.info(pc.gray(`[DRY RUN] Would execute: ${command}`));
@@ -161,13 +173,29 @@ export async function dottsApply(configPath: string, options: ApplyOptions = {})
         const { app, config } = yield* _(Effect.promise(() => loadConfig(finalPath)));
         
         p.log.step(pc.cyan(`Applying configuration: ${config.name}${options.dryRun ? ' (DRY RUN)' : ''}`));
-        yield* _(runner.run(app));
+        const rawResources = flatten(app);
+        const sudoSession = yield* _(Effect.sync(() => setupSudoSession(rawResources, { dryRun: options.dryRun })));
+        yield* _(
+          Effect.acquireUseRelease(
+            Effect.succeed(sudoSession),
+            () => runner.run(app),
+            (session) => Effect.sync(() => session.cleanup()),
+          ),
+        );
         return config;
       })));
     } else {
       const { app, config } = yield* _(Effect.promise(() => loadConfig(configPath)));
       p.log.step(pc.cyan(`Applying configuration: ${config.name}${options.dryRun ? ' (DRY RUN)' : ''}`));
-      yield* _(runner.run(app));
+      const rawResources = flatten(app);
+      const sudoSession = yield* _(Effect.sync(() => setupSudoSession(rawResources, { dryRun: options.dryRun })));
+      yield* _(
+        Effect.acquireUseRelease(
+          Effect.succeed(sudoSession),
+          () => runner.run(app),
+          (session) => Effect.sync(() => session.cleanup()),
+        ),
+      );
       return config;
     }
   });

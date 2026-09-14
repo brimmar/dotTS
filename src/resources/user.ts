@@ -31,6 +31,7 @@ export class UserResource extends Resource {
 
   apply() {
     const { name, uid, gid, groups, shell, home, createHome = true, state = 'present' } = this.props;
+    const become = this.props.become === false ? undefined : (this.props.become ?? true);
 
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
@@ -47,7 +48,7 @@ export class UserResource extends Resource {
           if (home) args.push('--home-dir', home);
           if (createHome) args.push('--create-home');
           args.push(name);
-          yield* exec.execFile('useradd', args, { become: this.props.become });
+          yield* exec.execFile('useradd', args, { become });
         } else {
           // Update existing user
           const args: string[] = [];
@@ -104,29 +105,30 @@ export class UserResource extends Resource {
 
           if (needsUpdate) {
             args.push(name);
-            yield* exec.execFile('usermod', args, { become: this.props.become });
+            yield* exec.execFile('usermod', args, { become });
           }
         }
       } else {
         if (exists) {
-          yield* this.deleteUser(exec);
+          yield* this.deleteUser(exec, become);
         }
       }
     });
   }
 
   destroy() {
+    const become = this.props.become === false ? undefined : (this.props.become ?? true);
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
-      yield* this.deleteUser(exec);
+      yield* this.deleteUser(exec, become);
     });
   }
 
-  private deleteUser(exec: SystemCommand): Effect.Effect<void, Error> {
+  private deleteUser(exec: SystemCommand, become?: boolean | string): Effect.Effect<void, Error> {
     const { name, removeHome } = this.props;
     const args = removeHome ? ['--remove', name] : [name];
     return ignoreIfAbsent(
-      exec.execFile('userdel', args, { become: this.props.become }),
+      exec.execFile('userdel', args, { become }),
       ['does not exist', 'no such user', 'unknown user', 'not found'],
     );
   }

@@ -41,6 +41,7 @@ export class AptRepositoryResource extends Resource {
       const http = yield* HttpService;
       const platform = yield* PlatformService;
       const info = yield* platform.get();
+      const become = this.props.become === false ? undefined : (this.props.become ?? true);
 
       if (info.os !== 'linux' || !isDebianFamily(info)) {
         throw new Error(`aptRepository resource is only supported on Debian-based systems. Current: ${info.os} ${info.distro}`);
@@ -53,7 +54,7 @@ export class AptRepositoryResource extends Resource {
         if (key) {
           const keyExists = yield* fs.exists(keyringPath);
           if (!keyExists) {
-            yield* fs.mkdir('/etc/apt/keyrings');
+            yield* fs.mkdir('/etc/apt/keyrings', { become });
             // Download key. We use a temporary file to dearmor it.
             const tempKeyPath = `/tmp/dotts-${name}.key`;
             const keyContent = yield* http.downloadString(key);
@@ -61,9 +62,9 @@ export class AptRepositoryResource extends Resource {
             
             // Check if it needs dearmoring (ASCII armored starts with -----BEGIN PGP PUBLIC KEY BLOCK-----)
             if (keyContent.includes('-----BEGIN PGP PUBLIC KEY BLOCK-----')) {
-              yield* exec.execFile('gpg', ['--dearmor', '--output', keyringPath, tempKeyPath], { become: this.props.become });
+              yield* exec.execFile('gpg', ['--dearmor', '--output', keyringPath, tempKeyPath], { become });
             } else {
-              yield* exec.execFile('cp', [tempKeyPath, keyringPath], { become: this.props.become });
+              yield* exec.execFile('cp', [tempKeyPath, keyringPath], { become });
             }
             yield* fs.rm(tempKeyPath);
             changed = true;
@@ -78,27 +79,27 @@ export class AptRepositoryResource extends Resource {
         const currentContent = listExists ? (yield* fs.readFile(listPath)).trim() : '';
 
         if (currentContent !== line) {
-          yield* fs.writeFile(listPath, line + '\n');
+          yield* fs.writeFile(listPath, line + '\n', { become });
           changed = true;
         }
 
         // 3. Update apt
         if (changed) {
-          yield* exec.execFile('apt-get', ['update'], { become: this.props.become });
+          yield* exec.execFile('apt-get', ['update'], { become });
         }
       } else {
         // state === 'absent'
         let removed = false;
         if (yield* fs.exists(listPath)) {
-          yield* fs.rm(listPath);
+          yield* fs.rm(listPath, { become });
           removed = true;
         }
         if (yield* fs.exists(keyringPath)) {
-          yield* fs.rm(keyringPath);
+          yield* fs.rm(keyringPath, { become });
           removed = true;
         }
         if (removed) {
-          yield* exec.execFile('apt-get', ['update'], { become: this.props.become });
+          yield* exec.execFile('apt-get', ['update'], { become });
         }
       }
     });
@@ -108,13 +109,14 @@ export class AptRepositoryResource extends Resource {
     const { name } = this.props;
     const keyringPath = `/etc/apt/keyrings/${name}.gpg`;
     const listPath = `/etc/apt/sources.list.d/${name}.list`;
+    const become = this.props.become === false ? undefined : (this.props.become ?? true);
 
     return Effect.gen(this, function* () {
       const fs = yield* FileSystem;
       const exec = yield* SystemCommand;
-      yield* fs.rm(listPath);
-      yield* fs.rm(keyringPath);
-      yield* exec.execFile('apt-get', ['update'], { become: this.props.become });
+      yield* fs.rm(listPath, { become });
+      yield* fs.rm(keyringPath, { become });
+      yield* exec.execFile('apt-get', ['update'], { become });
     });
   }
 }

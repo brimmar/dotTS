@@ -25,6 +25,7 @@ export class GroupResource extends Resource {
 
   apply() {
     const { name, gid, state = 'present' } = this.props;
+    const become = this.props.become === false ? undefined : (this.props.become ?? true);
 
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
@@ -36,20 +37,20 @@ export class GroupResource extends Resource {
           const args: string[] = [];
           if (gid !== undefined) args.push('--gid', String(gid));
           args.push(name);
-          yield* exec.execFile('groupadd', args, { become: this.props.become });
+          yield* exec.execFile('groupadd', args, { become });
         } else if (gid !== undefined) {
           const groupLine = yield* exec.execFile('getent', ['group', name], {
-            become: this.props.become,
+            become,
             intent: 'read',
           });
           const currentGid = groupLine.split(':')[2] ?? '';
           if (parseInt(currentGid) !== gid) {
-            yield* exec.execFile('groupmod', ['--gid', String(gid), name], { become: this.props.become });
+            yield* exec.execFile('groupmod', ['--gid', String(gid), name], { become });
           }
         }
       } else {
         if (exists) {
-          yield* exec.execFile('groupdel', [name], { become: this.props.become });
+          yield* exec.execFile('groupdel', [name], { become });
         }
       }
     });
@@ -57,10 +58,11 @@ export class GroupResource extends Resource {
 
   destroy() {
     const { name } = this.props;
+    const become = this.props.become === false ? undefined : (this.props.become ?? true);
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
       yield* ignoreIfAbsent(
-        exec.execFile('groupdel', [name], { become: this.props.become }),
+        exec.execFile('groupdel', [name], { become }),
         ['does not exist', 'no such group', 'unknown group', 'not found'],
       );
     });

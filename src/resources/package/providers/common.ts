@@ -52,13 +52,15 @@ export class AptProvider implements PackageProvider {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
       const pkg = version ? `${name}=${version}` : name;
-      yield* exec.execFile('apt-get', ['install', '-y', pkg], { become: options?.become });
+      const become = options?.become === false ? undefined : (options?.become ?? true);
+      yield* exec.execFile('apt-get', ['install', '-y', pkg], { become });
     });
   }
   uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.execFile('apt-get', ['remove', '-y', name], { become: options?.become });
+      const become = options?.become === false ? undefined : (options?.become ?? true);
+      yield* exec.execFile('apt-get', ['remove', '-y', name], { become });
     });
   }
   isInstalled(name: string, version?: string) {
@@ -85,13 +87,15 @@ export class PacmanProvider implements PackageProvider {
       if (version) {
          p.log.warn(`Pacman provider does not support specific versions easily. Installing latest ${name}.`);
       }
-      yield* exec.execFile('pacman', ['-S', '--noconfirm', name], { become: options?.become });
+      const become = options?.become === false ? undefined : (options?.become ?? true);
+      yield* exec.execFile('pacman', ['-S', '--noconfirm', name], { become });
     });
   }
   uninstall(name: string, options?: { become?: boolean | string }) {
     return Effect.gen(function* () {
       const exec = yield* SystemCommand;
-      yield* exec.execFile('pacman', ['-Rs', '--noconfirm', name], { become: options?.become });
+      const become = options?.become === false ? undefined : (options?.become ?? true);
+      yield* exec.execFile('pacman', ['-Rs', '--noconfirm', name], { become });
     });
   }
   isInstalled(name: string, version?: string) {
