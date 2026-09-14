@@ -172,4 +172,45 @@ describe('AptRepositoryResource', () => {
     expect(commands).toContain('cp /tmp/dotts-github-cli.key /etc/apt/keyrings/github-cli.gpg');
     expect(commands.some((c) => c.includes('gpg --dearmor'))).toBe(false);
   });
+
+  it('should remove broken .list files pointing to missing or invalid keyrings before apt update', async () => {
+    const commands: string[] = [];
+    const files: Record<string, string> = {
+      '/etc/apt/sources.list.d': '',
+      '/etc/apt/sources.list.d/broken.list': 'deb [signed-by=/etc/apt/keyrings/broken.gpg] https://example.com stable main',
+    };
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new AptRepositoryResource(stack, 'test-repo', {
+      name: 'good-repo',
+      uri: 'https://example.com/good',
+      distribution: 'stable',
+      components: ['main'],
+    });
+
+    const CustomExec = Layer.succeed(SystemCommand, SystemCommand.of({
+      run: (cmd: string) => {
+        commands.push(cmd);
+        return Effect.succeed('');
+      },
+      execFile: (file, args) => {
+        commands.push([file, ...args].join(' '));
+        if (file === 'find') return Effect.succeed('/etc/apt/sources.list.d/broken.list');
+        if (file === 'gpg' && args[0] === '--show-keys') return Effect.fail(new Error('no valid data'));
+        return Effect.succeed('');
+      },
+    }));
+
+    await Effect.runPromise(
+      res.apply().pipe(
+        Effect.provide(MockPlatform),
+        Effect.provide(MockFS(files)),
+        Effect.provide(MockHttp('')),
+        Effect.provide(CustomExec),
+      ),
+    );
+
+    expect(files['/etc/apt/sources.list.d/broken.list']).toBeUndefined();
+    expect(commands).toContain('apt-get update');
+  });
 });

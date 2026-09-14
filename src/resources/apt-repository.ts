@@ -107,6 +107,7 @@ export class AptRepositoryResource extends Resource {
 
         // 3. Update apt
         if (changed) {
+          yield* sanitizeBrokenAptSources(fs, exec, become);
           yield* Effect.retry(
             exec.execFile('apt-get', ['update'], { become }),
             Schedule.recurs(5).pipe(Schedule.addDelay(() => Duration.seconds(3))),
@@ -124,6 +125,7 @@ export class AptRepositoryResource extends Resource {
           removed = true;
         }
         if (removed) {
+          yield* sanitizeBrokenAptSources(fs, exec, become);
           yield* Effect.retry(
             exec.execFile('apt-get', ['update'], { become }),
             Schedule.recurs(5).pipe(Schedule.addDelay(() => Duration.seconds(3))),
@@ -144,10 +146,62 @@ export class AptRepositoryResource extends Resource {
       const exec = yield* SystemCommand;
       yield* fs.rm(listPath, { become });
       yield* fs.rm(keyringPath, { become });
+      yield* sanitizeBrokenAptSources(fs, exec, become);
       yield* Effect.retry(
         exec.execFile('apt-get', ['update'], { become }),
         Schedule.recurs(5).pipe(Schedule.addDelay(() => Duration.seconds(3))),
       );
     });
   }
+}
+
+function sanitizeBrokenAptSources(
+  fs: FileSystem,
+  exec: SystemCommand,
+  become?: boolean | string,
+) {
+  return Effect.gen(function* () {
+    const sourcesDir = '/etc/apt/sources.list.d';
+    const exists = yield* fs.exists(sourcesDir);
+    if (!exists) return;
+
+    const result = yield* Effect.match(
+      exec.execFile('find', [sourcesDir, '-maxdepth', '1', '-name', '*.list'], { intent: 'read' }),
+      {
+        onFailure: () => '',
+        onSuccess: (out) => out,
+      },
+    );
+
+    const listFiles = result.split('\n').map((l) => l.trim()).filter(Boolean);
+    for (const file of listFiles) {
+      const content = yield* Effect.match(
+        fs.readFile(file),
+        {
+          onFailure: () => '',
+          onSuccess: (c) => c,
+        },
+      );
+
+      const match = content.match(/signed-by=([^\s\]]+)/);
+      if (match && match[1]) {
+        const keyring = match[1];
+        const keyringExists = yield* fs.exists(keyring);
+        let keyringValid = false;
+        if (keyringExists) {
+          keyringValid = yield* Effect.match(
+            exec.execFile('gpg', ['--show-keys', keyring], { intent: 'read' }),
+            {
+              onFailure: () => false,
+              onSuccess: () => true,
+            },
+          );
+        }
+
+        if (!keyringExists || !keyringValid) {
+          yield* fs.rm(file, { become });
+        }
+      }
+    }
+  });
 }
