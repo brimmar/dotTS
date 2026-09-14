@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { SystemCommand, SystemCommandLive, buildSudoArgs } from './exec';
@@ -35,6 +35,16 @@ describe('SystemCommand Service', () => {
 
     const result = await Effect.runPromise(Effect.provide(program, SystemCommandLive));
     expect(result).toBe('/tmp');
+  });
+
+  it('should execute in a custom working directory with tilde expansion', async () => {
+    const program = Effect.gen(function* () {
+      const exec = yield* SystemCommand;
+      return yield* exec.run('pwd', { cwd: '~' });
+    });
+
+    const result = await Effect.runPromise(Effect.provide(program, SystemCommandLive));
+    expect(result).toBe(homedir());
   });
 
   it('should execute with custom environment variables', async () => {

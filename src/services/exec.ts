@@ -1,4 +1,6 @@
 import { Context, Effect, Layer } from 'effect';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
 export interface ExecOptions {
@@ -44,10 +46,17 @@ export function buildSudoArgs(
 function spawnExecFile(file: string, args: string[], options?: ExecOptions): Promise<string> {
   const spawned = buildSudoArgs(file, args, options?.become);
   const env = options?.env ? { ...process.env, ...options.env } : undefined;
+  const cwd = options?.cwd
+    ? options.cwd === '~'
+      ? homedir()
+      : options.cwd.startsWith('~/') || options.cwd.startsWith('~\\')
+        ? join(homedir(), options.cwd.slice(2))
+        : options.cwd
+    : undefined;
 
   return new Promise((resolve, reject) => {
     const child = spawn(spawned.file, spawned.args, {
-      cwd: options?.cwd,
+      cwd,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
