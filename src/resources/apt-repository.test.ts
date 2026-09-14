@@ -63,7 +63,7 @@ describe('AptRepositoryResource', () => {
 
     expect(files['/etc/apt/sources.list.d/docker.list']).toContain('[signed-by=/etc/apt/keyrings/docker.gpg]');
     expect(commands).toContain('gpg --dearmor --output /etc/apt/keyrings/docker.gpg /tmp/dotts-docker.key');
-    expect(commands).toContain('apt-get update');
+    expect(commands.some((c) => c.startsWith('apt-get update'))).toBe(true);
   });
 
   it('should remove a repository when state is absent', async () => {
@@ -93,7 +93,7 @@ describe('AptRepositoryResource', () => {
 
     expect(files['/etc/apt/sources.list.d/docker.list']).toBeUndefined();
     expect(files['/etc/apt/keyrings/docker.gpg']).toBeUndefined();
-    expect(commands).toContain('apt-get update');
+    expect(commands.some((c) => c.startsWith('apt-get update'))).toBe(true);
   });
 
   it('allows aptRepository on Pop!_OS', async () => {
@@ -211,6 +211,49 @@ describe('AptRepositoryResource', () => {
     );
 
     expect(files['/etc/apt/sources.list.d/broken.list']).toBeUndefined();
-    expect(commands).toContain('apt-get update');
+    expect(commands.some((c) => c.startsWith('apt-get update'))).toBe(true);
+  });
+
+  it('passes Acquire options to apt-get update to tolerate clock skew', async () => {
+    const commands: [string, string[]][] = [];
+    const files: Record<string, string> = {};
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new AptRepositoryResource(stack, 'test-repo', {
+      name: 'skew-test',
+      uri: 'https://example.com',
+      distribution: 'stable',
+      components: ['main'],
+    });
+
+    const CustomExec = Layer.succeed(
+      SystemCommand,
+      SystemCommand.of({
+        run: () => Effect.succeed(''),
+        execFile: (file, args) => {
+          commands.push([file, args]);
+          return Effect.succeed('');
+        },
+      }),
+    );
+
+    await Effect.runPromise(
+      res.apply().pipe(
+        Effect.provide(MockPlatform),
+        Effect.provide(MockFS(files)),
+        Effect.provide(MockHttp('')),
+        Effect.provide(CustomExec),
+      ),
+    );
+
+    const aptUpdate = commands.find(([file]) => file === 'apt-get');
+    expect(aptUpdate).toBeDefined();
+    expect(aptUpdate?.[1]).toEqual([
+      'update',
+      '-o',
+      'Acquire::Check-Valid-Until=false',
+      '-o',
+      'Acquire::Max-FutureTime=86400',
+    ]);
   });
 });

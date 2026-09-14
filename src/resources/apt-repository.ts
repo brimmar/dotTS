@@ -20,6 +20,14 @@ export interface AptRepositoryProps {
   retryDelay?: number;
 }
 
+export const APT_UPDATE_ARGS = [
+  'update',
+  '-o',
+  'Acquire::Check-Valid-Until=false',
+  '-o',
+  'Acquire::Max-FutureTime=86400',
+];
+
 export class AptRepositoryResource extends Resource {
   override readonly kind = 'apt-repo' as const;
   constructor(scope: Component, id: string, override readonly props: AptRepositoryProps) {
@@ -109,7 +117,7 @@ export class AptRepositoryResource extends Resource {
         if (changed) {
           yield* sanitizeBrokenAptSources(fs, exec, become);
           yield* Effect.retry(
-            exec.execFile('apt-get', ['update'], { become }),
+            exec.execFile('apt-get', APT_UPDATE_ARGS, { become }),
             Schedule.recurs(5).pipe(Schedule.addDelay(() => Duration.seconds(3))),
           );
         }
@@ -127,7 +135,7 @@ export class AptRepositoryResource extends Resource {
         if (removed) {
           yield* sanitizeBrokenAptSources(fs, exec, become);
           yield* Effect.retry(
-            exec.execFile('apt-get', ['update'], { become }),
+            exec.execFile('apt-get', APT_UPDATE_ARGS, { become }),
             Schedule.recurs(5).pipe(Schedule.addDelay(() => Duration.seconds(3))),
           );
         }
@@ -148,7 +156,7 @@ export class AptRepositoryResource extends Resource {
       yield* fs.rm(keyringPath, { become });
       yield* sanitizeBrokenAptSources(fs, exec, become);
       yield* Effect.retry(
-        exec.execFile('apt-get', ['update'], { become }),
+        exec.execFile('apt-get', APT_UPDATE_ARGS, { become }),
         Schedule.recurs(5).pipe(Schedule.addDelay(() => Duration.seconds(3))),
       );
     });
