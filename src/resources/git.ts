@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { Resource, Component } from '../core/component';
 import { SystemCommand } from '../services/exec';
-import { FileSystem } from '../services/fs';
+import { FileSystem, resolvePath } from '../services/fs';
 import { hashConfig } from '../core/hash';
 
 export interface GitResourceProps {
@@ -29,16 +29,17 @@ export class GitResource extends Resource {
 
   apply() {
     const { url, dest, branch, sparse, depth, recursive } = this.props;
+    const targetDest = resolvePath(dest);
 
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
       const fs = yield* FileSystem;
 
-      const exists = yield* fs.exists(dest);
-      const isGit = exists && (yield* fs.exists(`${dest}/.git`));
+      const exists = yield* fs.exists(targetDest);
+      const isGit = exists && (yield* fs.exists(`${targetDest}/.git`));
 
       const become = this.props.become;
-      const inRepo = { cwd: dest, become };
+      const inRepo = { cwd: targetDest, become };
 
       if (!isGit) {
         const cloneArgs = ['clone'];
@@ -46,7 +47,7 @@ export class GitResource extends Resource {
         if (branch) cloneArgs.push('--branch', branch);
         if (recursive) cloneArgs.push('--recursive');
         if (sparse) cloneArgs.push('--no-checkout');
-        cloneArgs.push(url, dest);
+        cloneArgs.push(url, targetDest);
         yield* exec.execFile('git', cloneArgs, { become });
 
         if (sparse) {
@@ -55,8 +56,10 @@ export class GitResource extends Resource {
           yield* exec.execFile('git', ['checkout', branch || 'HEAD'], inRepo);
         }
       } else {
-        const currentUrl = yield* exec.execFile('git', ['remote', 'get-url', 'origin'], { ...inRepo, intent: 'read' });
-        if (currentUrl !== url) {
+        const rawUrl = yield* exec.execFile('git', ['remote', 'get-url', 'origin'], { ...inRepo, intent: 'read' });
+        const currentUrl = rawUrl.trim();
+        const normalize = (u: string) => u.replace(/^git@github\.com:/, 'https://github.com/').replace(/\.git$/, '');
+        if (normalize(currentUrl) !== normalize(url)) {
           throw new Error(`Git destination ${dest} exists but points to ${currentUrl} instead of ${url}`);
         }
 

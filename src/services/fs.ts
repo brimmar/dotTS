@@ -36,7 +36,7 @@ import { SystemCommand } from './exec';
  * handle it explicitly — otherwise paths like `~/.config/nvim` are treated
  * as a literal directory starting with `~`.
  */
-function resolvePath(p: string): string {
+export function resolvePath(p: string): string {
   if (p === '~') return homedir();
   if (p.startsWith('~/') || p.startsWith('~\\')) return `${homedir()}${p.slice(1)}`;
   return resolve(p);

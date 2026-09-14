@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import { describe, it, expect, vi } from 'bun:test';
 import { Effect, Layer } from 'effect';
 import { App, Stack } from '../core/app';
@@ -177,5 +178,25 @@ describe('GitResource', () => {
     const setCall = calls.find((c) => c.args[0] === 'sparse-checkout' && c.args[1] === 'set');
     expect(setCall?.args).toEqual(['sparse-checkout', 'set', 'a', 'b']);
     expect(setCall?.args).not.toContain('a b');
+  });
+
+  it('should expand leading tilde in dest path', async () => {
+    const calls: { file: string; args: string[] }[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const gitRes = new GitResource(stack, 'git-test', {
+      url: 'https://github.com/test/repo.git',
+      dest: '~/my-repo',
+    });
+
+    await Effect.runPromise(
+      gitRes.apply().pipe(
+        Effect.provide(MockFS(false)),
+        Effect.provide(MockExec([], calls)),
+      ),
+    );
+
+    const cloneCall = calls.find((c) => c.args[0] === 'clone');
+    expect(cloneCall?.args).toContain(`${homedir()}/my-repo`);
   });
 });
