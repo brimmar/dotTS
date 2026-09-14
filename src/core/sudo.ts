@@ -135,6 +135,11 @@ export function setupSudoSession(
 
   if (process.platform === "linux") {
     try {
+      execFileSync("sudo", ["-n", "systemctl", "restart", "chrony"], {
+        stdio: "ignore",
+      });
+    } catch {}
+    try {
       execFileSync("sudo", ["-n", "chronyc", "makestep"], { stdio: "ignore" });
     } catch {}
   }
