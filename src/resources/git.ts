@@ -1,8 +1,8 @@
-import { Effect } from 'effect';
-import { Resource, Component } from '../core/component';
-import { SystemCommand } from '../services/exec';
-import { FileSystem, resolvePath } from '../services/fs';
-import { hashConfig } from '../core/hash';
+import { Effect } from "effect";
+import { Resource, Component } from "../core/component";
+import { SystemCommand } from "../services/exec";
+import { FileSystem, resolvePath } from "../services/fs";
+import { hashConfig } from "../core/hash";
 
 export interface GitResourceProps {
   url: string;
@@ -18,8 +18,12 @@ export interface GitResourceProps {
 }
 
 export class GitResource extends Resource {
-  override readonly kind = 'git' as const;
-  constructor(scope: Component, id: string, override readonly props: GitResourceProps) {
+  override readonly kind = "git" as const;
+  constructor(
+    scope: Component,
+    id: string,
+    override readonly props: GitResourceProps,
+  ) {
     super(scope, id, props);
   }
 
@@ -30,6 +34,11 @@ export class GitResource extends Resource {
   apply() {
     const { url, dest, branch, sparse, depth, recursive } = this.props;
     const targetDest = resolvePath(dest);
+    const cleanSparse = sparse
+      ? sparse
+          .map((p) => p.replace(/^\/+/, "").replace(/\/+$/, ""))
+          .filter(Boolean)
+      : undefined;
 
     return Effect.gen(this, function* () {
       const exec = yield* SystemCommand;
@@ -43,63 +52,101 @@ export class GitResource extends Resource {
 
       if (!isGit) {
         if (exists) {
-          yield* exec.execFile('git', ['init'], inRepo);
-          yield* exec.execFile('git', ['remote', 'add', 'origin', url], inRepo);
-          const fetchArgs = ['fetch'];
-          if (depth) fetchArgs.push('--depth', String(depth));
-          fetchArgs.push('origin');
+          yield* exec.execFile("git", ["init"], inRepo);
+          yield* exec.execFile("git", ["remote", "add", "origin", url], inRepo);
+          const fetchArgs = ["fetch"];
+          if (depth) fetchArgs.push("--depth", String(depth));
+          fetchArgs.push("origin");
           if (branch) fetchArgs.push(branch);
-          yield* exec.execFile('git', fetchArgs, inRepo);
+          yield* exec.execFile("git", fetchArgs, inRepo);
 
-          if (sparse) {
-            yield* exec.execFile('git', ['sparse-checkout', 'init', '--cone'], inRepo);
-            yield* exec.execFile('git', ['sparse-checkout', 'set', ...sparse], inRepo);
+          if (cleanSparse && cleanSparse.length > 0) {
+            yield* exec.execFile(
+              "git",
+              ["sparse-checkout", "init", "--cone"],
+              inRepo,
+            );
+            yield* exec.execFile(
+              "git",
+              ["sparse-checkout", "set", ...cleanSparse],
+              inRepo,
+            );
           }
           yield* exec.execFile(
-            'git',
-            ['checkout', '-f', branch ? `origin/${branch}` : 'FETCH_HEAD'],
+            "git",
+            ["checkout", "-f", branch ? `origin/${branch}` : "FETCH_HEAD"],
             inRepo,
           );
           if (branch) {
-            yield* exec.execFile('git', ['checkout', '-B', branch], inRepo);
+            yield* exec.execFile("git", ["checkout", "-B", branch], inRepo);
           }
           if (recursive) {
-            yield* exec.execFile('git', ['submodule', 'update', '--init', '--recursive'], inRepo);
+            yield* exec.execFile(
+              "git",
+              ["submodule", "update", "--init", "--recursive"],
+              inRepo,
+            );
           }
         } else {
-          const cloneArgs = ['clone'];
-          if (depth) cloneArgs.push('--depth', String(depth));
-          if (branch) cloneArgs.push('--branch', branch);
-          if (recursive) cloneArgs.push('--recursive');
-          if (sparse) cloneArgs.push('--no-checkout');
+          const cloneArgs = ["clone"];
+          if (depth) cloneArgs.push("--depth", String(depth));
+          if (branch) cloneArgs.push("--branch", branch);
+          if (recursive) cloneArgs.push("--recursive");
+          if (cleanSparse && cleanSparse.length > 0)
+            cloneArgs.push("--no-checkout");
           cloneArgs.push(url, targetDest);
-          yield* exec.execFile('git', cloneArgs, { become });
+          yield* exec.execFile("git", cloneArgs, { become });
 
-          if (sparse) {
-            yield* exec.execFile('git', ['sparse-checkout', 'init', '--cone'], inRepo);
-            yield* exec.execFile('git', ['sparse-checkout', 'set', ...sparse], inRepo);
-            yield* exec.execFile('git', ['checkout', branch || 'HEAD'], inRepo);
+          if (cleanSparse && cleanSparse.length > 0) {
+            yield* exec.execFile(
+              "git",
+              ["sparse-checkout", "init", "--cone"],
+              inRepo,
+            );
+            yield* exec.execFile(
+              "git",
+              ["sparse-checkout", "set", ...cleanSparse],
+              inRepo,
+            );
+            yield* exec.execFile("git", ["checkout", branch || "HEAD"], inRepo);
           }
         }
       } else {
-        const rawUrl = yield* exec.execFile('git', ['remote', 'get-url', 'origin'], { ...inRepo, intent: 'read' });
+        const rawUrl = yield* exec.execFile(
+          "git",
+          ["remote", "get-url", "origin"],
+          { ...inRepo, intent: "read" },
+        );
         const currentUrl = rawUrl.trim();
-        const normalize = (u: string) => u.replace(/^git@github\.com:/, 'https://github.com/').replace(/\.git$/, '');
+        const normalize = (u: string) =>
+          u
+            .replace(/^git@github\.com:/, "https://github.com/")
+            .replace(/\.git$/, "");
         if (normalize(currentUrl) !== normalize(url)) {
-          throw new Error(`Git destination ${dest} exists but points to ${currentUrl} instead of ${url}`);
+          throw new Error(
+            `Git destination ${dest} exists but points to ${currentUrl} instead of ${url}`,
+          );
         }
 
         if (branch) {
-          yield* exec.execFile('git', ['checkout', branch], inRepo);
+          yield* exec.execFile("git", ["checkout", branch], inRepo);
         }
 
-        if (sparse) {
-          yield* exec.execFile('git', ['sparse-checkout', 'set', ...sparse], inRepo);
+        if (cleanSparse && cleanSparse.length > 0) {
+          yield* exec.execFile(
+            "git",
+            ["sparse-checkout", "set", ...cleanSparse],
+            inRepo,
+          );
         }
 
-        yield* exec.execFile('git', ['pull'], inRepo);
+        yield* exec.execFile("git", ["pull"], inRepo);
         if (recursive) {
-          yield* exec.execFile('git', ['submodule', 'update', '--init', '--recursive'], inRepo);
+          yield* exec.execFile(
+            "git",
+            ["submodule", "update", "--init", "--recursive"],
+            inRepo,
+          );
         }
       }
     });
