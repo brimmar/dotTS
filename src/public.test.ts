@@ -138,6 +138,39 @@ describe('Functional Helpers', () => {
     expect(called).toBe(false);
   });
 
+  it('onDistro() matches Pop!_OS as pop and as ubuntu via ID_LIKE', () => {
+    ActiveContext.setPlatform({
+      os: 'linux',
+      arch: 'x64',
+      distro: 'pop',
+      distroLike: ['ubuntu', 'debian'],
+    });
+
+    let called = false;
+    onDistro('pop', () => {
+      called = true;
+    });
+    expect(called).toBe(true);
+
+    called = false;
+    onDistro('ubuntu', () => {
+      called = true;
+    });
+    expect(called).toBe(true);
+
+    called = false;
+    onDistro(['ubuntu', 'debian'], () => {
+      called = true;
+    });
+    expect(called).toBe(true);
+
+    called = false;
+    onDistro('arch', () => {
+      called = true;
+    });
+    expect(called).toBe(false);
+  });
+
   it('pkg() uses a stable colon-prefixed id', () => {
     const res = pkg('git');
     expect(res.id).toBe('pkg:git');

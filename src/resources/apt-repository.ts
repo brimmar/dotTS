@@ -3,7 +3,7 @@ import { Resource, Component } from '../core/component';
 import { SystemCommand } from '../services/exec';
 import { FileSystem } from '../services/fs';
 import { HttpService } from '../services/http';
-import { PlatformService } from '../services/platform';
+import { isDebianFamily, PlatformService } from '../services/platform';
 import { hashConfig } from '../core/hash';
 import { join } from 'node:path';
 
@@ -42,7 +42,7 @@ export class AptRepositoryResource extends Resource {
       const platform = yield* PlatformService;
       const info = yield* platform.get();
 
-      if (info.os !== 'linux' || (info.distro !== 'ubuntu' && info.distro !== 'debian')) {
+      if (info.os !== 'linux' || !isDebianFamily(info)) {
         throw new Error(`aptRepository resource is only supported on Debian-based systems. Current: ${info.os} ${info.distro}`);
       }
 

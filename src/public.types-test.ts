@@ -66,6 +66,17 @@ export function publicTypesTest(): void {
     });
   });
 
+  onDistro('pop', (d) => {
+    d.pkg('x', { manager: 'apt' });
+    // @ts-expect-error pacman is not a debian manager
+    d.pkg('x', { manager: 'pacman' });
+    d.aptRepository('nodejs', {
+      uri: 'https://example.com',
+      distribution: 'nodistro',
+      components: ['main'],
+    });
+  });
+
   onDistro('arch', (d) => {
     d.pkg('x', { manager: 'pacman' });
     // @ts-expect-error apt is not an arch manager

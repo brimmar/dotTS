@@ -115,7 +115,7 @@ export class ActiveContext {
     return new ResourceStub(undefined, 'stack');
   }
 
-  static getPlatform(): { os: string; arch: string; distro?: string } | undefined {
+  static getPlatform(): { os: string; arch: string; distro?: string; distroLike?: string[] } | undefined {
     return undefined;
   }
 }

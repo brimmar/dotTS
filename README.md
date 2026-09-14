@@ -319,7 +319,7 @@ onPlatform('linux', () => {
 onDistro(distro: Distro | Distro[], callback: () => void | Promise<void>): void
 ```
 
-Runs `callback` when the current Linux distro matches. Unknown distros never match. `Distro` is `'ubuntu' | 'debian' | 'arch' | 'fedora' | 'centos' | 'rhel' | 'alpine'`.
+Runs `callback` when the current Linux distro matches. Matching uses `/etc/os-release` `ID` and `ID_LIKE`, so Pop!_OS (`ID=pop`) matches `pop` and `ubuntu`. Unknown distros never match. `Distro` is `'ubuntu' | 'debian' | 'pop' | 'arch' | 'fedora' | 'centos' | 'rhel' | 'alpine'`.
 
 ```ts
 import { pkg, onDistro } from 'dotts';

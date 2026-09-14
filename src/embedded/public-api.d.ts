@@ -258,12 +258,12 @@ export declare function unarchive(id: string, props: UnarchiveProps): ResourceHa
  */
 export declare function secret(name: string): SecretToken;
 export type OS = 'linux' | 'darwin' | 'win32' | 'freebsd' | 'openbsd' | 'aix' | 'sunos' | 'android';
-export type Distro = 'ubuntu' | 'debian' | 'arch' | 'fedora' | 'centos' | 'rhel' | 'alpine';
+export type Distro = 'ubuntu' | 'debian' | 'pop' | 'arch' | 'fedora' | 'centos' | 'rhel' | 'alpine';
 export type DarwinManagers = 'brew' | 'bun' | 'npm' | 'cargo' | 'pip';
 export type DebianManagers = 'apt' | 'bun' | 'npm' | 'cargo' | 'pip';
 export type ArchManagers = 'pacman' | 'bun' | 'npm' | 'cargo' | 'pip';
 export type LinuxManagers = DebianManagers | ArchManagers;
-export type DebianDistro = 'ubuntu' | 'debian';
+export type DebianDistro = 'ubuntu' | 'debian' | 'pop';
 export type ArchDistro = 'arch';
 export interface CommonApi {
     file: typeof file;
@@ -321,6 +321,7 @@ export declare function onPlatform(os: OS[], fn: (api: CommonApi) => void | Prom
 export declare function onPlatform<O extends OS>(os: O, fn: (api: ApiFor<O>) => void | Promise<void>): void | Promise<void>;
 /**
  * Run `fn` only on the given Linux distro. Use the `api` argument for distro-narrowed helpers.
+ * Matches `ID` and `ID_LIKE` from os-release, so Pop!_OS matches `pop` and `ubuntu`.
  * Unknown distros never match. Homogeneous Debian or Arch lists keep their
  * narrowed API; mixed lists receive `CommonApi` only.
  * @param distro One distro name or a list of names.
