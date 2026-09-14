@@ -1,10 +1,10 @@
-import * as p from "@clack/prompts";
-import { Context, Effect, Layer } from "effect";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import * as p from "@clack/prompts";
+import { Context, Effect, Layer } from "effect";
 import pc from "picocolors";
-import { Component, flatten, Resource } from "../core/component";
+import { type Component, flatten, Resource } from "../core/component";
 import { DottsError } from "../core/errors";
 import { SecretToken } from "../core/secret";
 import { FileSystem } from "./fs";
@@ -136,7 +136,7 @@ export const ValidationServiceLive = Layer.effect(
                   yield* Effect.fail(
                     new DottsError(
                       `Secret not found: ${value.name} (referenced by ${res.id})`,
-                      `Configure the secret with 'dotts secrets set ${value.name} <value>' or verify .dotts/secrets.json.`,
+                      `Configure the secret with 'dotts secrets set ${value.name} <value>' or verify .dotts/vault.`,
                     ),
                   );
                 }

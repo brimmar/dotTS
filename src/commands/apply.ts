@@ -1,32 +1,31 @@
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import * as p from "@clack/prompts";
-import pc from "picocolors";
 import { Effect, Layer } from "effect";
+import pc from "picocolors";
+import { flatten } from "../core/component";
+import { loadConfig } from "../core/loader";
 import { Runner, RunnerLive } from "../core/runner";
-import { FileSystem, FileSystemLive } from "../services/fs";
+import { checkPathPermission, setupSudoSession } from "../core/sudo";
 import { DryRun } from "../services/dry-run";
 import { SystemCommand, SystemCommandLive } from "../services/exec";
-import { SecretManager, SecretManagerLive } from "../services/secrets-manager";
-import { SecretStoreLive } from "../services/secrets";
-import {
-  StateService,
-  StateServiceLive,
-  type AppState,
-} from "../services/state";
+import { FileSystem, FileSystemLive } from "../services/fs";
+import { HttpServiceLive } from "../services/http";
 import { PlatformServiceLive } from "../services/platform";
-import { TemplateServiceLive } from "../services/template";
 import {
   RemoteRepoService,
   RemoteRepoServiceLive,
 } from "../services/remote-repo";
+import { SecretStoreLive } from "../services/secrets";
+import { SecretManager, SecretManagerLive } from "../services/secrets-manager";
+import {
+  type AppState,
+  StateService,
+  StateServiceLive,
+} from "../services/state";
 import { TempDirService, TempDirServiceLive } from "../services/temp-dir";
-import { HttpServiceLive } from "../services/http";
-import { loadConfig } from "../core/loader";
-import { existsSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-
-import { flatten } from "../core/component";
-import { checkPathPermission, setupSudoSession } from "../core/sudo";
+import { TemplateServiceLive } from "../services/template";
 import {
   ValidationService,
   ValidationServiceLive,
@@ -217,7 +216,7 @@ export async function dottsApply(
             const configDir = dirname(finalPath);
             yield* _(
               secretManager.setPaths({
-                secretsFile: join(configDir, ".dotts", "secrets.json"),
+                secretsFile: join(configDir, ".dotts", "vault"),
                 masterKeyFile: join(homedir(), ".dotts_key"),
               }),
             );
@@ -254,7 +253,7 @@ export async function dottsApply(
       const configDir = dirname(resolved);
       yield* _(
         secretManager.setPaths({
-          secretsFile: join(configDir, ".dotts", "secrets.json"),
+          secretsFile: join(configDir, ".dotts", "vault"),
           masterKeyFile: join(homedir(), ".dotts_key"),
         }),
       );

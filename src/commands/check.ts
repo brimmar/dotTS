@@ -1,8 +1,8 @@
-import * as p from "@clack/prompts";
-import { Effect } from "effect";
 import { exists } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import * as p from "@clack/prompts";
+import { Effect } from "effect";
 import pc from "picocolors";
 import { loadConfig } from "../core/loader";
 import { SystemCommandLive } from "../services/exec";
@@ -68,7 +68,7 @@ export async function dottsCheck(configPath: string) {
           const finalPath = join(dir, "dotts.ts");
           const sm = yield* SecretManager;
           yield* sm.setPaths({
-            secretsFile: join(dir, ".dotts", "secrets.json"),
+            secretsFile: join(dir, ".dotts", "vault"),
             masterKeyFile: join(homedir(), ".dotts_key"),
           });
           yield* Effect.promise(() => typecheckProject(finalPath, dir, true));
@@ -85,7 +85,7 @@ export async function dottsCheck(configPath: string) {
       const absolutePath = resolve(configPath);
       const sm = yield* SecretManager;
       yield* sm.setPaths({
-        secretsFile: join(dirname(absolutePath), ".dotts", "secrets.json"),
+        secretsFile: join(dirname(absolutePath), ".dotts", "vault"),
         masterKeyFile: join(homedir(), ".dotts_key"),
       });
       yield* Effect.promise(() =>

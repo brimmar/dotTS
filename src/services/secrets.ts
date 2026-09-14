@@ -1,10 +1,10 @@
-import { Context, Effect, Layer } from "effect";
 import {
   createCipheriv,
   createDecipheriv,
   createHash,
   randomBytes,
 } from "node:crypto";
+import { Context, Effect, Layer } from "effect";
 
 export interface SecretStore {
   readonly encrypt: (
@@ -32,9 +32,36 @@ function keyMaterial(key: string): Buffer {
   return createHash("sha256").update(key, "utf8").digest();
 }
 
+export const VAULT_HEADER = "$DOTTS_VAULT;1.0;AES-256-GCM";
+
+export function formatVault(blob: string): string {
+  const lines = [VAULT_HEADER];
+  for (let i = 0; i < blob.length; i += 80) {
+    lines.push(blob.slice(i, i + 80));
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+export function parseVault(content: string): string {
+  const trimmed = content.trim();
+  if (trimmed.startsWith(VAULT_HEADER)) {
+    const lines = trimmed.split(/\r?\n/).slice(1);
+    return lines.map((l) => l.trim()).join("");
+  }
+  return trimmed;
+}
+
+export function isVaultFormat(content: string): boolean {
+  return content.trim().startsWith(VAULT_HEADER);
+}
+
 function parseBlob(encryptedValue: string) {
-  const [ivHex, authTagHex, encryptedHex] = encryptedValue.split(":");
-  if (!ivHex || !authTagHex || !encryptedHex) {
+  const parts = encryptedValue.split(":");
+  if (parts.length < 3) {
+    throw new Error("Invalid encrypted format");
+  }
+  const [ivHex, authTagHex, encryptedHex] = parts;
+  if (!ivHex || !authTagHex || encryptedHex === undefined) {
     throw new Error("Invalid encrypted format");
   }
   return {

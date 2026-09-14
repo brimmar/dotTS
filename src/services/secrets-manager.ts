@@ -1,9 +1,15 @@
+import { randomBytes } from "node:crypto";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { Context, Effect, Layer } from "effect";
 import { FileSystem } from "./fs";
-import { decryptNew, SecretStore } from "./secrets";
-import { join, dirname } from "node:path";
-import { homedir } from "node:os";
-import { randomBytes } from "node:crypto";
+import {
+  formatVault,
+  isVaultFormat,
+  parseVault,
+  SecretStore,
+  VAULT_HEADER,
+} from "./secrets";
 
 const SECRET_FILE_MODE = 0o600;
 
@@ -20,6 +26,12 @@ export interface SecretManager {
 
 export const SecretManager = Context.GenericTag<SecretManager>("SecretManager");
 
+interface LoadedSecrets {
+  secrets: Record<string, string>;
+  corruptLegacy: Record<string, string>;
+  format: "vault" | "legacy";
+}
+
 export const SecretManagerLive = Layer.effect(
   SecretManager,
   Effect.gen(function* () {
@@ -27,10 +39,29 @@ export const SecretManagerLive = Layer.effect(
     const store = yield* SecretStore;
 
     let customMasterKeyFile = false;
-    let secretsFile = join(process.cwd(), ".dotts/secrets.json");
+    let configuredSecretsFile = join(process.cwd(), ".dotts/vault");
     let masterKeyFile = join(homedir(), ".dotts_key");
 
-    const getMasterKey = () =>
+    const resolveSecretsPath = () =>
+      Effect.gen(function* () {
+        if (yield* fs.exists(configuredSecretsFile)) {
+          return configuredSecretsFile;
+        }
+        const dir = dirname(configuredSecretsFile);
+        const candidates = ["vault", "secrets.vault", "secrets.json"];
+        for (const candidate of candidates) {
+          const candidatePath = join(dir, candidate);
+          if (
+            candidatePath !== configuredSecretsFile &&
+            (yield* fs.exists(candidatePath))
+          ) {
+            return candidatePath;
+          }
+        }
+        return configuredSecretsFile;
+      });
+
+    const getMasterKey = (targetFile: string) =>
       Effect.gen(function* () {
         if (process.env.DOTTS_KEY) {
           return process.env.DOTTS_KEY.trim();
@@ -49,13 +80,13 @@ export const SecretManagerLive = Layer.effect(
           }
         }
         if (!exists) {
-          const secretsExist = yield* fs.exists(secretsFile);
+          const secretsExist = yield* fs.exists(targetFile);
           if (secretsExist) {
-            const secrets = yield* loadSecrets();
-            if (Object.keys(secrets).length > 0) {
+            const content = (yield* fs.readFile(targetFile)).trim();
+            if (content.length > 0) {
               return yield* Effect.fail(
                 new Error(
-                  `Master key file not found at ${masterKeyFile} (or ~/.vault-pass). Set DOTTS_KEY environment variable or create ${masterKeyFile} to decrypt secrets.`,
+                  `Master key file not found at ${masterKeyFile} (or ~/.vault-pass, ~/.vault_pass). Set DOTTS_KEY environment variable or create ${masterKeyFile} to decrypt secrets.`,
                 ),
               );
             }
@@ -73,98 +104,196 @@ export const SecretManagerLive = Layer.effect(
         return key.trim();
       });
 
-    const loadSecrets = () =>
+    const loadSecrets = (
+      targetFile: string,
+      key: string,
+    ): Effect.Effect<LoadedSecrets, Error> =>
       Effect.gen(function* () {
-        const exists = yield* fs.exists(secretsFile);
-        if (!exists) return {};
-        const content = yield* fs.readFile(secretsFile);
-        return JSON.parse(content) as Record<string, string>;
-      });
+        const exists = yield* fs.exists(targetFile);
+        if (!exists) {
+          return {
+            secrets: {},
+            corruptLegacy: {},
+            format: "vault",
+          };
+        }
 
-    const saveSecrets = (secrets: Record<string, string>) =>
-      Effect.gen(function* () {
-        yield* fs.mkdir(dirname(secretsFile));
-        yield* fs.writeFile(secretsFile, JSON.stringify(secrets, null, 2), {
-          mode: SECRET_FILE_MODE,
-        });
-        yield* fs.chmod(secretsFile, SECRET_FILE_MODE);
-      });
+        const rawContent = yield* fs.readFile(targetFile);
+        const content = rawContent.trim();
+        if (!content) {
+          return {
+            secrets: {},
+            corruptLegacy: {},
+            format: "vault",
+          };
+        }
 
-    const migrateSecrets = (secrets: Record<string, string>, key: string) =>
-      Effect.gen(function* () {
-        let changed = false;
-        const next: Record<string, string> = { ...secrets };
+        if (isVaultFormat(content)) {
+          const blob = parseVault(content);
+          const decryptedJson = yield* store.decrypt(blob, key);
+          let parsed: Record<string, string>;
+          try {
+            parsed = JSON.parse(decryptedJson);
+          } catch (e) {
+            return yield* Effect.fail(
+              new Error(`Failed to parse decrypted vault JSON: ${String(e)}`),
+            );
+          }
+          return {
+            secrets: parsed,
+            corruptLegacy: {},
+            format: "vault",
+          };
+        }
 
-        for (const [name, encrypted] of Object.entries(secrets)) {
-          const usesNewKey = yield* Effect.sync(() => {
-            try {
-              decryptNew(encrypted, key);
-              return true;
-            } catch {
-              return false;
-            }
-          });
+        if (content.startsWith("{")) {
+          let raw: Record<string, string>;
+          try {
+            raw = JSON.parse(content) as Record<string, string>;
+          } catch (e) {
+            return yield* Effect.fail(
+              new Error(`Failed to parse legacy secrets JSON: ${String(e)}`),
+            );
+          }
 
-          if (usesNewKey) continue;
+          const secrets: Record<string, string> = {};
+          const corruptLegacy: Record<string, string> = {};
 
-          // decryptNew failed: legacy candidate or corrupt blob. Leave corrupt entries as-is.
-          const plaintext = yield* store
-            .decrypt(encrypted, key)
-            .pipe(
+          for (const [name, encryptedValue] of Object.entries(raw)) {
+            const res = yield* store.decrypt(encryptedValue, key).pipe(
+              Effect.map((val) => ({ ok: true as const, val })),
               Effect.catchAll(() =>
-                Effect.succeed<string | undefined>(undefined),
+                Effect.succeed({ ok: false as const, val: undefined }),
               ),
             );
-          if (plaintext === undefined) continue;
+            if (res.ok && res.val !== undefined) {
+              secrets[name] = res.val;
+            } else {
+              corruptLegacy[name] = encryptedValue;
+            }
+          }
 
-          next[name] = yield* store.encrypt(plaintext, key);
-          changed = true;
+          return {
+            secrets,
+            corruptLegacy,
+            format: "legacy",
+          };
         }
 
-        if (changed) {
-          yield* saveSecrets(next);
+        return yield* Effect.fail(
+          new Error(
+            `Invalid secrets file format in ${targetFile}. Expected ${VAULT_HEADER} header or legacy JSON format.`,
+          ),
+        );
+      });
+
+    const saveSecrets = (
+      targetFile: string,
+      loaded: LoadedSecrets,
+      key: string,
+    ) =>
+      Effect.gen(function* () {
+        yield* fs.mkdir(dirname(targetFile));
+
+        if (
+          loaded.format === "legacy" &&
+          Object.keys(loaded.corruptLegacy).length > 0
+        ) {
+          const raw: Record<string, string> = { ...loaded.corruptLegacy };
+          for (const [k, v] of Object.entries(loaded.secrets)) {
+            raw[k] = yield* store.encrypt(v, key);
+          }
+          yield* fs.writeFile(targetFile, JSON.stringify(raw, null, 2), {
+            mode: SECRET_FILE_MODE,
+          });
+          yield* fs.chmod(targetFile, SECRET_FILE_MODE);
+        } else {
+          const json = JSON.stringify(loaded.secrets, null, 2);
+          const encryptedBlob = yield* store.encrypt(json, key);
+          const vaultContent = formatVault(encryptedBlob);
+          yield* fs.writeFile(targetFile, vaultContent, {
+            mode: SECRET_FILE_MODE,
+          });
+          yield* fs.chmod(targetFile, SECRET_FILE_MODE);
+          loaded.format = "vault";
         }
-        return next;
+      });
+
+    const migrateIfLegacy = (
+      targetFile: string,
+      loaded: LoadedSecrets,
+      key: string,
+    ) =>
+      Effect.gen(function* () {
+        if (
+          loaded.format === "legacy" &&
+          Object.keys(loaded.corruptLegacy).length === 0 &&
+          Object.keys(loaded.secrets).length > 0
+        ) {
+          yield* saveSecrets(targetFile, loaded, key);
+        }
       });
 
     return SecretManager.of({
       setPaths: (paths) =>
         Effect.sync(() => {
-          secretsFile = paths.secretsFile;
+          configuredSecretsFile = paths.secretsFile;
           masterKeyFile = paths.masterKeyFile;
           customMasterKeyFile = true;
         }),
       get: (name) =>
         Effect.gen(function* () {
-          const key = yield* getMasterKey();
-          const secrets = yield* loadSecrets();
-          const migrated = yield* migrateSecrets(secrets, key);
-          const encrypted = migrated[name];
-          if (!encrypted) throw new Error(`Secret not found: ${name}`);
-          return yield* store.decrypt(encrypted, key);
+          const targetFile = yield* resolveSecretsPath();
+          const key = yield* getMasterKey(targetFile);
+          const loaded = yield* loadSecrets(targetFile, key);
+          yield* migrateIfLegacy(targetFile, loaded, key);
+          if (name in loaded.corruptLegacy) {
+            return yield* Effect.fail(
+              new Error(`Decryption failed: corrupt secret ${name}`),
+            );
+          }
+          const val = loaded.secrets[name];
+          if (val !== undefined) {
+            return val;
+          }
+          return yield* Effect.fail(new Error(`Secret not found: ${name}`));
         }),
       set: (name, value) =>
         Effect.gen(function* () {
-          const key = yield* getMasterKey();
-          const secrets = yield* loadSecrets();
-          const migrated = yield* migrateSecrets(secrets, key);
-          migrated[name] = yield* store.encrypt(value, key);
-          yield* saveSecrets(migrated);
+          const targetFile = yield* resolveSecretsPath();
+          const key = yield* getMasterKey(targetFile);
+          const loaded = yield* loadSecrets(targetFile, key);
+          delete loaded.corruptLegacy[name];
+          loaded.secrets[name] = value;
+          yield* saveSecrets(targetFile, loaded, key);
         }),
       list: () =>
         Effect.gen(function* () {
-          const key = yield* getMasterKey();
-          const secrets = yield* loadSecrets();
-          const migrated = yield* migrateSecrets(secrets, key);
-          return Object.keys(migrated);
+          const targetFile = yield* resolveSecretsPath();
+          const key = yield* getMasterKey(targetFile);
+          const loaded = yield* loadSecrets(targetFile, key);
+          yield* migrateIfLegacy(targetFile, loaded, key);
+          return [
+            ...Object.keys(loaded.secrets),
+            ...Object.keys(loaded.corruptLegacy),
+          ];
         }),
       remove: (name) =>
         Effect.gen(function* () {
-          const key = yield* getMasterKey();
-          const secrets = yield* loadSecrets();
-          if (secrets[name]) {
-            delete secrets[name];
-            yield* saveSecrets(secrets);
+          const targetFile = yield* resolveSecretsPath();
+          const key = yield* getMasterKey(targetFile);
+          const loaded = yield* loadSecrets(targetFile, key);
+          let changed = false;
+          if (name in loaded.corruptLegacy) {
+            delete loaded.corruptLegacy[name];
+            changed = true;
+          }
+          if (name in loaded.secrets) {
+            delete loaded.secrets[name];
+            changed = true;
+          }
+          if (changed) {
+            yield* saveSecrets(targetFile, loaded, key);
           }
         }),
     });
