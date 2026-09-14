@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { Resource, Component } from '../core/component';
-import { FileSystem } from '../services/fs';
+import { FileSystem, resolvePath } from '../services/fs';
 import { SystemCommand } from '../services/exec';
 import { hashConfig } from '../core/hash';
 import { createHash } from 'node:crypto';
@@ -35,12 +35,14 @@ export class UnarchiveResource extends Resource {
       const exec = yield* SystemCommand;
 
       const { src, dest, stripComponents = 0, become } = this.props;
+      const resolvedSrc = resolvePath(src);
+      const resolvedDest = resolvePath(dest);
 
       // Ensure destination exists
-      yield* fs.mkdir(dest, { become });
+      yield* fs.mkdir(resolvedDest, { become });
 
       if (src.endsWith('.zip')) {
-        yield* exec.execFile('unzip', ['-o', src, '-d', dest], { become });
+        yield* exec.execFile('unzip', ['-o', resolvedSrc, '-d', resolvedDest], { become });
       } else if (
         src.endsWith('.tar') ||
         src.endsWith('.tar.gz') ||
@@ -55,7 +57,7 @@ export class UnarchiveResource extends Resource {
 
         flags += 'f';
 
-        const tarArgs = [flags, src, '-C', dest];
+        const tarArgs = [flags, resolvedSrc, '-C', resolvedDest];
         if (stripComponents > 0) {
           tarArgs.push(`--strip-components=${stripComponents}`);
         }
@@ -66,13 +68,13 @@ export class UnarchiveResource extends Resource {
 
       // Apply ownership and mode if specified
       if (this.props.mode !== undefined) {
-        yield* fs.chmod(dest, this.props.mode, { become });
+        yield* fs.chmod(resolvedDest, this.props.mode, { become });
       }
 
       if (this.props.uid !== undefined || this.props.gid !== undefined) {
         const uid = this.props.uid ?? process.getuid!();
         const gid = this.props.gid ?? process.getgid!();
-        yield* fs.chown(dest, uid, gid, { become });
+        yield* fs.chown(resolvedDest, uid, gid, { become });
       }
     });
   }

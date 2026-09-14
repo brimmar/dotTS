@@ -71,4 +71,31 @@ describe('SymlinkResource', () => {
 
     await rm(testDir, { recursive: true, force: true });
   });
+
+  it('should expand leading tilde in symlink source', async () => {
+    const { homedir } = require('os');
+    const { readlink } = require('fs/promises');
+    const app = new App();
+    const stack = new Stack(app, 'test');
+
+    await mkdir(testDir, { recursive: true });
+    const linkPath = join(testDir, 'tilde-link.txt');
+
+    const linkRes = new SymlinkResource(stack, 'tilde-link', {
+      source: '~/test-target.txt',
+      path: linkPath,
+    });
+
+    await Effect.runPromise(
+      linkRes.apply().pipe(
+        Effect.provide(FileSystemLive),
+        Effect.provide(SystemCommandLive),
+      ),
+    );
+
+    const actualTarget = await readlink(linkPath);
+    expect(actualTarget).toBe(`${homedir()}/test-target.txt`);
+
+    await rm(testDir, { recursive: true, force: true });
+  });
 });

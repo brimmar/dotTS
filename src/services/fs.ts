@@ -221,8 +221,10 @@ export const FileSystemLive = Layer.effect(
       },
       symlink: (target, path, options) => {
         const resolvedPath = resolvePath(path);
-        // NOTE: target is intentionally NOT resolved — symlinks can be relative or
-        // point to absolute paths specified by the user as-is.
+        const resolvedTarget =
+          target === '~' || target.startsWith('~/') || target.startsWith('~\\')
+            ? `${homedir()}${target.slice(1)}`
+            : target;
         return wrap(
           options,
           async () => {
@@ -230,14 +232,14 @@ export const FileSystemLive = Layer.effect(
             try {
               await NodeFS.unlink(resolvedPath);
             } catch {}
-            await NodeFS.symlink(target, resolvedPath);
+            await NodeFS.symlink(resolvedTarget, resolvedPath);
           },
           (exec) =>
             Effect.gen(function* () {
               yield* exec.execFile('mkdir', ['-p', '--', dirname(resolvedPath)], options);
-              yield* exec.execFile('ln', ['-sf', '--', target, resolvedPath], options);
+              yield* exec.execFile('ln', ['-sf', '--', resolvedTarget, resolvedPath], options);
             }),
-          (error) => `Failed to create symlink ${resolvedPath} -> ${target}: ${String(error)}`
+          (error) => `Failed to create symlink ${resolvedPath} -> ${resolvedTarget}: ${String(error)}`
         );
       },
       rm: (path, options) => {

@@ -188,4 +188,35 @@ describe('UnarchiveResource', () => {
 
     expect(rmCalls).toEqual([]);
   });
+
+  it('should expand leading tilde in src and dest paths', async () => {
+    const { homedir } = require('os');
+    const calls: { file: string; args: readonly string[] }[] = [];
+    const MockFS = Layer.succeed(FileSystem, FileSystem.of({
+      mkdir: () => Effect.void,
+      writeFileBytes: () => Effect.void,
+    } as any));
+    const MockExec = Layer.succeed(SystemCommand, SystemCommand.of({
+      execFile: (file: string, args: readonly string[]) => Effect.sync(() => {
+        calls.push({ file, args });
+        return '';
+      }),
+    } as any));
+
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const zipRes = new UnarchiveResource(stack, 'tilde-zip', {
+      src: '~/archive.zip',
+      dest: '~/out',
+    });
+
+    await Effect.runPromise(
+      zipRes.apply().pipe(Effect.provide(MockFS), Effect.provide(MockExec))
+    );
+
+    expect(calls[0]).toEqual({
+      file: 'unzip',
+      args: ['-o', `${homedir()}/archive.zip`, '-d', `${homedir()}/out`],
+    });
+  });
 });
