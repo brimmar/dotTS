@@ -57,15 +57,33 @@ export class AptRepositoryResource extends Resource {
         // 1. Handle GPG Key
         if (key) {
           const keyExists = yield* fs.exists(keyringPath);
-          if (!keyExists) {
+          let keyValid = false;
+          if (keyExists) {
+            const check = yield* Effect.match(
+              exec.execFile('gpg', ['--show-keys', keyringPath], { intent: 'read' }),
+              {
+                onFailure: () => false,
+                onSuccess: () => true,
+              },
+            );
+            keyValid = check;
+          }
+
+          if (!keyExists || !keyValid) {
+            if (keyExists) {
+              yield* fs.rm(keyringPath, { become });
+            }
             yield* fs.mkdir('/etc/apt/keyrings', { become });
-            // Download key. We use a temporary file to dearmor it.
+            // Download key as raw bytes to prevent UTF-8 corruption of binary OpenPGP keyrings
             const tempKeyPath = `/tmp/dotts-${name}.key`;
-            const keyContent = yield* http.downloadString(key);
-            yield* fs.writeFile(tempKeyPath, keyContent);
-            
+            const keyBytes = yield* http.downloadBytes(key);
+            yield* fs.writeFileBytes(tempKeyPath, keyBytes);
+
             // Check if it needs dearmoring (ASCII armored starts with -----BEGIN PGP PUBLIC KEY BLOCK-----)
-            if (keyContent.includes('-----BEGIN PGP PUBLIC KEY BLOCK-----')) {
+            const textSample = new TextDecoder('utf-8', { fatal: false }).decode(keyBytes.slice(0, 128));
+            const isArmored = textSample.includes('-----BEGIN PGP');
+
+            if (isArmored) {
               yield* exec.execFile('gpg', ['--dearmor', '--output', keyringPath, tempKeyPath], { become });
             } else {
               yield* exec.execFile('cp', [tempKeyPath, keyringPath], { become });

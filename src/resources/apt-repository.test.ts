@@ -23,6 +23,7 @@ describe('AptRepositoryResource', () => {
 
   const MockHttp = (keyContent: string) => Layer.succeed(HttpService, HttpService.of({
     downloadString: (url: string) => Effect.succeed(keyContent),
+    downloadBytes: (url: string) => Effect.succeed(new TextEncoder().encode(keyContent)),
   } as any));
 
   const MockExec = (commands: string[] = []) => Layer.succeed(SystemCommand, SystemCommand.of({
@@ -141,5 +142,34 @@ describe('AptRepositoryResource', () => {
     });
 
     expect(res.concurrencyKey).toBe('pkg-manager-system');
+  });
+
+  it('should copy binary OpenPGP keys directly without gpg dearmor', async () => {
+    const commands: string[] = [];
+    const files: Record<string, string> = {};
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new AptRepositoryResource(stack, 'test-repo', {
+      name: 'github-cli',
+      uri: 'https://cli.github.com/packages',
+      distribution: 'stable',
+      components: ['main'],
+      key: 'https://cli.github.com/packages/githubcli-archive-keyring.gpg',
+    });
+
+    // Binary data (starts with OpenPGP packet tag, not ASCII armor)
+    const binaryKey = String.fromCharCode(0x99, 0x01, 0x00);
+
+    await Effect.runPromise(
+      res.apply().pipe(
+        Effect.provide(MockPlatform),
+        Effect.provide(MockFS(files)),
+        Effect.provide(MockHttp(binaryKey)),
+        Effect.provide(MockExec(commands)),
+      ),
+    );
+
+    expect(commands).toContain('cp /tmp/dotts-github-cli.key /etc/apt/keyrings/github-cli.gpg');
+    expect(commands.some((c) => c.includes('gpg --dearmor'))).toBe(false);
   });
 });
