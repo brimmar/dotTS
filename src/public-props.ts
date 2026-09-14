@@ -58,6 +58,7 @@ export interface GitProps extends ResourceBaseProps {
   sparse?: string[];
   depth?: number;
   recursive?: boolean;
+  force?: boolean;
 }
 
 export interface LineInFileProps extends ResourceBaseProps {
