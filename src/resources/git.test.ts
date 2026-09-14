@@ -166,6 +166,36 @@ describe("GitResource", () => {
     expect(commands).toContain("git pull");
   });
 
+  it("should update sparse-checkout and checkout when repository already exists", async () => {
+    const commands: string[] = [];
+    const app = new App();
+    const stack = new Stack(app, "test");
+    const gitRes = new GitResource(stack, "git-test", {
+      url: "https://github.com/test/repo.git",
+      dest: "/tmp/repo",
+      branch: "main",
+      sparse: ["dotfiles"],
+    });
+
+    const fsWithGit = Layer.succeed(
+      FileSystem,
+      FileSystem.of({
+        exists: (_path: string) => Effect.succeed(true),
+        writeFileBytes: () => Effect.void,
+      } as any),
+    );
+
+    await Effect.runPromise(
+      gitRes
+        .apply()
+        .pipe(Effect.provide(fsWithGit), Effect.provide(MockExec(commands))),
+    );
+
+    expect(commands).toContain("git sparse-checkout set dotfiles");
+    expect(commands).toContain("git checkout main");
+    expect(commands).toContain("git pull");
+  });
+
   it("should initialize in-place if destination exists but is not a git repository", async () => {
     const commands: string[] = [];
     const app = new App();

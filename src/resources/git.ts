@@ -138,6 +138,7 @@ export class GitResource extends Resource {
             ["sparse-checkout", "set", ...cleanSparse],
             inRepo,
           );
+          yield* exec.execFile("git", ["checkout", branch || "HEAD"], inRepo);
         }
 
         yield* exec.execFile("git", ["pull"], inRepo);
