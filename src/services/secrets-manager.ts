@@ -58,6 +58,16 @@ export const SecretManagerLive = Layer.effect(
             return candidatePath;
           }
         }
+        let current = dirname(dir);
+        while (current && current !== dirname(current)) {
+          for (const candidate of ["vault", "secrets.vault", "secrets.json"]) {
+            const candidatePath = join(current, ".dotts", candidate);
+            if (yield* fs.exists(candidatePath)) {
+              return candidatePath;
+            }
+          }
+          current = dirname(current);
+        }
         return configuredSecretsFile;
       });
 
@@ -69,14 +79,18 @@ export const SecretManagerLive = Layer.effect(
         let keyFile = masterKeyFile;
         let exists = yield* fs.exists(keyFile);
         if (!exists && !customMasterKeyFile) {
-          const vaultPass1 = join(homedir(), ".vault-pass");
-          const vaultPass2 = join(homedir(), ".vault_pass");
-          if (yield* fs.exists(vaultPass1)) {
-            keyFile = vaultPass1;
-            exists = true;
-          } else if (yield* fs.exists(vaultPass2)) {
-            keyFile = vaultPass2;
-            exists = true;
+          const keyCandidates = [
+            join(homedir(), ".dotts_key"),
+            join(homedir(), ".dotts-key"),
+            join(homedir(), ".vault-pass"),
+            join(homedir(), ".vault_pass"),
+          ];
+          for (const cand of keyCandidates) {
+            if (cand !== keyFile && (yield* fs.exists(cand))) {
+              keyFile = cand;
+              exists = true;
+              break;
+            }
           }
         }
         if (!exists) {

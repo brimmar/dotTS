@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { exists } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -93,10 +94,21 @@ export async function dottsCheck(
             yield* remoteRepo.clone(url, dir);
           }
 
-          const finalPath = join(dir, "dotts.ts");
+          let finalPath = join(dir, "dotts.ts");
+          if (!existsSync(finalPath)) {
+            if (existsSync(join(dir, "dotts", "dotts.ts"))) {
+              finalPath = join(dir, "dotts", "dotts.ts");
+            } else if (existsSync(join(dir, ".dotts", "dotts.ts"))) {
+              finalPath = join(dir, ".dotts", "dotts.ts");
+            }
+          }
           const sm = yield* SecretManager;
+          const configDir = dirname(finalPath);
+          const vaultCandidate = existsSync(join(dir, ".dotts", "vault"))
+            ? join(dir, ".dotts", "vault")
+            : join(configDir, ".dotts", "vault");
           yield* sm.setPaths({
-            secretsFile: join(dir, ".dotts", "vault"),
+            secretsFile: vaultCandidate,
             masterKeyFile: join(homedir(), ".dotts_key"),
           });
           yield* Effect.promise(() =>

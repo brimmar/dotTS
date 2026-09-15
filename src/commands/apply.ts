@@ -263,9 +263,12 @@ export async function dottsApply(
             }
 
             const configDir = dirname(finalPath);
+            const vaultCandidate = existsSync(join(dir, ".dotts", "vault"))
+              ? join(dir, ".dotts", "vault")
+              : join(configDir, ".dotts", "vault");
             yield* _(
               secretManager.setPaths({
-                secretsFile: join(configDir, ".dotts", "vault"),
+                secretsFile: vaultCandidate,
                 masterKeyFile: join(homedir(), ".dotts_key"),
               }),
             );
