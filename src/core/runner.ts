@@ -7,6 +7,7 @@ import { performance } from 'node:perf_hooks';
 import { App } from './app';
 import { rehydrate } from './registry';
 import { migrateStateId, migrateStateKeys } from './ids';
+import { currentResourceTag } from '../services/exec';
 
 export interface ResourceExecutionResult {
   id: string;
@@ -58,13 +59,15 @@ export const RunnerLive = Layer.effect(
           if (!options?.silent) {
             warnLeftoverScriptLineState(currentState, rawResources);
           }
-        const tiers = sortResourcesByTier(rawResources);
+          const resourceIndexMap = new Map<string, number>();
+          rawResources.forEach((res, i) => resourceIndexMap.set(res.id, i + 1));
+          const tiers = sortResourcesByTier(rawResources);
 
         let created = 0;
         let updated = 0;
         let converged = 0;
 
-        const tierConcurrency = options?.verbose ? 1 : 'unbounded';
+        const tierConcurrency = 'unbounded';
 
         for (const tier of tiers) {
           const groups = new Map<string | undefined, Resource[]>();
@@ -85,7 +88,8 @@ export const RunnerLive = Layer.effect(
                           res,
                           currentState,
                           newState,
-                          options?.silent,
+                          options,
+                          resourceIndexMap.get(res.id),
                         );
                         if (status === 'created') created++;
                         else if (status === 'updated') updated++;
@@ -106,7 +110,8 @@ export const RunnerLive = Layer.effect(
                       res,
                       currentState,
                       newState,
-                      options?.silent,
+                      options,
+                      resourceIndexMap.get(res.id),
                     );
                     if (status === 'created') created++;
                     else if (status === 'updated') updated++;
@@ -147,7 +152,8 @@ export const RunnerLive = Layer.effect(
           if (previous) persisted[res.id] = previous;
         }
 
-        for (const res of sortDestroyResources(toDestroy)) {
+        const sortedDestroy = sortDestroyResources(toDestroy);
+        for (const [i, res] of sortedDestroy.entries()) {
           const dest = resourceManagedPath(res.props);
           if (dest && remainingUsesPath(dest, newState)) {
             if (!options?.silent) {
@@ -155,8 +161,11 @@ export const RunnerLive = Layer.effect(
             }
             continue;
           }
+          const destroyTag = `#del-${i + 1} [${res.id}]`;
           const destStartTime = performance.now();
-          yield* withRetry(res.destroy(), res);
+          yield* withRetry(res.destroy(), res).pipe(
+            Effect.locally(currentResourceTag, destroyTag),
+          );
           const destDurationMs = performance.now() - destStartTime;
           const destDurationSeconds = Number((destDurationMs / 1000).toFixed(3));
           delete persisted[res.id];
@@ -164,7 +173,11 @@ export const RunnerLive = Layer.effect(
           deleted++;
           if (!options?.silent) {
             const timeStr = pc.dim(formatDuration(destDurationMs));
-            console.log(alignRight(pc.red(`- Delete: ${res.id}`), timeStr));
+            if (options?.verbose) {
+              console.log(alignRight(`${pc.cyan(destroyTag)} ${pc.red(`- Delete: ${res.id}`)}`, timeStr));
+            } else {
+              console.log(alignRight(pc.red(`- Delete: ${res.id}`), timeStr));
+            }
           }
           executedResources.push({
             id: res.id,
@@ -283,7 +296,8 @@ function runResource(
   res: Resource,
   currentState: AppState,
   newState: AppState,
-  silent?: boolean,
+  options?: RunnerOptions,
+  stepIndex?: number,
 ): Effect.Effect<RunResourceOutcome, Error, any> {
   return Effect.gen(function* () {
     const id = res.id;
@@ -305,14 +319,27 @@ function runResource(
       result = 'converged';
     }
 
+    const stepTag = stepIndex ? `#${stepIndex} [${id}]` : `[${id}]`;
+    const silent = options?.silent;
+
+    if (options?.verbose && !silent) {
+      console.log(pc.bold(pc.blue('=>')) + ' ' + pc.cyan(stepTag));
+    }
+
     const startTime = performance.now();
-    yield* withRetry(res.apply(), res);
+    yield* withRetry(res.apply(), res).pipe(
+      Effect.locally(currentResourceTag, stepTag),
+    );
     const durationMs = performance.now() - startTime;
     const durationSeconds = Number((durationMs / 1000).toFixed(3));
 
     if (!silent) {
       const timeStr = pc.dim(formatDuration(durationMs));
-      console.log(alignRight(labelPrefix, timeStr));
+      if (options?.verbose) {
+        console.log(alignRight(`${pc.cyan(stepTag)} ${labelPrefix}`, timeStr));
+      } else {
+        console.log(alignRight(labelPrefix, timeStr));
+      }
     }
 
     newState[id] = { hash, kind: res.kind, metadata: metadataForState({ ...(res.props as object) }) };

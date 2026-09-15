@@ -128,7 +128,7 @@ describe('Runner', () => {
     expect(maxActive).toBeGreaterThan(1);
   });
 
-  it('should serialize resources when verbose is true', async () => {
+  it('should maintain concurrency when verbose is true', async () => {
     const app = new App();
     const stack = new Stack(app, 'test');
 
@@ -158,7 +158,7 @@ describe('Runner', () => {
     const TestRunnerLayer = RunnerLive.pipe(Layer.provide(MockState()));
     await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
 
-    expect(maxActive).toBe(1);
+    expect(maxActive).toBeGreaterThan(1);
   });
 
   it('should serialize resources with the same concurrencyKey', async () => {
@@ -577,5 +577,29 @@ describe('Runner', () => {
     );
     expect(leftoverWarnings).toHaveLength(1);
     warn.mockRestore();
+  });
+
+  it('outputs Docker-style step tags when verbose is true', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    new TestResource(stack, 'pkg:curl', 'hash1');
+
+    const logs: string[] = [];
+    const logSpy = spyOn(console, 'log').mockImplementation((...args) => {
+      logs.push(args.join(' '));
+    });
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app, { verbose: true, silent: false });
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(Layer.provide(MockState()));
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    logSpy.mockRestore();
+
+    expect(logs.some((l) => l.includes('=>') && l.includes('#1 [pkg:curl]'))).toBe(true);
+    expect(logs.some((l) => l.includes('#1 [pkg:curl]') && l.includes('+ Create: pkg:curl'))).toBe(true);
   });
 });

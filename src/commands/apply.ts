@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import * as p from "@clack/prompts";
-import { Effect, Layer } from "effect";
+import { Effect, FiberRef, Layer } from "effect";
 import pc from "picocolors";
 import { flatten } from "../core/component";
 import { loadConfig } from "../core/loader";
@@ -10,6 +10,7 @@ import { Runner, RunnerLive } from "../core/runner";
 import { checkPathPermission, setupSudoSession } from "../core/sudo";
 import { DryRun } from "../services/dry-run";
 import {
+  currentResourceTag,
   SystemCommand,
   createSystemCommandLive,
 } from "../services/exec";
@@ -137,10 +138,12 @@ function dryRunSystemCommand(
       if (options?.intent === "read") {
         return live.execFile(file, args, { ...options, become: undefined });
       }
-      return Effect.sync(() => {
-        log(`[DRY RUN] Would execute: ${file} ${args.join(" ")}`);
+      return Effect.gen(function* () {
+        const tag = yield* FiberRef.get(currentResourceTag);
+        const prefix = tag ? pc.cyan(tag) + " " : "";
+        log(`${prefix}[DRY RUN] Would execute: ${file} ${args.join(" ")}`);
         if (verbose && options?.cwd && !json) {
-          p.log.info(pc.dim(`          cwd: ${options.cwd}`));
+          p.log.info(prefix + pc.dim(`          cwd: ${options.cwd}`));
         }
         return "";
       });
@@ -149,10 +152,12 @@ function dryRunSystemCommand(
       if (options?.intent === "read") {
         return live.run(command, { ...options, become: undefined });
       }
-      return Effect.sync(() => {
-        log(`[DRY RUN] Would run: ${command}`);
+      return Effect.gen(function* () {
+        const tag = yield* FiberRef.get(currentResourceTag);
+        const prefix = tag ? pc.cyan(tag) + " " : "";
+        log(`${prefix}[DRY RUN] Would run: ${command}`);
         if (verbose && options?.cwd && !json) {
-          p.log.info(pc.dim(`          cwd: ${options.cwd}`));
+          p.log.info(prefix + pc.dim(`          cwd: ${options.cwd}`));
         }
         return "";
       });

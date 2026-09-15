@@ -1,8 +1,10 @@
-import { Context, Effect, Layer } from 'effect';
+import { Context, Effect, FiberRef, Layer } from 'effect';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import pc from 'picocolors';
+
+export const currentResourceTag = FiberRef.unsafeMake<string>('');
 
 export interface ExecOptions {
   cwd?: string;
@@ -106,6 +108,7 @@ function spawnExecFile(
   args: string[],
   options?: ExecOptions,
   globalVerbose?: boolean,
+  tag?: string,
 ): Promise<string> {
   const spawned = buildSudoArgs(file, args, options?.become);
   const env = options?.env ? { ...process.env, ...options.env } : undefined;
@@ -121,13 +124,14 @@ function spawnExecFile(
   const shouldLog = verbose && options?.intent !== 'read' && !options?.probe;
 
   return new Promise((resolve, reject) => {
+    const tagPrefix = tag ? pc.cyan(tag) + ' ' : '  ';
     if (shouldLog) {
       const displayCmd = formatCommandForLog(spawned);
-      console.log(pc.dim('  $ ') + pc.cyan(displayCmd));
+      console.log(tagPrefix + pc.dim('$ ') + pc.cyan(displayCmd));
     }
 
-    const stdoutStreamer = shouldLog ? new LineStreamer(pc.dim('  │ ')) : undefined;
-    const stderrStreamer = shouldLog ? new LineStreamer(pc.dim('  │ '), pc.dim) : undefined;
+    const stdoutStreamer = shouldLog ? new LineStreamer(tagPrefix + pc.dim('│ ')) : undefined;
+    const stderrStreamer = shouldLog ? new LineStreamer(tagPrefix + pc.dim('│ '), pc.dim) : undefined;
 
     const child = spawn(spawned.file, spawned.args, {
       cwd,
@@ -163,7 +167,7 @@ function spawnExecFile(
         stdoutStreamer?.flush();
         stderrStreamer?.flush();
         if (code !== 0) {
-          console.log(pc.dim('  └─ exit ') + pc.red(String(code ?? 1)));
+          console.log(tagPrefix + pc.dim('└─ exit ') + pc.red(String(code ?? 1)));
         }
       }
       if (code === 0) {
@@ -193,16 +197,22 @@ export function createSystemCommand(config?: SystemCommandConfig): SystemCommand
   const isGlobalVerbose = config?.verbose ?? false;
   return SystemCommand.of({
     execFile: (file, args, options) =>
-      Effect.tryPromise({
-        try: () => spawnExecFile(file, args, options, isGlobalVerbose),
-        catch: (error) =>
-          new Error(`Command failed: ${file} ${args.join(' ')}\n${String(error)}`),
+      Effect.gen(function* () {
+        const tag = yield* FiberRef.get(currentResourceTag);
+        return yield* Effect.tryPromise({
+          try: () => spawnExecFile(file, args, options, isGlobalVerbose, tag),
+          catch: (error) =>
+            new Error(`Command failed: ${file} ${args.join(' ')}\n${String(error)}`),
+        });
       }),
     run: (command, options) =>
-      Effect.tryPromise({
-        try: () => spawnExecFile('sh', ['-c', command], options, isGlobalVerbose),
-        catch: (error) =>
-          new Error(`Command failed: ${command}\n${String(error)}`),
+      Effect.gen(function* () {
+        const tag = yield* FiberRef.get(currentResourceTag);
+        return yield* Effect.tryPromise({
+          try: () => spawnExecFile('sh', ['-c', command], options, isGlobalVerbose, tag),
+          catch: (error) =>
+            new Error(`Command failed: ${command}\n${String(error)}`),
+        });
       }),
   });
 }
