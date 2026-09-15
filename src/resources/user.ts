@@ -8,6 +8,7 @@ export interface UserProps {
   uid?: number;
   gid?: number | string;
   groups?: string[];
+  append?: boolean;
   shell?: string;
   home?: string;
   createHome?: boolean;
@@ -90,6 +91,9 @@ export class UserResource extends Resource {
             ).split(' ');
             const hasAllGroups = groups.every(g => currentGroups.includes(g));
             if (!hasAllGroups) {
+              if (this.props.append !== false) {
+                args.push('--append');
+              }
               args.push('--groups', groups.join(','));
               needsUpdate = true;
             }

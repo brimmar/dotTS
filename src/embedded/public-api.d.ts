@@ -68,6 +68,7 @@ export interface UserProps extends ResourceBaseProps {
     uid?: number;
     gid?: number | string;
     groups?: string[];
+    append?: boolean;
     shell?: string;
     home?: string;
     createHome?: boolean;

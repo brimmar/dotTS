@@ -163,6 +163,30 @@ describe('UserResource', () => {
     expect(probes.every((c) => c.intent === 'read')).toBe(true);
     const usermod = calls.find((c) => c.file === 'usermod');
     expect(usermod).toBeDefined();
+    expect(usermod?.args).toContain('--append');
     expect(usermod?.intent).toBeUndefined();
+  });
+
+  it('should omit --append when append is false', async () => {
+    const commands: string[] = [];
+    const calls: { file: string; args: string[]; intent?: 'read' | 'write' }[] = [];
+    const app = new App();
+    const stack = new Stack(app, 'test');
+    const res = new UserResource(stack, 'test-user', {
+      name: 'testuser',
+      groups: ['docker'],
+      append: false,
+    });
+
+    await Effect.runPromise(
+      res.apply().pipe(
+        Effect.provide(MockExec(commands, true, calls)),
+      ),
+    );
+
+    const usermod = calls.find((c) => c.file === 'usermod');
+    expect(usermod).toBeDefined();
+    expect(usermod?.args).not.toContain('--append');
+    expect(usermod?.args).toContain('--groups');
   });
 });
