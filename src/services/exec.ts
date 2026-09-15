@@ -127,33 +127,40 @@ function spawnExecFile(
 
   const display = getActiveDisplay();
   const verbose = options?.verbose ?? globalVerbose ?? false;
-  const shouldLog = verbose && options?.intent !== "read" && !options?.probe;
+  const isProbeOrRead = options?.intent === "read" || Boolean(options?.probe);
+  const shouldStreamToDisplay = Boolean(
+    display && resourceId && !isProbeOrRead,
+  );
+  const shouldLogToConsole = Boolean(
+    (!display || !resourceId) && verbose && !isProbeOrRead,
+  );
+  const shouldCapture = shouldStreamToDisplay || shouldLogToConsole;
 
   return new Promise((resolve, reject) => {
     const tagPrefix = tag ? pc.cyan(tag) + " " : "  ";
-    if (shouldLog) {
+    if (shouldCapture) {
       const displayCmd = formatCommandForLog(spawned);
-      if (display && resourceId) {
-        display.onResourceCommand(resourceId, displayCmd, cwd);
+      if (shouldStreamToDisplay) {
+        display?.onResourceCommand(resourceId!, displayCmd, cwd);
       } else {
         console.log(tagPrefix + pc.dim("$ ") + pc.cyan(displayCmd));
       }
     }
 
-    const stdoutStreamer = shouldLog
+    const stdoutStreamer = shouldCapture
       ? new LineStreamer((line) => {
-          if (display && resourceId) {
-            display.onResourceOutput(resourceId, line);
+          if (shouldStreamToDisplay) {
+            display?.onResourceOutput(resourceId!, line);
           } else {
             console.log(tagPrefix + pc.dim("│ ") + line);
           }
         })
       : undefined;
 
-    const stderrStreamer = shouldLog
+    const stderrStreamer = shouldCapture
       ? new LineStreamer((line) => {
-          if (display && resourceId) {
-            display.onResourceOutput(resourceId, line);
+          if (shouldStreamToDisplay) {
+            display?.onResourceOutput(resourceId!, line);
           } else {
             console.log(tagPrefix + pc.dim("│ ") + pc.dim(line));
           }
@@ -190,13 +197,13 @@ function spawnExecFile(
     child.on("close", (code) => {
       if (settled) return;
       settled = true;
-      if (shouldLog) {
+      if (shouldCapture) {
         stdoutStreamer?.flush();
         stderrStreamer?.flush();
         if (code !== 0) {
-          if (display && resourceId) {
-            display.onResourceOutput(
-              resourceId,
+          if (shouldStreamToDisplay) {
+            display?.onResourceOutput(
+              resourceId!,
               pc.red(`└─ exit ${code ?? 1}`),
             );
           } else {

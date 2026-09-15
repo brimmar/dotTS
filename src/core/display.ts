@@ -95,6 +95,7 @@ export class LiveDisplay {
   private prevLineCount = 0;
   private isTTY = Boolean(process.stdout.isTTY);
   private renderTimer: NodeJS.Timeout | null = null;
+  private ticker: NodeJS.Timeout | null = null;
   readonly verbose: boolean;
   readonly silent: boolean;
 
@@ -113,13 +114,12 @@ export class LiveDisplay {
       commands: [],
       currentCommandIndex: -1,
     });
-    if (this.verbose) {
-      this.requestRender();
-    }
+    this.ensureTicker();
+    this.requestRender();
   }
 
   onResourceCommand(id: string, cmd: string, cwd?: string) {
-    if (this.silent || !this.verbose) return;
+    if (this.silent) return;
     const res = this.active.get(id);
     if (!res) return;
     res.commands.push({ cmd, cwd, lines: [] });
@@ -128,7 +128,7 @@ export class LiveDisplay {
   }
 
   onResourceOutput(id: string, line: string) {
-    if (this.silent || !this.verbose) return;
+    if (this.silent) return;
     const res = this.active.get(id);
     if (!res) return;
     const currentCmd =
@@ -152,8 +152,10 @@ export class LiveDisplay {
     const res = this.active.get(id);
     this.active.delete(id);
 
-    if (this.verbose) {
-      this.clearDynamic();
+    this.clearDynamic();
+
+    if (this.active.size === 0) {
+      this.stopTicker();
     }
 
     const timeStr = pc.dim(formatDuration(completion.durationMs));
@@ -177,10 +179,11 @@ export class LiveDisplay {
       console.log(
         alignRight(`${pc.cyan(stepTag)} ${completion.labelPrefix}`, timeStr),
       );
-      this.render();
     } else {
       console.log(alignRight(completion.labelPrefix, timeStr));
     }
+
+    this.render();
   }
 
   onResourceFail(id: string, error: Error, stepIndex?: number) {
@@ -191,8 +194,10 @@ export class LiveDisplay {
     const res = this.active.get(id);
     this.active.delete(id);
 
-    if (this.verbose) {
-      this.clearDynamic();
+    this.clearDynamic();
+
+    if (this.active.size === 0) {
+      this.stopTicker();
     }
 
     const stepTag = `#${res?.stepIndex ?? stepIndex ?? "?"} [${id}]`;
@@ -212,20 +217,33 @@ export class LiveDisplay {
     }
     console.log(pc.red(`■ Failed: ${id}`));
 
-    if (this.verbose) {
-      this.render();
-    }
+    this.render();
   }
 
   stop() {
+    this.stopTicker();
     if (this.renderTimer) {
       clearTimeout(this.renderTimer);
       this.renderTimer = null;
     }
-    if (this.verbose) {
-      this.clearDynamic();
-    }
+    this.clearDynamic();
     this.active.clear();
+  }
+
+  private ensureTicker() {
+    if (!this.isTTY || this.silent) return;
+    if (this.ticker) return;
+    this.ticker = setInterval(() => {
+      this.render();
+    }, 80);
+    this.ticker.unref?.();
+  }
+
+  private stopTicker() {
+    if (this.ticker) {
+      clearInterval(this.ticker);
+      this.ticker = null;
+    }
   }
 
   private clearDynamic() {
@@ -236,7 +254,7 @@ export class LiveDisplay {
   }
 
   private requestRender() {
-    if (!this.isTTY || this.silent || !this.verbose) return;
+    if (!this.isTTY || this.silent) return;
     if (this.renderTimer) return;
     this.renderTimer = setTimeout(() => {
       this.renderTimer = null;
@@ -245,14 +263,17 @@ export class LiveDisplay {
   }
 
   private render() {
-    if (!this.isTTY || this.silent || !this.verbose) return;
+    if (!this.isTTY || this.silent) return;
     if (this.renderTimer) {
       clearTimeout(this.renderTimer);
       this.renderTimer = null;
     }
     this.clearDynamic();
 
-    if (this.active.size === 0) return;
+    if (this.active.size === 0) {
+      this.stopTicker();
+      return;
+    }
 
     const cols = process.stdout.columns || 80;
     const maxTerminalRows = process.stdout.rows
