@@ -9,7 +9,10 @@ import { loadConfig } from "../core/loader";
 import { Runner, RunnerLive } from "../core/runner";
 import { checkPathPermission, setupSudoSession } from "../core/sudo";
 import { DryRun } from "../services/dry-run";
-import { SystemCommand, SystemCommandLive } from "../services/exec";
+import {
+  SystemCommand,
+  createSystemCommandLive,
+} from "../services/exec";
 import { FileSystem, FileSystemLive } from "../services/fs";
 import { HttpServiceLive } from "../services/http";
 import { PlatformServiceLive } from "../services/platform";
@@ -34,73 +37,111 @@ import {
 export interface ApplyOptions {
   dryRun?: boolean;
   yes?: boolean;
+  verbose?: boolean;
+  json?: boolean;
+}
+
+export interface ApplyResult {
+  success: boolean;
+  command: "apply";
+  config: string;
+  dryRun: boolean;
+  summary: {
+    created: number;
+    updated: number;
+    deleted: number;
+    converged: number;
+    durationSeconds: number;
+  };
+  resources: Array<{
+    id: string;
+    kind: string;
+    status: "created" | "updated" | "converged" | "deleted";
+    durationSeconds?: number;
+  }>;
 }
 
 /** Live reads; mutating methods log and do not touch disk. */
-export function dryRunFileSystem(live: FileSystem): FileSystem {
+export function dryRunFileSystem(
+  live: FileSystem,
+  options?: { json?: boolean },
+): FileSystem {
+  const log = (msg: string) => {
+    if (!options?.json) {
+      p.log.info(pc.gray(msg));
+    }
+  };
   return FileSystem.of({
-    readFile: (path, options) => live.readFile(path, options),
-    exists: (path, options) => live.exists(path, options),
-    writeFile: (path, _content, options) =>
+    readFile: (path, opt) => live.readFile(path, opt),
+    exists: (path, opt) => live.exists(path, opt),
+    writeFile: (path, _content, opt) =>
       Effect.sync(() => {
-        checkPathPermission(path, options);
-        p.log.info(pc.gray(`[DRY RUN] Would write file: ${path}`));
+        checkPathPermission(path, opt);
+        log(`[DRY RUN] Would write file: ${path}`);
       }),
-    writeFileBytes: (path, _content, options) =>
+    writeFileBytes: (path, _content, opt) =>
       Effect.sync(() => {
-        checkPathPermission(path, options);
-        p.log.info(pc.gray(`[DRY RUN] Would write bytes: ${path}`));
+        checkPathPermission(path, opt);
+        log(`[DRY RUN] Would write bytes: ${path}`);
       }),
-    mkdir: (path, options) =>
+    mkdir: (path, opt) =>
       Effect.sync(() => {
-        checkPathPermission(path, options);
-        p.log.info(pc.gray(`[DRY RUN] Would create directory: ${path}`));
+        checkPathPermission(path, opt);
+        log(`[DRY RUN] Would create directory: ${path}`);
       }),
-    symlink: (target, path, options) =>
+    symlink: (target, path, opt) =>
       Effect.sync(() => {
-        checkPathPermission(path, options);
-        p.log.info(
-          pc.gray(`[DRY RUN] Would create symlink: ${path} -> ${target}`),
-        );
+        checkPathPermission(path, opt);
+        log(`[DRY RUN] Would create symlink: ${path} -> ${target}`);
       }),
-    rm: (path, options) =>
+    rm: (path, opt) =>
       Effect.sync(() => {
-        checkPathPermission(path, options);
-        p.log.info(pc.gray(`[DRY RUN] Would remove: ${path}`));
+        checkPathPermission(path, opt);
+        log(`[DRY RUN] Would remove: ${path}`);
       }),
-    rmdir: (path, options) =>
+    rmdir: (path, opt) =>
       Effect.sync(() => {
-        checkPathPermission(path, options);
-        p.log.info(pc.gray(`[DRY RUN] Would rmdir: ${path}`));
+        checkPathPermission(path, opt);
+        log(`[DRY RUN] Would rmdir: ${path}`);
       }),
-    unlink: (path, options) =>
+    unlink: (path, opt) =>
       Effect.sync(() => {
-        checkPathPermission(path, options);
-        p.log.info(pc.gray(`[DRY RUN] Would unlink: ${path}`));
+        checkPathPermission(path, opt);
+        log(`[DRY RUN] Would unlink: ${path}`);
       }),
-    chmod: (path, mode, options) =>
+    chmod: (path, mode, opt) =>
       Effect.sync(() => {
-        checkPathPermission(path, options);
-        p.log.info(pc.gray(`[DRY RUN] Would chmod: ${path} to ${mode}`));
+        checkPathPermission(path, opt);
+        log(`[DRY RUN] Would chmod: ${path} to ${mode}`);
       }),
-    chown: (path, uid, gid, options) =>
+    chown: (path, uid, gid, opt) =>
       Effect.sync(() => {
-        checkPathPermission(path, options);
-        p.log.info(pc.gray(`[DRY RUN] Would chown: ${path} to ${uid}:${gid}`));
+        checkPathPermission(path, opt);
+        log(`[DRY RUN] Would chown: ${path} to ${uid}:${gid}`);
       }),
   });
 }
 
-function dryRunSystemCommand(live: SystemCommand): SystemCommand {
+function dryRunSystemCommand(
+  live: SystemCommand,
+  verbose?: boolean,
+  json?: boolean,
+): SystemCommand {
+  const log = (msg: string) => {
+    if (!json) {
+      p.log.info(pc.gray(msg));
+    }
+  };
   return SystemCommand.of({
     execFile: (file, args, options) => {
       if (options?.intent === "read") {
         return live.execFile(file, args, { ...options, become: undefined });
       }
       return Effect.sync(() => {
-        p.log.info(
-          pc.gray(`[DRY RUN] Would execute: ${file} ${args.join(" ")}`),
-        );
+        log(`[DRY RUN] Would execute: ${file} ${args.join(" ")}`);
+        if (verbose && options?.cwd && !json) {
+          p.log.info(pc.dim(`          cwd: ${options.cwd}`));
+        }
         return "";
       });
     },
@@ -109,7 +150,10 @@ function dryRunSystemCommand(live: SystemCommand): SystemCommand {
         return live.run(command, { ...options, become: undefined });
       }
       return Effect.sync(() => {
-        p.log.info(pc.gray(`[DRY RUN] Would execute: ${command}`));
+        log(`[DRY RUN] Would run: ${command}`);
+        if (verbose && options?.cwd && !json) {
+          p.log.info(pc.dim(`          cwd: ${options.cwd}`));
+        }
         return "";
       });
     },
@@ -119,17 +163,17 @@ function dryRunSystemCommand(live: SystemCommand): SystemCommand {
 export async function dottsApply(
   configPath: string,
   options: ApplyOptions = {},
-) {
+): Promise<ApplyResult> {
+  const BaseExecLayer = createSystemCommandLive({ verbose: options.verbose });
+
   const FSLayer = options.dryRun
     ? Layer.effect(
         FileSystem,
         Effect.gen(function* () {
           const live = yield* FileSystem;
-          return dryRunFileSystem(live);
+          return dryRunFileSystem(live, { json: options.json });
         }),
-      ).pipe(
-        Layer.provide(FileSystemLive.pipe(Layer.provide(SystemCommandLive))),
-      )
+      ).pipe(Layer.provide(FileSystemLive.pipe(Layer.provide(BaseExecLayer))))
     : FileSystemLive;
 
   const ExecLayer = options.dryRun
@@ -137,10 +181,10 @@ export async function dottsApply(
         SystemCommand,
         Effect.gen(function* () {
           const live = yield* SystemCommand;
-          return dryRunSystemCommand(live);
+          return dryRunSystemCommand(live, options.verbose, options.json);
         }),
-      ).pipe(Layer.provide(SystemCommandLive))
-    : SystemCommandLive;
+      ).pipe(Layer.provide(BaseExecLayer))
+    : BaseExecLayer;
 
   const StateLayer = options.dryRun
     ? Layer.effect(
@@ -199,10 +243,14 @@ export async function dottsApply(
       return yield* _(
         tempDir.use((dir) =>
           Effect.gen(function* (_) {
-            const s = p.spinner();
-            s.start(`Cloning ${url}...`);
-            yield* _(remoteRepo.clone(url, dir));
-            s.stop(`Cloned to temporary directory.`);
+            if (!options.json) {
+              const s = p.spinner();
+              s.start(`Cloning ${url}...`);
+              yield* _(remoteRepo.clone(url, dir));
+              s.stop(`Cloned to temporary directory.`);
+            } else {
+              yield* _(remoteRepo.clone(url, dir));
+            }
 
             let finalPath = join(dir, "dotts.ts");
             if (!existsSync(finalPath)) {
@@ -225,11 +273,13 @@ export async function dottsApply(
               Effect.promise(() => loadConfig(finalPath)),
             );
 
-            p.log.step(
-              pc.cyan(
-                `Applying configuration: ${config.name}${options.dryRun ? " (DRY RUN)" : ""}`,
-              ),
-            );
+            if (!options.json) {
+              p.log.step(
+                pc.cyan(
+                  `Applying configuration: ${config.name}${options.dryRun ? " (DRY RUN)" : ""}`,
+                ),
+              );
+            }
             yield* _(validator.validate(app));
             const rawResources = flatten(app);
             const sudoSession = yield* _(
@@ -237,14 +287,27 @@ export async function dottsApply(
                 setupSudoSession(rawResources, { dryRun: options.dryRun }),
               ),
             );
-            yield* _(
+            const report = yield* _(
               Effect.acquireUseRelease(
                 Effect.succeed(sudoSession),
-                () => runner.run(app),
+                () => runner.run(app, { silent: options.json }),
                 (session) => Effect.sync(() => session.cleanup()),
               ),
             );
-            return config;
+            return {
+              success: true,
+              command: "apply" as const,
+              config: config.name,
+              dryRun: Boolean(options.dryRun),
+              summary: {
+                created: report.created,
+                updated: report.updated,
+                deleted: report.deleted,
+                converged: report.converged,
+                durationSeconds: report.durationSeconds,
+              },
+              resources: report.resources,
+            };
           }),
         ),
       );
@@ -261,11 +324,13 @@ export async function dottsApply(
       const { app, config } = yield* _(
         Effect.promise(() => loadConfig(configPath)),
       );
-      p.log.step(
-        pc.cyan(
-          `Applying configuration: ${config.name}${options.dryRun ? " (DRY RUN)" : ""}`,
-        ),
-      );
+      if (!options.json) {
+        p.log.step(
+          pc.cyan(
+            `Applying configuration: ${config.name}${options.dryRun ? " (DRY RUN)" : ""}`,
+          ),
+        );
+      }
       yield* _(validator.validate(app));
       const rawResources = flatten(app);
       const sudoSession = yield* _(
@@ -273,22 +338,35 @@ export async function dottsApply(
           setupSudoSession(rawResources, { dryRun: options.dryRun }),
         ),
       );
-      yield* _(
+      const report = yield* _(
         Effect.acquireUseRelease(
           Effect.succeed(sudoSession),
-          () => runner.run(app),
+          () => runner.run(app, { silent: options.json }),
           (session) => Effect.sync(() => session.cleanup()),
         ),
       );
-      return config;
+      return {
+        success: true,
+        command: "apply" as const,
+        config: config.name,
+        dryRun: Boolean(options.dryRun),
+        summary: {
+          created: report.created,
+          updated: report.updated,
+          deleted: report.deleted,
+          converged: report.converged,
+          durationSeconds: report.durationSeconds,
+        },
+        resources: report.resources,
+      };
     }
   });
 
   const RemoteRepoLayer = RemoteRepoServiceLive.pipe(
-    Layer.provide(SystemCommandLive),
+    Layer.provide(BaseExecLayer),
   );
   const TempDirLayer = TempDirServiceLive.pipe(
-    Layer.provide(FileSystemLive.pipe(Layer.provide(SystemCommandLive))),
+    Layer.provide(FileSystemLive.pipe(Layer.provide(BaseExecLayer))),
   );
 
   const SecretManagerWithDeps = SecretManagerLive.pipe(

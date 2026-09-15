@@ -41,28 +41,62 @@ async function main() {
         await dottsPrepare(request.dir);
         p.log.success("Editor types prepared.");
       } else if (request.kind === "check") {
-        await dottsCheck(request.configPath);
+        const result = await dottsCheck(request.configPath, {
+          json: request.json,
+        });
+        if (request.json) {
+          process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+        }
       } else if (request.kind === "doctor") {
-        await dottsDoctor();
+        const result = await dottsDoctor({ json: request.json });
+        if (request.json) {
+          process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+        }
       } else if (request.kind === "apply") {
-        await dottsApply(request.configPath, {
+        const result = await dottsApply(request.configPath, {
           dryRun: request.dryRun,
           yes: request.yes,
+          verbose: request.verbose,
+          json: request.json,
         });
+        if (request.json) {
+          process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+        }
       } else if (request.kind === "secrets-get") {
         await dottsSecretGet(request.name);
       } else if (request.kind === "secrets-set") {
         await dottsSecretSet(request.name, request.value);
       } else if (request.kind === "secrets-list") {
-        await dottsSecretList();
+        const result = await dottsSecretList({ json: request.json });
+        if (request.json) {
+          process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+        }
       } else if (request.kind === "secrets-remove") {
         await dottsSecretRemove(request.name);
       }
     } catch (error) {
+      const isJson = args.includes("--json");
       const formatted = formatError(error);
-      p.log.error(pc.red(`${formatted.title}: ${formatted.message}`));
-      if (formatted.hint) {
-        p.note(formatted.hint, "suggested fix");
+      if (isJson) {
+        process.stdout.write(
+          `${JSON.stringify(
+            {
+              success: false,
+              error: {
+                title: formatted.title,
+                message: formatted.message,
+                hint: formatted.hint,
+              },
+            },
+            null,
+            2,
+          )}\n`,
+        );
+      } else {
+        p.log.error(pc.red(`${formatted.title}: ${formatted.message}`));
+        if (formatted.hint) {
+          p.note(formatted.hint, "suggested fix");
+        }
       }
       process.exit(1);
     }

@@ -90,6 +90,37 @@ describe('dotts apply', () => {
     expect(existsSync(marker)).toBe(true);
     await rm(dir, { recursive: true, force: true });
   });
+
+  it('supports json mode and returns execution report', async () => {
+    const dir = join(tmpdir(), 'dotts-apply-json-' + Math.random().toString(36).slice(2));
+    const configPath = join(dir, 'dotts.ts');
+    await mkdir(dir, { recursive: true });
+    await writeFile(configPath, `
+      export default () => {};
+    `);
+
+    const result = await dottsApply(configPath, { json: true });
+    expect(result.success).toBe(true);
+    expect(result.command).toBe('apply');
+    expect(result.summary).toBeDefined();
+    expect(result.summary.created).toBe(0);
+    expect(result.summary.converged).toBe(0);
+    expect(Array.isArray(result.resources)).toBe(true);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('supports verbose mode', async () => {
+    const dir = join(tmpdir(), 'dotts-apply-verbose-' + Math.random().toString(36).slice(2));
+    const configPath = join(dir, 'dotts.ts');
+    await mkdir(dir, { recursive: true });
+    await writeFile(configPath, `
+      export default () => {};
+    `);
+
+    const result = await dottsApply(configPath, { verbose: true });
+    expect(result.success).toBe(true);
+    await rm(dir, { recursive: true, force: true });
+  });
 });
 
 describe('dryRunFileSystem', () => {

@@ -86,4 +86,66 @@ describe('parseArgv', () => {
       value: '-h',
     });
   });
+
+  it("parses ['apply', '--verbose'] and ['apply', '-v'] with verbose true", () => {
+    expect(parseArgv(['apply', '--verbose'])).toEqual({
+      kind: 'apply',
+      configPath: './dotts.ts',
+      dryRun: false,
+      verbose: true,
+    });
+    expect(parseArgv(['apply', '-v'])).toEqual({
+      kind: 'apply',
+      configPath: './dotts.ts',
+      dryRun: false,
+      verbose: true,
+    });
+  });
+
+  it("parses ['apply', '--json'] with json true", () => {
+    expect(parseArgv(['apply', '--json'])).toEqual({
+      kind: 'apply',
+      configPath: './dotts.ts',
+      dryRun: false,
+      json: true,
+    });
+  });
+
+  it("parses combined flags for apply", () => {
+    expect(parseArgv(['apply', 'my-dotts.ts', '-v', '--json', '--dry-run', '-y'])).toEqual({
+      kind: 'apply',
+      configPath: 'my-dotts.ts',
+      dryRun: true,
+      yes: true,
+      verbose: true,
+      json: true,
+    });
+  });
+
+  it("parses ['check', '--json'] with json true", () => {
+    expect(parseArgv(['check', '--json'])).toEqual({
+      kind: 'check',
+      configPath: './dotts.ts',
+      json: true,
+    });
+    expect(parseArgv(['check', 'custom.ts', '--json'])).toEqual({
+      kind: 'check',
+      configPath: 'custom.ts',
+      json: true,
+    });
+  });
+
+  it("parses ['doctor', '--json'] with json true", () => {
+    expect(parseArgv(['doctor', '--json'])).toEqual({
+      kind: 'doctor',
+      json: true,
+    });
+  });
+
+  it("parses ['secrets', 'list', '--json'] with json true", () => {
+    expect(parseArgv(['secrets', 'list', '--json'])).toEqual({
+      kind: 'secrets-list',
+      json: true,
+    });
+  });
 });

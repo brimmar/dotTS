@@ -24,18 +24,27 @@ import {
 } from "../services/validation";
 import { dottsPrepare } from "./prepare";
 
-function throwOnTypeErrors(diagnostics: TypecheckDiagnostic[]): void {
+function throwOnTypeErrors(
+  diagnostics: TypecheckDiagnostic[],
+  json = false,
+): void {
   if (diagnostics.length === 0) return;
-  for (const d of diagnostics) {
-    p.log.error(pc.red(`${d.file}:${d.line}:${d.column}: ${d.message}`));
+  if (!json) {
+    for (const d of diagnostics) {
+      p.log.error(pc.red(`${d.file}:${d.line}:${d.column}: ${d.message}`));
+    }
   }
-  throw new Error(`Typecheck failed with ${diagnostics.length} error(s)`);
+  const details = diagnostics
+    .map((d) => `${d.file}:${d.line}:${d.column}: ${d.message}`)
+    .join("\n");
+  throw new Error(`Typecheck failed with ${diagnostics.length} error(s):\n${details}`);
 }
 
 async function typecheckProject(
   configPath: string,
   projectDir: string,
   writeTypesIfMissing: boolean,
+  json = false,
 ): Promise<void> {
   const typesDir = join(projectDir, ".dotts", "types");
   if (writeTypesIfMissing && !(await exists(typesDir))) {
@@ -46,10 +55,25 @@ async function typecheckProject(
       configPath: resolve(configPath),
       typesDir,
     }),
+    json,
   );
 }
 
-export async function dottsCheck(configPath: string) {
+export interface CheckOptions {
+  json?: boolean;
+}
+
+export interface CheckResult {
+  success: boolean;
+  command: "check";
+  config: string;
+  valid: boolean;
+}
+
+export async function dottsCheck(
+  configPath: string,
+  options: CheckOptions = {},
+): Promise<CheckResult> {
   const program = Effect.gen(function* () {
     const remoteRepo = yield* RemoteRepoService;
     const tempDir = yield* TempDirService;
@@ -60,10 +84,14 @@ export async function dottsCheck(configPath: string) {
 
       return yield* tempDir.use((dir) =>
         Effect.gen(function* () {
-          const s = p.spinner();
-          s.start(`Cloning ${url}...`);
-          yield* remoteRepo.clone(url, dir);
-          s.stop(`Cloned to temporary directory.`);
+          if (!options.json) {
+            const s = p.spinner();
+            s.start(`Cloning ${url}...`);
+            yield* remoteRepo.clone(url, dir);
+            s.stop(`Cloned to temporary directory.`);
+          } else {
+            yield* remoteRepo.clone(url, dir);
+          }
 
           const finalPath = join(dir, "dotts.ts");
           const sm = yield* SecretManager;
@@ -71,12 +99,16 @@ export async function dottsCheck(configPath: string) {
             secretsFile: join(dir, ".dotts", "vault"),
             masterKeyFile: join(homedir(), ".dotts_key"),
           });
-          yield* Effect.promise(() => typecheckProject(finalPath, dir, true));
+          yield* Effect.promise(() =>
+            typecheckProject(finalPath, dir, true, options.json),
+          );
           const { app, config } = yield* Effect.promise(() =>
             loadConfig(finalPath),
           );
 
-          p.log.step(pc.cyan(`Checking remote configuration: ${config.name}`));
+          if (!options.json) {
+            p.log.step(pc.cyan(`Checking remote configuration: ${config.name}`));
+          }
           yield* validator.validate(app);
           return config;
         }),
@@ -89,12 +121,19 @@ export async function dottsCheck(configPath: string) {
         masterKeyFile: join(homedir(), ".dotts_key"),
       });
       yield* Effect.promise(() =>
-        typecheckProject(absolutePath, dirname(absolutePath), false),
+        typecheckProject(
+          absolutePath,
+          dirname(absolutePath),
+          false,
+          options.json,
+        ),
       );
       const { app, config } = yield* Effect.promise(() =>
         loadConfig(configPath),
       );
-      p.log.step(pc.cyan(`Checking configuration: ${config.name}`));
+      if (!options.json) {
+        p.log.step(pc.cyan(`Checking configuration: ${config.name}`));
+      }
       yield* validator.validate(app);
       return config;
     }
@@ -114,10 +153,19 @@ export async function dottsCheck(configPath: string) {
   );
   try {
     const config = await Effect.runPromise(MainLive);
-    p.log.success(pc.green("Configuration is valid!"));
-    return config;
+    if (!options.json) {
+      p.log.success(pc.green("Configuration is valid!"));
+    }
+    return {
+      success: true,
+      command: "check",
+      config: config.name,
+      valid: true,
+    };
   } catch (error) {
-    p.log.error(pc.red(`Validation failed: ${String(error)}`));
+    if (!options.json) {
+      p.log.error(pc.red(`Validation failed: ${String(error)}`));
+    }
     throw error;
   }
 }

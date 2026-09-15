@@ -8,8 +8,31 @@ import { App } from './app';
 import { rehydrate } from './registry';
 import { migrateStateId, migrateStateKeys } from './ids';
 
+export interface ResourceExecutionResult {
+  id: string;
+  kind: string;
+  status: 'created' | 'updated' | 'converged' | 'deleted';
+  durationSeconds?: number;
+}
+
+export interface ExecutionReport {
+  created: number;
+  updated: number;
+  deleted: number;
+  converged: number;
+  durationSeconds: number;
+  resources: ResourceExecutionResult[];
+}
+
+export interface RunnerOptions {
+  silent?: boolean;
+}
+
 export interface Runner {
-  readonly run: (component: Component) => Effect.Effect<void, Error, never>;
+  readonly run: (
+    component: Component,
+    options?: RunnerOptions,
+  ) => Effect.Effect<ExecutionReport, Error, never>;
 }
 
 export const Runner = Context.GenericTag<Runner>('Runner');
@@ -20,13 +43,20 @@ export const RunnerLive = Layer.effect(
     const stateService = yield* StateService;
 
     return Runner.of({
-      run: (component: Component): Effect.Effect<void, Error, never> => Effect.gen(function* () {
-        const startTime = performance.now();
-        const currentState = migrateStateKeys(yield* stateService.load());
-        const newState: AppState = {};
-        
-        const rawResources = flatten(component);
-        warnLeftoverScriptLineState(currentState, rawResources);
+      run: (
+        component: Component,
+        options?: RunnerOptions,
+      ): Effect.Effect<ExecutionReport, Error, never> =>
+        Effect.gen(function* () {
+          const startTime = performance.now();
+          const currentState = migrateStateKeys(yield* stateService.load());
+          const newState: AppState = {};
+          const executedResources: ResourceExecutionResult[] = [];
+
+          const rawResources = flatten(component);
+          if (!options?.silent) {
+            warnLeftoverScriptLineState(currentState, rawResources);
+          }
         const tiers = sortResourcesByTier(rawResources);
 
         let created = 0;
@@ -48,20 +78,42 @@ export const RunnerLive = Layer.effect(
                   yield* Effect.all(
                     resources.map((res) => 
                       Effect.gen(function* () {
-                        const result = yield* runResource(res, currentState, newState);
-                        if (result === 'created') created++;
-                        else if (result === 'updated') updated++;
+                        const { status, durationSeconds } = yield* runResource(
+                          res,
+                          currentState,
+                          newState,
+                          options?.silent,
+                        );
+                        if (status === 'created') created++;
+                        else if (status === 'updated') updated++;
                         else converged++;
+                        executedResources.push({
+                          id: res.id,
+                          kind: res.kind,
+                          status,
+                          durationSeconds,
+                        });
                       })
                     ),
                     { concurrency: 'unbounded' }
                   );
                 } else {
                   for (const res of resources) {
-                    const result = yield* runResource(res, currentState, newState);
-                    if (result === 'created') created++;
-                    else if (result === 'updated') updated++;
+                    const { status, durationSeconds } = yield* runResource(
+                      res,
+                      currentState,
+                      newState,
+                      options?.silent,
+                    );
+                    if (status === 'created') created++;
+                    else if (status === 'updated') updated++;
                     else converged++;
+                    executedResources.push({
+                      id: res.id,
+                      kind: res.kind,
+                      status,
+                      durationSeconds,
+                    });
                   }
                 }
               })
@@ -77,7 +129,9 @@ export const RunnerLive = Layer.effect(
           if (hasStateId(newState, id, currentState[id]?.kind)) continue;
           const oldState = currentState[id];
           if (!oldState || !oldState.kind) {
-            console.warn(`cannot destroy ${id}: missing kind; keeping it in state until purged`);
+            if (!options?.silent) {
+              console.warn(`cannot destroy ${id}: missing kind; keeping it in state until purged`);
+            }
             if (oldState) newState[id] = oldState;
             continue;
           }
@@ -93,14 +147,28 @@ export const RunnerLive = Layer.effect(
         for (const res of sortDestroyResources(toDestroy)) {
           const dest = resourceManagedPath(res.props);
           if (dest && remainingUsesPath(dest, newState)) {
-            console.warn(`skip destroy ${res.id}: remaining resources still under ${dest}`);
+            if (!options?.silent) {
+              console.warn(`skip destroy ${res.id}: remaining resources still under ${dest}`);
+            }
             continue;
           }
+          const destStartTime = performance.now();
           yield* withRetry(res.destroy(), res);
+          const destDurationMs = performance.now() - destStartTime;
+          const destDurationSeconds = Number((destDurationMs / 1000).toFixed(3));
           delete persisted[res.id];
           yield* stateService.save(persisted);
           deleted++;
-          console.log(pc.red(`- Delete: ${res.id}`));
+          if (!options?.silent) {
+            const timeStr = pc.dim(formatDuration(destDurationMs));
+            console.log(alignRight(pc.red(`- Delete: ${res.id}`), timeStr));
+          }
+          executedResources.push({
+            id: res.id,
+            kind: res.kind,
+            status: 'deleted',
+            durationSeconds: destDurationSeconds,
+          });
         }
 
         yield* stateService.save(persisted);
@@ -108,13 +176,24 @@ export const RunnerLive = Layer.effect(
         const endTime = performance.now();
         const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-        console.log('\n' + pc.bold('Execution Summary:'));
-        console.log(`${pc.green(`+ ${created} created`)}`);
-        console.log(`${pc.yellow(`~ ${updated} updated`)}`);
-        console.log(`${pc.red(`- ${deleted} deleted`)}`);
-        console.log(`${pc.gray(`  ${converged} converged`)}`);
-        console.log(pc.cyan(`Total duration: ${duration}s`));
-      }) as Effect.Effect<void, Error, never>,
+        if (!options?.silent) {
+          console.log('\n' + pc.bold('Execution Summary:'));
+          console.log(`${pc.green(`+ ${created} created`)}`);
+          console.log(`${pc.yellow(`~ ${updated} updated`)}`);
+          console.log(`${pc.red(`- ${deleted} deleted`)}`);
+          console.log(`${pc.gray(`  ${converged} converged`)}`);
+          console.log(pc.cyan(`Total duration: ${duration}s`));
+        }
+
+        return {
+          created,
+          updated,
+          deleted,
+          converged,
+          durationSeconds: Number(duration),
+          resources: executedResources,
+        };
+      }) as Effect.Effect<ExecutionReport, Error, never>,
     });
   })
 );
@@ -163,7 +242,46 @@ function metadataForState(props: Record<string, unknown> = {}): Record<string, u
   };
 }
 
-function runResource(res: Resource, currentState: AppState, newState: AppState): Effect.Effect<ResourceResult, Error, any> {
+function visibleLength(str: string): number {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: strip ANSI escape codes for terminal width
+  return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').length;
+}
+
+export function formatDuration(ms: number): string {
+  if (ms < 1) return '<1ms';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(2)}s`;
+  const mins = Math.floor(seconds / 60);
+  const remSecs = (seconds % 60).toFixed(1);
+  return `${mins}m ${remSecs}s`;
+}
+
+export function alignRight(
+  left: string,
+  right: string,
+  maxWidth = process.stdout.columns || 80,
+): string {
+  const leftLen = visibleLength(left);
+  const rightLen = visibleLength(right);
+  const padding = maxWidth - leftLen - rightLen;
+  if (padding > 1) {
+    return left + ' '.repeat(padding) + right;
+  }
+  return left + '  ' + right;
+}
+
+interface RunResourceOutcome {
+  status: ResourceResult;
+  durationSeconds: number;
+}
+
+function runResource(
+  res: Resource,
+  currentState: AppState,
+  newState: AppState,
+  silent?: boolean,
+): Effect.Effect<RunResourceOutcome, Error, any> {
   return Effect.gen(function* () {
     const id = res.id;
     const hash = res.hash();
@@ -171,22 +289,31 @@ function runResource(res: Resource, currentState: AppState, newState: AppState):
     const oldState = stateId in currentState ? currentState[stateId] : currentState[id];
 
     let result: ResourceResult;
+    let labelPrefix: string;
 
     if (!oldState) {
-      console.log(pc.green(`+ Create: ${id}`));
+      labelPrefix = pc.green(`+ Create: ${id}`);
       result = 'created';
     } else if (oldState.hash !== hash) {
-      console.log(pc.yellow(`~ Update: ${id}`));
+      labelPrefix = pc.yellow(`~ Update: ${id}`);
       result = 'updated';
     } else {
-      console.log(pc.gray(`~ Converge: ${id}`));
+      labelPrefix = pc.gray(`~ Converge: ${id}`);
       result = 'converged';
     }
 
+    const startTime = performance.now();
     yield* withRetry(res.apply(), res);
+    const durationMs = performance.now() - startTime;
+    const durationSeconds = Number((durationMs / 1000).toFixed(3));
+
+    if (!silent) {
+      const timeStr = pc.dim(formatDuration(durationMs));
+      console.log(alignRight(labelPrefix, timeStr));
+    }
 
     newState[id] = { hash, kind: res.kind, metadata: metadataForState({ ...(res.props as object) }) };
-    return result;
+    return { status: result, durationSeconds };
   });
 }
 

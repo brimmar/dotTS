@@ -1,11 +1,11 @@
 export const HELP_TEXT = `dotts init [--force] [dir]
 dotts prepare [dir]
-dotts check [path]
-dotts apply [path] [--dry-run] [--yes|-y]
-dotts doctor
+dotts check [path] [--json]
+dotts apply [path] [--dry-run] [--yes|-y] [--verbose|-v] [--json]
+dotts doctor [--json]
 dotts secrets get <name>
 dotts secrets set <name> <value>
-dotts secrets list
+dotts secrets list [--json]
 dotts secrets remove <name>`;
 
 export type CliRequest =
@@ -13,12 +13,19 @@ export type CliRequest =
   | { kind: "help" }
   | { kind: "init"; projectDir: string; force: boolean }
   | { kind: "prepare"; dir: string }
-  | { kind: "check"; configPath: string }
-  | { kind: "doctor" }
-  | { kind: "apply"; configPath: string; dryRun: boolean; yes?: boolean }
+  | { kind: "check"; configPath: string; json?: boolean }
+  | { kind: "doctor"; json?: boolean }
+  | {
+      kind: "apply";
+      configPath: string;
+      dryRun: boolean;
+      yes?: boolean;
+      verbose?: boolean;
+      json?: boolean;
+    }
   | { kind: "secrets-get"; name: string }
   | { kind: "secrets-set"; name: string; value: string }
-  | { kind: "secrets-list" }
+  | { kind: "secrets-list"; json?: boolean }
   | { kind: "secrets-remove"; name: string };
 
 function isHelpFlag(arg: string): boolean {
@@ -79,13 +86,20 @@ export function parseArgv(argv: string[]): CliRequest {
   }
 
   if (command === "check") {
-    const { positional } = takeArgs(argv.slice(1), []);
-    return { kind: "check", configPath: positional || "./dotts.ts" };
+    const { positional, flags } = takeArgs(argv.slice(1), ["--json"]);
+    return {
+      kind: "check",
+      configPath: positional || "./dotts.ts",
+      ...(flags.has("--json") ? { json: true } : {}),
+    };
   }
 
   if (command === "doctor") {
-    takeArgs(argv.slice(1), []);
-    return { kind: "doctor" };
+    const { flags } = takeArgs(argv.slice(1), ["--json"]);
+    return {
+      kind: "doctor",
+      ...(flags.has("--json") ? { json: true } : {}),
+    };
   }
 
   if (command === "apply") {
@@ -93,13 +107,20 @@ export function parseArgv(argv: string[]): CliRequest {
       "--dry-run",
       "--yes",
       "-y",
+      "--verbose",
+      "-v",
+      "--json",
     ]);
     const yes = flags.has("--yes") || flags.has("-y");
+    const verbose = flags.has("--verbose") || flags.has("-v");
+    const json = flags.has("--json");
     return {
       kind: "apply",
       configPath: positional || "./dotts.ts",
       dryRun: flags.has("--dry-run"),
       ...(yes ? { yes: true } : {}),
+      ...(verbose ? { verbose: true } : {}),
+      ...(json ? { json: true } : {}),
     };
   }
 
@@ -121,7 +142,11 @@ export function parseArgv(argv: string[]): CliRequest {
       return { kind: "secrets-set", name, value };
     }
     if (action === "list") {
-      return { kind: "secrets-list" };
+      const { flags } = takeArgs(argv.slice(2), ["--json"]);
+      return {
+        kind: "secrets-list",
+        ...(flags.has("--json") ? { json: true } : {}),
+      };
     }
     if (action === "remove") {
       const name = argv[2];

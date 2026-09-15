@@ -5,31 +5,54 @@ import { SystemCommand, SystemCommandLive } from '../services/exec';
 import { FileSystem, FileSystemLive } from '../services/fs';
 import { platform, release } from 'node:os';
 
-export async function dottsDoctor() {
-  p.log.step(pc.cyan('Running system diagnostics...'));
+export interface DoctorOptions {
+  json?: boolean;
+}
+
+export interface DoctorResult {
+  success: boolean;
+  command: "doctor";
+  os: { platform: string; release: string };
+  tools: Record<string, boolean>;
+  writeAccess: boolean;
+}
+
+export async function dottsDoctor(
+  options: DoctorOptions = {},
+): Promise<DoctorResult> {
+  if (!options.json) {
+    p.log.step(pc.cyan('Running system diagnostics...'));
+  }
 
   const program = Effect.gen(function* () {
     const exec = yield* SystemCommand;
     const fs = yield* FileSystem;
 
     // 1. OS Info
-    p.log.info(pc.gray(`OS: ${platform()} ${release()}`));
+    const osInfo = { platform: platform(), release: release() };
+    if (!options.json) {
+      p.log.info(pc.gray(`OS: ${osInfo.platform} ${osInfo.release}`));
+    }
 
     // 2. Check tools
-    const tools = ['bun', 'node', 'npm', 'git', 'brew', 'apt-get'];
-    for (const tool of tools) {
+    const toolsToCheck = ['bun', 'node', 'npm', 'git', 'brew', 'apt-get'];
+    const tools: Record<string, boolean> = {};
+    for (const tool of toolsToCheck) {
       const result = yield* Effect.match(
-        exec.run(`which ${tool}`),
+        exec.run(`which ${tool}`, { intent: 'read' }),
         {
           onFailure: () => false,
           onSuccess: () => true,
         }
       );
+      tools[tool] = result;
       
-      if (result) {
-        p.log.info(`${pc.green('✓')} ${tool} found`);
-      } else {
-        p.log.info(`${pc.gray('○')} ${tool} not found`);
+      if (!options.json) {
+        if (result) {
+          p.log.info(`${pc.green('✓')} ${tool} found`);
+        } else {
+          p.log.info(`${pc.gray('○')} ${tool} not found`);
+        }
       }
     }
 
@@ -44,16 +67,29 @@ export async function dottsDoctor() {
       }
     );
 
+    let writeAccess = false;
     if (writeResult === 'OK') {
       yield* fs.rm(testFile);
-      p.log.info(`${pc.green('✓')} Write access to current directory`);
+      writeAccess = true;
+      if (!options.json) {
+        p.log.info(`${pc.green('✓')} Write access to current directory`);
+      }
     } else {
-      p.log.error(`${pc.red('✗')} No write access to current directory: ${writeResult}`);
+      if (!options.json) {
+        p.log.error(`${pc.red('✗')} No write access to current directory: ${writeResult}`);
+      }
     }
 
+    return {
+      success: writeAccess,
+      command: 'doctor' as const,
+      os: osInfo,
+      tools,
+      writeAccess,
+    };
   });
 
   const MainLive = FileSystemLive.pipe(Layer.provideMerge(SystemCommandLive));
   
-  await Effect.runPromise(Effect.provide(program, MainLive));
+  return await Effect.runPromise(Effect.provide(program, MainLive));
 }

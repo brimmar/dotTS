@@ -71,4 +71,24 @@ export default () => {
     await expect(dottsCheck(configPath)).rejects.toThrow();
     expect(await exists(marker)).toBe(false);
   });
+
+  it('supports json mode and returns CheckResult', async () => {
+    await mkdir(testDir, { recursive: true });
+    await writeTypes();
+    const configPath = join(testDir, 'dotts-json.ts');
+    await writeFile(
+      configPath,
+      `
+      export default () => {};
+    `,
+    );
+
+    const result = await dottsCheck(configPath, { json: true });
+    expect(result).toEqual({
+      command: 'check',
+      config: 'functional-config',
+      success: true,
+      valid: true,
+    });
+  });
 });

@@ -23,20 +23,39 @@ export async function dottsSecretSet(name: string, value: string) {
   await Effect.runPromise(runnable);
 }
 
-export async function dottsSecretList() {
+export interface SecretListOptions {
+  json?: boolean;
+}
+
+export interface SecretListResult {
+  success: boolean;
+  command: "secrets-list";
+  secrets: string[];
+}
+
+export async function dottsSecretList(
+  options: SecretListOptions = {},
+): Promise<SecretListResult> {
   const program = Effect.gen(function* (_) {
     const sm = yield* _(SecretManager);
     const secrets = yield* _(sm.list());
 
-    if (secrets.length === 0) {
-      p.log.info("No secrets found.");
-      return;
+    if (!options.json) {
+      if (secrets.length === 0) {
+        p.log.info("No secrets found.");
+      } else {
+        p.log.info(pc.cyan("Configured secrets:"));
+        for (const s of secrets) {
+          p.log.info(`  - ${s} (********)`);
+        }
+      }
     }
 
-    p.log.info(pc.cyan("Configured secrets:"));
-    for (const s of secrets) {
-      p.log.info(`  - ${s} (********)`);
-    }
+    return {
+      success: true,
+      command: "secrets-list" as const,
+      secrets,
+    };
   });
 
   const runnable = program.pipe(
@@ -46,7 +65,7 @@ export async function dottsSecretList() {
     Effect.provide(SystemCommandLive),
   );
 
-  await Effect.runPromise(runnable);
+  return await Effect.runPromise(runnable);
 }
 
 export async function dottsSecretRemove(name: string) {
