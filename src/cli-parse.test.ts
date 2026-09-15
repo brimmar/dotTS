@@ -23,16 +23,32 @@ describe('parseArgv', () => {
     expect(() => parseArgv(['secrets', 'remove'])).toThrow('Usage: dotts secrets remove <name>');
   });
 
-  it("parses ['--help'] as help, not interactive", () => {
-    const req = parseArgv(['--help']);
-    expect(req.kind).toBe('help');
-    expect(req.kind).not.toBe('interactive');
+  it("parses ['--help'] and ['help'] as global help", () => {
+    expect(parseArgv(['--help'])).toEqual({ kind: 'help' });
+    expect(parseArgv(['-h'])).toEqual({ kind: 'help' });
+    expect(parseArgv(['help'])).toEqual({ kind: 'help' });
   });
 
-  it("parses ['-h'] and ['apply', '--help'] as help", () => {
-    expect(parseArgv(['-h']).kind).toBe('help');
-    expect(parseArgv(['apply', '--help']).kind).toBe('help');
-    expect(parseArgv(['apply', '-h']).kind).toBe('help');
+  it("parses contextual help for commands and subcommands", () => {
+    expect(parseArgv(['apply', '--help'])).toEqual({ kind: 'help', command: 'apply' });
+    expect(parseArgv(['apply', '-h'])).toEqual({ kind: 'help', command: 'apply' });
+    expect(parseArgv(['apply', 'dotts.ts', '--help'])).toEqual({ kind: 'help', command: 'apply' });
+    expect(parseArgv(['help', 'apply'])).toEqual({ kind: 'help', command: 'apply' });
+    expect(parseArgv(['check', '--help'])).toEqual({ kind: 'help', command: 'check' });
+    expect(parseArgv(['doctor', '-h'])).toEqual({ kind: 'help', command: 'doctor' });
+    expect(parseArgv(['init', '--help'])).toEqual({ kind: 'help', command: 'init' });
+    expect(parseArgv(['prepare', '--help'])).toEqual({ kind: 'help', command: 'prepare' });
+    expect(parseArgv(['secrets', '--help'])).toEqual({ kind: 'help', command: 'secrets' });
+    expect(parseArgv(['secrets', 'list', '--help'])).toEqual({
+      kind: 'help',
+      command: 'secrets',
+      subcommand: 'list',
+    });
+    expect(parseArgv(['help', 'secrets', 'set'])).toEqual({
+      kind: 'help',
+      command: 'secrets',
+      subcommand: 'set',
+    });
   });
 
   it("parses version flags and commands", () => {

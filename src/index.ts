@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { HELP_TEXT, parseArgv } from "./cli-parse";
+import { parseArgv } from "./cli-parse";
 import { dottsApply } from "./commands/apply";
 import { dottsCheck } from "./commands/check";
 import { dottsDoctor } from "./commands/doctor";
@@ -14,6 +14,7 @@ import {
   dottsSecretSet,
 } from "./commands/secrets";
 import { formatError } from "./core/errors";
+import { getHelpText } from "./help";
 import { CLI_VERSION } from "./version";
 
 async function main() {
@@ -24,8 +25,9 @@ async function main() {
       const request = parseArgv(args);
 
       if (request.kind === "help") {
-        // --help / -h prints usage and does not open the interactive menu
-        process.stdout.write(`${HELP_TEXT}\n`);
+        process.stdout.write(
+          `${getHelpText(request.command, request.subcommand)}\n`,
+        );
         return;
       }
 

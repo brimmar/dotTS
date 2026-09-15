@@ -1,17 +1,10 @@
-export const HELP_TEXT = `dotts [--version|-v]
-dotts init [--force] [dir]
-dotts prepare [dir]
-dotts check [path] [--json]
-dotts apply [path] [--dry-run] [--yes|-y] [--verbose|-v] [--json]
-dotts doctor [--json]
-dotts secrets get <name>
-dotts secrets set <name> <value>
-dotts secrets list [--json]
-dotts secrets remove <name>`;
+import { GLOBAL_HELP } from "./help";
+
+export const HELP_TEXT = GLOBAL_HELP;
 
 export type CliRequest =
   | { kind: "interactive" }
-  | { kind: "help" }
+  | { kind: "help"; command?: string; subcommand?: string }
   | { kind: "version"; json?: boolean }
   | { kind: "init"; projectDir: string; force: boolean }
   | { kind: "prepare"; dir: string }
@@ -68,8 +61,35 @@ export function parseArgv(argv: string[]): CliRequest {
     return { kind: "interactive" };
   }
 
-  if (argv.length === 1 && isHelpFlag(command)) {
-    return { kind: "help" };
+  if (command === "help") {
+    const targetCommand = argv[1];
+    const targetSubcommand = argv[2];
+    return {
+      kind: "help",
+      ...(targetCommand ? { command: targetCommand } : {}),
+      ...(targetSubcommand ? { subcommand: targetSubcommand } : {}),
+    };
+  }
+
+  const hasHelpFlag = argv.some((arg, index) => {
+    if (command === "secrets" && argv[1] === "set" && index === 3) {
+      return false;
+    }
+    return isHelpFlag(arg);
+  });
+
+  if (hasHelpFlag) {
+    if (command === "--help" || command === "-h") {
+      return { kind: "help" };
+    }
+    if (command === "secrets") {
+      const action = argv[1];
+      if (action && ["get", "set", "list", "remove"].includes(action)) {
+        return { kind: "help", command: "secrets", subcommand: action };
+      }
+      return { kind: "help", command: "secrets" };
+    }
+    return { kind: "help", command };
   }
 
   if (isVersionFlag(command)) {
@@ -78,10 +98,6 @@ export function parseArgv(argv: string[]): CliRequest {
   }
 
   const afterCommand = argv[1];
-  if (afterCommand !== undefined && isHelpFlag(afterCommand)) {
-    return { kind: "help" };
-  }
-
   if (afterCommand !== undefined && (afterCommand === "--version" || afterCommand === "-V")) {
     return { kind: "version" };
   }
