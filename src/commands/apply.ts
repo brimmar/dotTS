@@ -164,7 +164,8 @@ export async function dottsApply(
   configPath: string,
   options: ApplyOptions = {},
 ): Promise<ApplyResult> {
-  const BaseExecLayer = createSystemCommandLive({ verbose: options.verbose });
+  const isVerbose = Boolean(options.verbose && !options.json);
+  const BaseExecLayer = createSystemCommandLive({ verbose: isVerbose });
 
   const FSLayer = options.dryRun
     ? Layer.effect(
@@ -290,7 +291,11 @@ export async function dottsApply(
             const report = yield* _(
               Effect.acquireUseRelease(
                 Effect.succeed(sudoSession),
-                () => runner.run(app, { silent: options.json }),
+                () =>
+                  runner.run(app, {
+                    silent: options.json,
+                    verbose: isVerbose,
+                  }),
                 (session) => Effect.sync(() => session.cleanup()),
               ),
             );
@@ -341,7 +346,11 @@ export async function dottsApply(
       const report = yield* _(
         Effect.acquireUseRelease(
           Effect.succeed(sudoSession),
-          () => runner.run(app, { silent: options.json }),
+          () =>
+            runner.run(app, {
+              silent: options.json,
+              verbose: isVerbose,
+            }),
           (session) => Effect.sync(() => session.cleanup()),
         ),
       );

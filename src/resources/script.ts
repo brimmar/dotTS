@@ -40,6 +40,7 @@ export class ScriptResource extends Resource {
               cwd: this.props.workingDir,
               env: this.props.environment,
               become: this.props.become,
+              probe: true,
             }),
             {
               onFailure: () => false,
@@ -55,6 +56,7 @@ export class ScriptResource extends Resource {
               cwd: this.props.workingDir,
               env: this.props.environment,
               become: this.props.become,
+              probe: true,
             }),
             {
               onFailure: () => false,

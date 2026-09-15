@@ -11,6 +11,7 @@ export interface ExecOptions {
   stdin?: string;
   intent?: 'read' | 'write';
   verbose?: boolean;
+  probe?: boolean;
 }
 
 export type RunOptions = ExecOptions;
@@ -61,8 +62,9 @@ class LineStreamer {
     const lines = this.buffer.split('\n');
     this.buffer = lines.pop() ?? '';
     for (const line of lines) {
-      if (line.length > 0) {
-        const formatted = this.color ? this.color(line) : line;
+      const clean = line.split('\r').pop()?.trimEnd() ?? line;
+      if (clean.length > 0) {
+        const formatted = this.color ? this.color(clean) : clean;
         console.log(this.prefix + formatted);
       }
     }
@@ -70,24 +72,31 @@ class LineStreamer {
 
   flush() {
     if (this.buffer.length > 0) {
-      const formatted = this.color ? this.color(this.buffer) : this.buffer;
-      console.log(this.prefix + formatted);
+      const clean = this.buffer.split('\r').pop()?.trimEnd() ?? this.buffer;
+      if (clean.length > 0) {
+        const formatted = this.color ? this.color(clean) : clean;
+        console.log(this.prefix + formatted);
+      }
       this.buffer = '';
     }
   }
 }
 
 function formatCommandForLog(spawned: { file: string; args: string[] }): string {
-  if (
-    spawned.file === 'sudo' &&
-    spawned.args[0] === '--' &&
-    spawned.args[1] === 'sh' &&
-    spawned.args[2] === '-c'
-  ) {
-    return `sudo ${spawned.args.slice(3).join(' ') || spawned.args[3]}`;
+  if (spawned.file === 'sudo') {
+    const dashDashIndex = spawned.args.indexOf('--');
+    if (dashDashIndex !== -1) {
+      const sudoFlags = spawned.args.slice(0, dashDashIndex);
+      const afterDash = spawned.args.slice(dashDashIndex + 1);
+      const sudoPrefix = sudoFlags.length > 0 ? `sudo ${sudoFlags.join(' ')} ` : 'sudo ';
+      if (afterDash[0] === 'sh' && afterDash[1] === '-c') {
+        return `${sudoPrefix}${afterDash.slice(2).join(' ')}`;
+      }
+      return `${sudoPrefix}${afterDash.join(' ')}`;
+    }
   }
   if (spawned.file === 'sh' && spawned.args[0] === '-c') {
-    return spawned.args[1] ?? 'sh -c';
+    return spawned.args.slice(1).join(' ') || 'sh -c';
   }
   return `${spawned.file} ${spawned.args.join(' ')}`;
 }
@@ -109,7 +118,7 @@ function spawnExecFile(
     : undefined;
 
   const verbose = options?.verbose ?? globalVerbose ?? false;
-  const shouldLog = verbose && options?.intent !== 'read';
+  const shouldLog = verbose && options?.intent !== 'read' && !options?.probe;
 
   return new Promise((resolve, reject) => {
     if (shouldLog) {
@@ -153,8 +162,9 @@ function spawnExecFile(
       if (shouldLog) {
         stdoutStreamer?.flush();
         stderrStreamer?.flush();
-        const exitColor = code === 0 ? pc.green : pc.red;
-        console.log(pc.dim('  └─ exit ') + exitColor(String(code ?? 0)));
+        if (code !== 0) {
+          console.log(pc.dim('  └─ exit ') + pc.red(String(code ?? 1)));
+        }
       }
       if (code === 0) {
         resolve(stdout.trim());

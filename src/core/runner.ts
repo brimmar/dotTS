@@ -26,6 +26,7 @@ export interface ExecutionReport {
 
 export interface RunnerOptions {
   silent?: boolean;
+  verbose?: boolean;
 }
 
 export interface Runner {
@@ -63,6 +64,8 @@ export const RunnerLive = Layer.effect(
         let updated = 0;
         let converged = 0;
 
+        const tierConcurrency = options?.verbose ? 1 : 'unbounded';
+
         for (const tier of tiers) {
           const groups = new Map<string | undefined, Resource[]>();
           for (const res of tier) {
@@ -95,7 +98,7 @@ export const RunnerLive = Layer.effect(
                         });
                       })
                     ),
-                    { concurrency: 'unbounded' }
+                    { concurrency: tierConcurrency }
                   );
                 } else {
                   for (const res of resources) {
@@ -118,7 +121,7 @@ export const RunnerLive = Layer.effect(
                 }
               })
             ),
-            { concurrency: 'unbounded' }
+            { concurrency: tierConcurrency }
           );
         }
 

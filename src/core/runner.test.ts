@@ -128,6 +128,39 @@ describe('Runner', () => {
     expect(maxActive).toBeGreaterThan(1);
   });
 
+  it('should serialize resources when verbose is true', async () => {
+    const app = new App();
+    const stack = new Stack(app, 'test');
+
+    let activeCount = 0;
+    let maxActive = 0;
+
+    class SlowResource extends TestResource {
+      override apply() {
+        return Effect.gen(this, function* () {
+          activeCount++;
+          if (activeCount > maxActive) maxActive = activeCount;
+          yield* Effect.sleep('10 millis');
+          activeCount--;
+        });
+      }
+    }
+
+    new SlowResource(stack, 'r1');
+    new SlowResource(stack, 'r2');
+    new SlowResource(stack, 'r3');
+
+    const program = Effect.gen(function* () {
+      const runner = yield* Runner;
+      yield* runner.run(app, { verbose: true, silent: true });
+    });
+
+    const TestRunnerLayer = RunnerLive.pipe(Layer.provide(MockState()));
+    await Effect.runPromise(Effect.provide(program, TestRunnerLayer));
+
+    expect(maxActive).toBe(1);
+  });
+
   it('should serialize resources with the same concurrencyKey', async () => {
     const app = new App();
     const stack = new Stack(app, 'test');
