@@ -35,6 +35,15 @@ describe('parseArgv', () => {
     expect(parseArgv(['apply', '-h']).kind).toBe('help');
   });
 
+  it("parses version flags and commands", () => {
+    expect(parseArgv(['--version'])).toEqual({ kind: 'version' });
+    expect(parseArgv(['-v'])).toEqual({ kind: 'version' });
+    expect(parseArgv(['-V'])).toEqual({ kind: 'version' });
+    expect(parseArgv(['version'])).toEqual({ kind: 'version' });
+    expect(parseArgv(['--version', '--json'])).toEqual({ kind: 'version', json: true });
+    expect(parseArgv(['apply', '--version'])).toEqual({ kind: 'version' });
+  });
+
   it("parses ['apply', 'f.ts', '--dry-run'] with dryRun true", () => {
     const req = parseArgv(['apply', 'f.ts', '--dry-run']);
     expect(req).toEqual({ kind: 'apply', configPath: 'f.ts', dryRun: true });

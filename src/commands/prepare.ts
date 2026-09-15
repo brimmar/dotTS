@@ -2,6 +2,7 @@ import { exists, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import ts from 'typescript';
 import { DottsError } from '../core/errors';
+import { CLI_VERSION } from '../version';
 
 // Bun embeds this asset in `bun build --compile`. dist/public.d.ts is not a
 // single file (it imports ./public-props and ./core/secret), so init/prepare
@@ -59,18 +60,6 @@ async function ensureDottsPath(tsconfigPath: string): Promise<void> {
   }
 }
 
-async function cliVersion(): Promise<string> {
-  try {
-    const parsed = JSON.parse(await Bun.file(join(import.meta.dir, '../../package.json')).text()) as {
-      version?: string;
-    };
-    if (parsed.version) return parsed.version;
-  } catch {
-    // Compiled binaries may not include package.json next to the source tree.
-  }
-  return '0.1.0';
-}
-
 async function writeEditorTypes(projectDir: string): Promise<void> {
   const typesDir = join(projectDir, '.dotts', 'types');
   await rm(typesDir, { recursive: true, force: true });
@@ -79,10 +68,9 @@ async function writeEditorTypes(projectDir: string): Promise<void> {
   const dts = await Bun.file(publicApiDts as unknown as string).text();
   await writeFile(join(typesDir, 'index.d.ts'), dts);
 
-  const version = await cliVersion();
   await writeFile(
     join(typesDir, 'package.json'),
-    `${JSON.stringify({ name: 'dotts', version, types: 'index.d.ts' }, null, 2)}\n`,
+    `${JSON.stringify({ name: 'dotts', version: CLI_VERSION, types: 'index.d.ts' }, null, 2)}\n`,
   );
 }
 

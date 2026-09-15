@@ -14,6 +14,7 @@ import {
   dottsSecretSet,
 } from "./commands/secrets";
 import { formatError } from "./core/errors";
+import { CLI_VERSION } from "./version";
 
 async function main() {
   const args = process.argv.slice(2);
@@ -25,6 +26,15 @@ async function main() {
       if (request.kind === "help") {
         // --help / -h prints usage and does not open the interactive menu
         process.stdout.write(`${HELP_TEXT}\n`);
+        return;
+      }
+
+      if (request.kind === "version") {
+        if (request.json) {
+          process.stdout.write(`${JSON.stringify({ version: CLI_VERSION }, null, 2)}\n`);
+        } else {
+          process.stdout.write(`${CLI_VERSION}\n`);
+        }
         return;
       }
 

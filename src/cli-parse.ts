@@ -1,4 +1,5 @@
-export const HELP_TEXT = `dotts init [--force] [dir]
+export const HELP_TEXT = `dotts [--version|-v]
+dotts init [--force] [dir]
 dotts prepare [dir]
 dotts check [path] [--json]
 dotts apply [path] [--dry-run] [--yes|-y] [--verbose|-v] [--json]
@@ -11,6 +12,7 @@ dotts secrets remove <name>`;
 export type CliRequest =
   | { kind: "interactive" }
   | { kind: "help" }
+  | { kind: "version"; json?: boolean }
   | { kind: "init"; projectDir: string; force: boolean }
   | { kind: "prepare"; dir: string }
   | { kind: "check"; configPath: string; json?: boolean }
@@ -30,6 +32,10 @@ export type CliRequest =
 
 function isHelpFlag(arg: string): boolean {
   return arg === "--help" || arg === "-h";
+}
+
+function isVersionFlag(arg: string): boolean {
+  return arg === "--version" || arg === "-v" || arg === "-V" || arg === "version";
 }
 
 function takeArgs(
@@ -66,9 +72,18 @@ export function parseArgv(argv: string[]): CliRequest {
     return { kind: "help" };
   }
 
+  if (isVersionFlag(command)) {
+    const { flags } = takeArgs(argv.slice(1), ["--json"]);
+    return { kind: "version", ...(flags.has("--json") ? { json: true } : {}) };
+  }
+
   const afterCommand = argv[1];
   if (afterCommand !== undefined && isHelpFlag(afterCommand)) {
     return { kind: "help" };
+  }
+
+  if (afterCommand !== undefined && (afterCommand === "--version" || afterCommand === "-V")) {
+    return { kind: "version" };
   }
 
   if (command === "init") {
