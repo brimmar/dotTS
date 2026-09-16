@@ -1,8 +1,8 @@
 import { describe, expect, it, spyOn } from "bun:test";
 import {
-  LiveDisplay,
   alignRight,
   formatDuration,
+  LiveDisplay,
   safeTruncateAnsi,
 } from "./display";
 
@@ -121,5 +121,43 @@ describe("LiveDisplay", () => {
     );
     expect(logs.some((l) => l.includes("Exit code 127"))).toBe(true);
     expect(logs.some((l) => l.includes("■ Failed: test:fail"))).toBe(true);
+  });
+
+  it("flattens multi-line commands and sanitizes newlines", () => {
+    const display = new LiveDisplay({ verbose: true });
+    display.onResourceStart("test:multi", 1, 1);
+    display.onResourceCommand(
+      "test:multi",
+      "echo line1\necho line2\r\necho line3",
+    );
+    display.onResourceOutput("test:multi", "output line1\r\noutput line2");
+
+    const active = display.getActiveResource("test:multi");
+    expect(active).toBeDefined();
+    expect(active?.commands[0]?.cmd).toBe("echo line1 echo line2 echo line3");
+    expect(active?.commands[0]?.lines).toEqual(["output line1 output line2"]);
+    display.stop();
+  });
+
+  it("caps retained output lines to prevent memory bloat", () => {
+    const display = new LiveDisplay({ verbose: true });
+    display.onResourceStart("test:flood", 1, 1);
+    display.onResourceCommand("test:flood", "flood");
+
+    for (let i = 0; i < 120; i++) {
+      display.onResourceOutput("test:flood", `line ${i}`);
+    }
+
+    const active = display.getActiveResource("test:flood");
+    expect(active?.commands[0]?.lines.length).toBe(50);
+    expect(active?.commands[0]?.lines[49]).toBe("line 119");
+    display.stop();
+  });
+
+  it("sanitizes newlines in safeTruncateAnsi", () => {
+    const truncated = safeTruncateAnsi("hello\nworld\r\nfoo", 50);
+    expect(truncated).not.toContain("\n");
+    expect(truncated).not.toContain("\r");
+    expect(truncated).toBe("hello world foo");
   });
 });

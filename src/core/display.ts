@@ -52,20 +52,21 @@ export function alignRight(
   if (padding > 1) {
     return left + " ".repeat(padding) + right;
   }
-  return left + "  " + right;
+  return `${left}  ${right}`;
 }
 
 export function safeTruncateAnsi(str: string, maxCols: number): string {
-  if (visibleLength(str) <= maxCols) return str;
-  if (maxCols <= 3) return str.slice(0, maxCols);
+  const sanitized = str.replace(/[\r\n]+/g, " ");
+  if (visibleLength(sanitized) <= maxCols) return sanitized;
+  if (maxCols <= 3) return sanitized.slice(0, maxCols);
 
   const targetVisible = maxCols - 3;
   let visibleLen = 0;
   let inEscape = false;
   let result = "";
 
-  for (let i = 0; i < str.length; i++) {
-    const char = str[i];
+  for (let i = 0; i < sanitized.length; i++) {
+    const char = sanitized[i];
     if (!char) continue;
     if (char === "\x1b") {
       inEscape = true;
@@ -81,13 +82,13 @@ export function safeTruncateAnsi(str: string, maxCols: number): string {
     }
 
     if (visibleLen >= targetVisible) {
-      return result + "..." + "\x1b[0m";
+      return `${result}...\x1b[0m`;
     }
     result += char;
     visibleLen++;
   }
 
-  return result + "..." + "\x1b[0m";
+  return `${result}...\x1b[0m`;
 }
 
 export class LiveDisplay {
@@ -102,6 +103,10 @@ export class LiveDisplay {
   constructor(options: DisplayOptions = {}) {
     this.verbose = Boolean(options.verbose);
     this.silent = Boolean(options.silent);
+  }
+
+  getActiveResource(id: string): ActiveResource | undefined {
+    return this.active.get(id);
   }
 
   onResourceStart(id: string, stepIndex: number, totalSteps: number) {
@@ -122,7 +127,8 @@ export class LiveDisplay {
     if (this.silent) return;
     const res = this.active.get(id);
     if (!res) return;
-    res.commands.push({ cmd, cwd, lines: [] });
+    const cleanCmd = cmd.replace(/[\r\n]+/g, " ").trim();
+    res.commands.push({ cmd: cleanCmd, cwd, lines: [] });
     res.currentCommandIndex = res.commands.length - 1;
     this.requestRender();
   }
@@ -131,14 +137,19 @@ export class LiveDisplay {
     if (this.silent) return;
     const res = this.active.get(id);
     if (!res) return;
+    const clean = line.replace(/[\r\n]+/g, " ").trim();
+    if (!clean) return;
     const currentCmd =
       res.currentCommandIndex >= 0
         ? res.commands[res.currentCommandIndex]
         : undefined;
     if (currentCmd) {
-      currentCmd.lines.push(line);
+      currentCmd.lines.push(clean);
+      if (currentCmd.lines.length > 50) {
+        currentCmd.lines.shift();
+      }
     } else {
-      res.commands.push({ cmd: "", lines: [line] });
+      res.commands.push({ cmd: "", lines: [clean] });
       res.currentCommandIndex = res.commands.length - 1;
     }
     this.requestRender();
@@ -156,13 +167,17 @@ export class LiveDisplay {
 
     if (this.active.size === 0) {
       this.stopTicker();
+      if (this.renderTimer) {
+        clearTimeout(this.renderTimer);
+        this.renderTimer = null;
+      }
     }
 
     const timeStr = pc.dim(formatDuration(completion.durationMs));
 
     if (this.verbose && res) {
       const stepTag = `#${res.stepIndex} [${id}]`;
-      console.log(pc.bold(pc.blue("=>")) + " " + pc.cyan(stepTag));
+      console.log(`${pc.bold(pc.blue("=>"))} ${pc.cyan(stepTag)}`);
       if (res.commands.length > 0) {
         for (const cmdRec of res.commands) {
           if (cmdRec.cmd) {
@@ -183,7 +198,9 @@ export class LiveDisplay {
       console.log(alignRight(completion.labelPrefix, timeStr));
     }
 
-    this.render();
+    if (this.active.size > 0) {
+      this.requestRender();
+    }
   }
 
   onResourceFail(id: string, error: Error, stepIndex?: number) {
@@ -198,10 +215,14 @@ export class LiveDisplay {
 
     if (this.active.size === 0) {
       this.stopTicker();
+      if (this.renderTimer) {
+        clearTimeout(this.renderTimer);
+        this.renderTimer = null;
+      }
     }
 
     const stepTag = `#${res?.stepIndex ?? stepIndex ?? "?"} [${id}]`;
-    console.log(pc.bold(pc.red("=>")) + " " + pc.red(stepTag));
+    console.log(`${pc.bold(pc.red("=>"))} ${pc.red(stepTag)}`);
     if (res && res.commands.length > 0) {
       for (const cmdRec of res.commands) {
         if (cmdRec.cmd) {
@@ -217,7 +238,9 @@ export class LiveDisplay {
     }
     console.log(pc.red(`■ Failed: ${id}`));
 
-    this.render();
+    if (this.active.size > 0) {
+      this.requestRender();
+    }
   }
 
   stop() {
@@ -248,7 +271,11 @@ export class LiveDisplay {
 
   private clearDynamic() {
     if (this.isTTY && this.prevLineCount > 0) {
-      process.stdout.write(`\x1b[${this.prevLineCount}A\r\x1b[0J`);
+      let clearSeq = "\r\x1b[2K";
+      for (let i = 0; i < this.prevLineCount; i++) {
+        clearSeq += "\x1b[1A\x1b[2K";
+      }
+      process.stdout.write(`${clearSeq}\r`);
       this.prevLineCount = 0;
     }
   }
@@ -276,9 +303,12 @@ export class LiveDisplay {
     }
 
     const cols = process.stdout.columns || 80;
-    const maxTerminalRows = process.stdout.rows
-      ? Math.max(6, process.stdout.rows - 2)
-      : 20;
+    const maxCols = Math.max(10, cols - 1);
+    const terminalRows = process.stdout.rows || 24;
+    const maxDynamicRows = Math.min(
+      8,
+      Math.max(3, Math.floor(terminalRows / 3)),
+    );
     const lines: string[] = [];
 
     const activeList = Array.from(this.active.values());
@@ -286,26 +316,25 @@ export class LiveDisplay {
       const res = activeList[i];
       if (!res) continue;
 
-      if (lines.length + 3 > maxTerminalRows && i < activeList.length) {
+      if (lines.length + 2 > maxDynamicRows && i < activeList.length) {
         const remaining = activeList.length - i;
         lines.push(
           safeTruncateAnsi(
             pc.dim(`   ... and ${remaining} more active tasks`),
-            cols,
+            maxCols,
           ),
         );
         break;
       }
 
-      const elapsed =
-        ((performance.now() - res.startTime) / 1000).toFixed(1) + "s";
+      const elapsed = `${((performance.now() - res.startTime) / 1000).toFixed(1)}s`;
       const header = safeTruncateAnsi(
         pc.bold(pc.blue("=>")) +
           " " +
           pc.cyan(`#${res.stepIndex} [${res.id}]`) +
           " " +
           pc.dim(`(${elapsed})`),
-        cols,
+        maxCols,
       );
       lines.push(header);
 
@@ -315,17 +344,19 @@ export class LiveDisplay {
           : undefined;
       if (currentCmd?.cmd) {
         lines.push(
-          safeTruncateAnsi(pc.dim("   $ ") + pc.cyan(currentCmd.cmd), cols),
+          safeTruncateAnsi(pc.dim("   $ ") + pc.cyan(currentCmd.cmd), maxCols),
         );
         const recent = currentCmd.lines.slice(-1);
         for (const l of recent) {
-          lines.push(safeTruncateAnsi(pc.dim("   │ ") + pc.dim(l), cols));
+          if (lines.length + 1 <= maxDynamicRows) {
+            lines.push(safeTruncateAnsi(pc.dim("   │ ") + pc.dim(l), maxCols));
+          }
         }
       }
     }
 
     if (lines.length > 0) {
-      process.stdout.write(lines.join("\n") + "\n");
+      process.stdout.write(`${lines.join("\n")}\n`);
       this.prevLineCount = lines.length;
     }
   }
