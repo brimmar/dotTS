@@ -230,7 +230,7 @@ export const FileSystemLive = Layer.effect(
           async () => {
             await NodeFS.mkdir(dirname(resolvedPath), { recursive: true });
             try {
-              await NodeFS.unlink(resolvedPath);
+              await NodeFS.rm(resolvedPath, { recursive: true, force: true });
             } catch {}
             await NodeFS.symlink(resolvedTarget, resolvedPath);
           },
