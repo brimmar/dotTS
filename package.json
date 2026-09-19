@@ -60,7 +60,7 @@
     "@biomejs/biome": "2.4.15"
   },
   "peerDependencies": {
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "dependencies": {
     "@types/node": "^26.4.0",
@@ -68,7 +68,7 @@
     "effect": "^3.21.2",
     "mustache": "^4.2.0",
     "picocolors": "^1.1.1",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "zod": "^4.3.6"
   },
   "bunInstall": {
