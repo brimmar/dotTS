@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import * as ts from 'typescript';
+import * as ts from '@typescript/typescript6';
 import { embeddedTypesStamp, nodeTypeAssets } from '../embedded/node-types-assets';
 
 export interface TypecheckDiagnostic {

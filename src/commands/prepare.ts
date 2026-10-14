@@ -1,6 +1,6 @@
 import { exists, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import ts from 'typescript';
+import ts from '@typescript/typescript6';
 import { DottsError } from '../core/errors';
 import { CLI_VERSION } from '../version';
 
