@@ -3,7 +3,9 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSyn
 import { join, relative, resolve } from 'node:path';
 
 const ROOT = resolve(join(import.meta.dir, '..'));
-const TS_LIB_DIR = join(ROOT, 'node_modules/typescript/lib');
+// TypeScript 7 ships the native tsc and no lib.*.d.ts. The compiler API and
+// those libs live in the typescript6 compatibility package.
+const TS_LIB_DIR = join(ROOT, 'node_modules/@typescript/typescript6/lib');
 const EMBEDDED_DIR = join(ROOT, 'src/embedded/types');
 const LIB_DEST_DIR = join(EMBEDDED_DIR, 'lib');
 const OUT_FILE = join(ROOT, 'src/embedded/node-types-assets.ts');
